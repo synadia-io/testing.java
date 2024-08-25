@@ -1,0 +1,17 @@
+{
+  "stream_name": "testing-java",
+  "publish_subject_prefix": "tj.subject.",
+  "executor_service_type": "virtual",
+  "message_count": 1000000,
+  "print_wait": 5000,
+  "report_increment": 50000,
+  "publish_type": "sawtooth",
+  "publish_threads": 5,
+  "publish_sawtooth_batch": 500,
+
+  "create_stream": false,
+  "stream_config":{
+    "name": "testing-java",
+    "subjects": ["tj.subject.0", "tj.subject.1", "tj.subject.2", "tj.subject.3", "tj.subject.4"]
+  }
+}
