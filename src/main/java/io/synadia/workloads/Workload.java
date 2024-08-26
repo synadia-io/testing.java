@@ -1,34 +1,51 @@
 package io.synadia.workloads;
 
-import io.nats.client.Options;
+import io.nats.client.Connection;
+import io.nats.client.JetStreamApiException;
+import io.nats.client.JetStreamManagement;
+import io.nats.client.Nats;
 import io.synadia.CommandLine;
-import io.synadia.DebugListener;
+import io.synadia.Debug;
 import io.synadia.Params;
-import io.synadia.types.ExecutorServiceType;
 
-import java.util.concurrent.Executors;
-
-public class Workload {
+public abstract class Workload {
     protected final CommandLine commandLine;
     protected final Params params;
-
-    protected final DebugListener listener;
-    protected final Options options;
 
     public Workload(CommandLine commandLine) {
         this.commandLine = commandLine;
         params = new Params(commandLine.paramsFile);
-        listener = new DebugListener();
+    }
 
-        Options.Builder builder = Options.builder()
-            .server(Options.DEFAULT_URL)
-            .connectionListener(listener)
-            .errorListener(listener);
+    abstract void subRunWorkload() throws Exception;
 
-        if (params.executorServiceType == ExecutorServiceType.Virtual) {
-            builder.executor(Executors.newVirtualThreadPerTaskExecutor());
+    public void runWorkload() throws Exception {
+        if (params.createStream) {
+            try (Connection nc = Nats.connect(params.managementServer)) {
+                JetStreamManagement jsm = nc.jetStreamManagement();
+                try {
+                    //noinspection DataFlowIssue
+                    jsm.deleteStream(params.streamConfig.getName());
+                }
+                catch (Exception ignore) {
+                }
+                while (true) {
+                    try {
+                        jsm.addStream(params.streamConfig);
+                        break;
+                    }
+                    catch (JetStreamApiException j) {
+                        if (j.getErrorCode() != 10058) {
+                            throw j;
+                        }
+                    }
+                }
+            }
+            catch (Exception e) {
+                Debug.info("Workload", e);
+                throw e;
+            }
         }
-
-        options = builder.build();
+        subRunWorkload();
     }
 }

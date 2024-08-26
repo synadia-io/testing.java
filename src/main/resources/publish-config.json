@@ -1,17 +1,20 @@
 {
-  "stream_name": "testing-java",
-  "publish_subject_prefix": "tj.subject.",
-  "executor_service_type": "virtual",
-  "message_count": 1000000,
-  "print_wait": 5000,
-  "report_increment": 50000,
-  "publish_type": "sawtooth",
-  "publish_threads": 5,
-  "publish_sawtooth_batch": 500,
-
-  "create_stream": false,
+  "multi_config": {
+    "server": "nats://localhost:4222,nats://localhost:5222,nats://localhost:6222",
+    "subject": "tj",
+    "action": "PubAsync",
+    "message_count": 1000000,
+    "payload_size": 1000,
+    "threads": 5,
+    "connection_strategy": "individual",
+    "report_frequency": 50000,
+    "round_size": 200,
+    "options_factory_class_name": "io.synadia.VirtualExecutorOptionsFactory"
+  },
+  "management_server": "nats://localhost:4222",
+  "create_stream": true,
   "stream_config":{
     "name": "testing-java",
-    "subjects": ["tj.subject.0", "tj.subject.1", "tj.subject.2", "tj.subject.3", "tj.subject.4"]
+    "subjects": ["tj"]
   }
 }
