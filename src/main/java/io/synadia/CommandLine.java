@@ -14,6 +14,7 @@
 package io.synadia;
 
 import io.nats.client.Options;
+import io.synadia.tools.Debug;
 
 import static java.lang.Integer.parseInt;
 
@@ -51,7 +52,15 @@ public class CommandLine {
         append(sb, "server", server, true);
         append(sb, "id", id, true);
         append(sb, "workload", workload, true);
+        append(sb, "paramsFile", paramsFile, true);
         return sb.toString().trim();
+    }
+
+    public void debug() {
+        Debug.info("Command Line", "server", server);
+        Debug.info("Command Line", "id", id);
+        Debug.info("Command Line", "workload", workload);
+        Debug.info("Command Line", "paramsFile", paramsFile);
     }
 
     // ----------------------------------------------------------------------------------------------------

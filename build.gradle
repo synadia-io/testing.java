@@ -16,10 +16,22 @@ repositories {
     }
 }
 
+def jnatsv = System.getenv("JNATS_VERSION")
+if (jnatsv == null || jnatsv.equals("")) {
+    try {
+        jnatsv = jnatsVersion
+    }
+    catch (Exception ignore) {}
+    if (jnatsv == null || jnatsv.equals("")) {
+        jnatsv = "2.20.2"
+    }
+}
+System.out.println("jnatsv: ${jnatsv} | " + jnatsv);
+
 dependencies {
-    implementation 'io.nats:jnats:2.20.2-SNAPSHOT'
-    implementation 'io.synadia:jnats-js-publish-extensions:0.3.0'
-    implementation 'io.synadia:retrier:0.2.0'
+    implementation "io.nats:jnats:${jnatsv}"
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.9.0'
 }
 
 // Apply a specific Java toolchain to ease working on different environments.
@@ -32,6 +44,12 @@ java {
 task copyToLib(type: Copy) {
     into "build/libs"
     from configurations.runtimeClasspath
+}
+
+task buildDeploy(type: Copy) {
+    dependsOn clean
+    dependsOn copyToLib
+    dependsOn jar
 }
 
 task (uberJar, type:Jar) {

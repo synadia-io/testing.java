@@ -16,6 +16,7 @@ package io.nats.jsmulti.settings;
 import io.nats.client.api.AckPolicy;
 import io.nats.client.support.JsonParser;
 import io.nats.client.support.JsonValue;
+import io.synadia.tools.Debug;
 
 import java.io.IOException;
 import java.io.PrintStream;
@@ -95,6 +96,10 @@ public class Arguments {
 
     public Arguments action(Action action) {
         return add("a", action);
+    }
+
+    public Arguments customAction(String customActionClassName) {
+        return add("ca", customActionClassName);
     }
 
     public Arguments server(String server) {
@@ -232,10 +237,31 @@ public class Arguments {
         for (String a : args) {
             ps.print(a + " ");
         }
-        ps.println("");
+        ps.println();
+    }
+
+    public void printCommandLineFormatted(PrintStream ps) {
+        for (int i = 0; i < args.size(); i++) {
+            String k = args.get(i);
+            String v = args.get(++i);
+            ps.println(k + " " + v);
+        }
+        ps.println();
     }
 
     public void printCommandLine() {
         printCommandLine(System.out);
+    }
+
+    public void printCommandLineFormatted() {
+        printCommandLineFormatted(System.out);
+    }
+
+    public void debugCommandLineFormatted() {
+        for (int i = 0; i < args.size(); i++) {
+            String k = args.get(i);
+            String v = args.get(++i);
+            Debug.info("Multi-Argument", k + " " + v);
+        }
     }
 }

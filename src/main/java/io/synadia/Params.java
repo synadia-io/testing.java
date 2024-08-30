@@ -4,6 +4,7 @@ import io.nats.client.Options;
 import io.nats.client.api.StreamConfiguration;
 import io.nats.client.support.JsonParser;
 import io.nats.client.support.JsonValue;
+import io.synadia.tools.Debug;
 
 import java.io.IOException;
 import java.nio.file.Files;

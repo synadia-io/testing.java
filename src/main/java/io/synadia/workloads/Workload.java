@@ -5,8 +5,8 @@ import io.nats.client.JetStreamApiException;
 import io.nats.client.JetStreamManagement;
 import io.nats.client.Nats;
 import io.synadia.CommandLine;
-import io.synadia.Debug;
 import io.synadia.Params;
+import io.synadia.tools.Debug;
 
 public abstract class Workload {
     protected final CommandLine commandLine;
@@ -14,6 +14,7 @@ public abstract class Workload {
 
     public Workload(CommandLine commandLine) {
         this.commandLine = commandLine;
+        commandLine.debug();
         params = new Params(commandLine.paramsFile);
     }
 
@@ -21,17 +22,19 @@ public abstract class Workload {
 
     public void runWorkload() throws Exception {
         if (params.createStream) {
+            Debug.info("Create Stream", params.streamConfig.getName());
             try (Connection nc = Nats.connect(params.managementServer)) {
                 JetStreamManagement jsm = nc.jetStreamManagement();
                 try {
                     //noinspection DataFlowIssue
+                    Debug.info("Delete Stream", params.streamConfig.getName());
                     jsm.deleteStream(params.streamConfig.getName());
                 }
                 catch (Exception ignore) {
                 }
                 while (true) {
                     try {
-                        jsm.addStream(params.streamConfig);
+                        Debug.info("Add Stream", jsm.addStream(params.streamConfig));
                         break;
                     }
                     catch (JetStreamApiException j) {

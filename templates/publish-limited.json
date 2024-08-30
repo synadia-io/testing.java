@@ -1,20 +1,26 @@
 {
   "multi_config": {
-    "server": "nats://localhost:4222,nats://localhost:5222,nats://localhost:6222",
+    "server": "nats://172.31.93.160:4222,nats://172.31.81.147:4222,nats://172.31.89.116:4222",
     "subject": "tj",
     "action": "PubAsync",
     "message_count": 1000000,
-    "payload_size": 1000,
+    "payload_size": 100,
     "threads": 5,
     "connection_strategy": "individual",
     "report_frequency": 50000,
     "round_size": 200,
     "options_factory_class_name": "io.synadia.VirtualExecutorOptionsFactory"
   },
-  "management_server": "nats://localhost:4222",
+  "management_server": "nats://172.31.93.160:4222",
   "create_stream": true,
   "stream_config":{
     "name": "testing-java",
-    "subjects": ["tj"]
+    "subjects": ["tj"],
+    "retention":"limits",
+    "max_msgs":42000,
+    "max_bytes":73000,
+    "storage":"file",
+    "num_replicas":1,
+    "discard":"old"
   }
 }

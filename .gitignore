@@ -12,7 +12,6 @@ gnatsd.log
 *.exe
 *.o
 *.so
-/bin
 
 # Packages #
 ############

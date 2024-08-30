@@ -3,14 +3,17 @@
  */
 package io.synadia.workloads;
 
+import io.nats.client.Connection;
+import io.nats.client.JetStream;
 import io.nats.jsmulti.JsMulti;
 import io.nats.jsmulti.settings.Arguments;
 import io.nats.jsmulti.settings.Context;
+import io.nats.jsmulti.shared.Stats;
 import io.synadia.CommandLine;
 
-public class Publisher extends Workload {
+public class ConsumerInfoLoad extends Workload {
 
-    public Publisher(CommandLine commandLine) {
+    public ConsumerInfoLoad(CommandLine commandLine) {
         super(commandLine);
     }
 
@@ -19,7 +22,11 @@ public class Publisher extends Workload {
         Arguments a = Arguments.instance()
             .addJsonConfig(params.jvMultiConfig.toJson());
         Context ctx = new Context(a);
-        a.debugCommandLineFormatted();
+        a.printCommandLineFormatted();
         JsMulti.run(ctx);
     }
+
+    private void foo(Context ctx, Connection nc, Stats stats, int id) throws Exception {
+        JetStream js = nc.jetStream(ctx.getJetStreamOptions());
+   }
 }
