@@ -54,7 +54,7 @@ public class Generator {
         else {
             jv = JsonValueUtils.mapBuilder()
                 .put("client_mode", true)
-                .put("dev_os", "win")
+                .put("dev_os", "unix")
                 .put("key_file", NA)
                 .put("server_user", "ubuntu")
                 .put("client_user", "ec2-user")
@@ -71,6 +71,7 @@ public class Generator {
         String serverFilter = jv.map.get("server_filter").string;
         String clientFilter = jv.map.get("client_filter").string;
 
+        System.out.println("clientMode: " + clientMode);
         System.out.println("devOs: " + devOs);
         System.out.println("keyFile: " + keyFile);
         System.out.println("serverUser: " + serverUser);
@@ -109,7 +110,6 @@ public class Generator {
             String scriptName = "server" + x;
 
             Generator current = gens.getFirst();
-            heading(scriptName + " " + current.name);
             if (x == 0) {
                 privateAdmin = current.privateIpAddr;
                 publicAdmin = current.publicIpAddr;
@@ -122,6 +122,7 @@ public class Generator {
             publicBootstrap.append("nats://").append(current.publicIpAddr);
 
             if (!clientMode) {
+                heading(scriptName + " " + current.name);
                 printSsh(scriptName, current, serverUser, keyFile);
                 printNatsCli(scriptName, current);
             }
