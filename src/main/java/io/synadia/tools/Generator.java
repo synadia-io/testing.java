@@ -2,11 +2,13 @@ package io.synadia.tools;
 
 import io.nats.client.support.JsonParser;
 import io.nats.client.support.JsonValue;
+import io.nats.client.support.JsonValueUtils;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,7 +36,20 @@ public class Generator {
     }
 
     public static void main(String[] args) throws Exception {
-        JsonValue jv = JsonParser.parse(Files.readAllBytes(Paths.get("generator.json")));
+        Path p = Paths.get("generator.json");
+        JsonValue jv;
+        if (p.toFile().exists()) {
+            jv = JsonParser.parse(Files.readAllBytes(p));
+        }
+        else {
+            jv = JsonValueUtils.mapBuilder()
+                .put("dev_os", "win")
+                .put("server_user", "ubuntu")
+                .put("client_user", "ec2-user")
+                .put("server_filter", "scottf-server-")
+                .put("client_filter", "scottf-client-")
+                .toJsonValue();
+        }
 
         String devOs = jv.map.get("dev_os").string.equals("win") ? OS_WIN : OS_UNIX;
         String keyFile = jv.map.get("key_file").string;
@@ -42,6 +57,7 @@ public class Generator {
         String clientUser = jv.map.get("client_user").string;
         String serverFilter = jv.map.get("server_filter").string;
         String clientFilter = jv.map.get("client_filter").string;
+
         System.out.println("devOs: " + devOs);
         System.out.println("keyFile: " + keyFile);
         System.out.println("serverUser: " + serverUser);
@@ -147,7 +163,9 @@ public class Generator {
     }
 
     private static void printSsh(String scriptName, Generator current, String user, String keyFile) throws IOException {
-        writeBatch(scriptName, "ssh", "ssh -oStrictHostKeyChecking=no -i " + keyFile + " " + user + "@" + current.publicDnsName);
+        if (keyFile != null && !keyFile.isEmpty()) {
+            writeBatch(scriptName, "ssh", "ssh -oStrictHostKeyChecking=no -i " + keyFile + " " + user + "@" + current.publicDnsName);
+        }
     }
 
     private static void writeBatch(String name, String prefix, String cmd) throws IOException {

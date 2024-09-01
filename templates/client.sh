@@ -22,3 +22,8 @@ gradle -version
 java -version
 
 git clone https://github.com/synadia-io/testing.java
+cd testing.java
+
+echo "EXPORT AWS security"
+echo "SETUP generator.json"
+echo "RUN chmod +x bin/generate & bin/generate"
