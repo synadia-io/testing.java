@@ -103,36 +103,39 @@ public class Generator {
         StringBuilder publicBootstrap = new StringBuilder();
         String deployTestPrivateJson = readTemplate("deploy-test.json");
         String deployTestPublicJson = deployTestPrivateJson;
-        for (int x = 0; x < 3; x++) {
-            String scriptName = "server" + x;
 
-            Generator current = gens.getFirst();
-            heading(scriptName + " " + current.name);
-            if (x == 0) {
-                privateAdmin = current.privateIpAddr;
-                publicAdmin = current.publicIpAddr;
+        if (!gens.isEmpty()) {
+            for (int x = 0; x < 3; x++) {
+                String scriptName = "server" + x;
+
+                Generator current = gens.getFirst();
+                heading(scriptName + " " + current.name);
+                if (x == 0) {
+                    privateAdmin = current.privateIpAddr;
+                    publicAdmin = current.publicIpAddr;
+                }
+                else {
+                    privateBootstrap.append(",");
+                    publicBootstrap.append(",");
+                }
+                privateBootstrap.append("nats://").append(current.privateIpAddr);
+                publicBootstrap.append("nats://").append(current.publicIpAddr);
+
+                printSsh(scriptName, current, serverUser, keyFile);
+                printNatsCli(scriptName, current);
+
+                deployTestPrivateJson = deployTestPrivateJson.replace("<Server" + x + ">", current.privateIpAddr);
+                deployTestPublicJson = deployTestPublicJson.replace("<Server" + x + ">", current.publicIpAddr);
+
+                // SERVER x SCRIPT
+                String template = readTemplate("server.sh")
+                    .replace("<InstanceId>", "" + x)
+                    .replace("<PrivateIpRoute1>", gens.get(1).privateIpAddr)
+                    .replace("<PrivateIpRoute2>", gens.get(2).privateIpAddr);
+                generate("server" + x, template);
+
+                gens.add(gens.removeFirst());
             }
-            else {
-                privateBootstrap.append(",");
-                publicBootstrap.append(",");
-            }
-            privateBootstrap.append("nats://").append(current.privateIpAddr);
-            publicBootstrap.append("nats://").append(current.publicIpAddr);
-
-            printSsh(scriptName, current, serverUser, keyFile);
-            printNatsCli(scriptName, current);
-
-            deployTestPrivateJson = deployTestPrivateJson.replace("<Server" + x + ">", current.privateIpAddr);
-            deployTestPublicJson = deployTestPublicJson.replace("<Server" + x + ">", current.publicIpAddr);
-
-            // SERVER x SCRIPT
-            String template = readTemplate("server.sh")
-                .replace("<InstanceId>", "" + x)
-                .replace("<PrivateIpRoute1>", gens.get(1).privateIpAddr)
-                .replace("<PrivateIpRoute2>", gens.get(2).privateIpAddr);
-            generate("server" + x, template);
-
-            gens.add(gens.removeFirst());
         }
 
         // DEPLOY TEST
