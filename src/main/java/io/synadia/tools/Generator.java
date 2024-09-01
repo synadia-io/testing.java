@@ -44,6 +44,7 @@ public class Generator {
         else {
             jv = JsonValueUtils.mapBuilder()
                 .put("dev_os", "win")
+                .put("key_file", "")
                 .put("server_user", "ubuntu")
                 .put("client_user", "ec2-user")
                 .put("server_filter", "scottf-server-")
