@@ -29,7 +29,6 @@ cd ~
 rm -rf testing.java
 git clone https://github.com/synadia-io/testing.java
 cd testing.java
-chmod +x bin/generate && bin/generate && chmod +x gen/* && chmod -x gen/*.json
 
 echo ""
 echo "TODO: Export AWS security"
