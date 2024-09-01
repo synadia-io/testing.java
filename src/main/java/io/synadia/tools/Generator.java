@@ -22,6 +22,7 @@ public class Generator {
     private static final int WHICH_PRIVATE = -1;
     private static final String OS_WIN = "win";
     private static final String OS_UNIX = "unix";
+    private static final String NA = "na";
 
     final String name;
     final String publicDnsName;
@@ -44,7 +45,7 @@ public class Generator {
         else {
             jv = JsonValueUtils.mapBuilder()
                 .put("dev_os", "win")
-                .put("key_file", "")
+                .put("key_file", NA)
                 .put("server_user", "ubuntu")
                 .put("client_user", "ec2-user")
                 .put("server_filter", "scottf-server-")
@@ -164,7 +165,7 @@ public class Generator {
     }
 
     private static void printSsh(String scriptName, Generator current, String user, String keyFile) throws IOException {
-        if (keyFile != null && !keyFile.isEmpty()) {
+        if (NA.equals(keyFile)) {
             writeBatch(scriptName, "ssh", "ssh -oStrictHostKeyChecking=no -i " + keyFile + " " + user + "@" + current.publicDnsName);
         }
     }
