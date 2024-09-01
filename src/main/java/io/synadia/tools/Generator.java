@@ -165,7 +165,7 @@ public class Generator {
     }
 
     private static void printSsh(String scriptName, Generator current, String user, String keyFile) throws IOException {
-        if (NA.equals(keyFile)) {
+        if (!NA.equals(keyFile)) {
             writeBatch(scriptName, "ssh", "ssh -oStrictHostKeyChecking=no -i " + keyFile + " " + user + "@" + current.publicDnsName);
         }
     }
