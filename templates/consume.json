@@ -1,0 +1,13 @@
+{
+  "multi_config": {
+    "server": "<Bootstrap>",
+    "subject": "tj",
+    "action": "SubPull",
+    "message_count": 10000000,
+    "threads": 3,
+    "batch_size": 100,
+    "connection_strategy": "individual",
+    "report_frequency": 10000,
+    "options_factory_class_name": "io.synadia.VirtualExecutorOptionsFactory"
+  }
+}

@@ -17,7 +17,7 @@ public class DeployTest extends Workload {
     }
 
     @Override
-    void subRunWorkload() throws Exception {
+    protected void subRunWorkload() throws Exception {
         System.out.println("Deploy Test");
         System.out.println("CLIENT_VERSION: " + Nats.CLIENT_VERSION);
         connect(params.jv.map.get("server0").string);

@@ -5,7 +5,7 @@
     "action": "PubAsync",
     "message_count": 1000000,
     "payload_size": 100,
-    "threads": 5,
+    "threads": 6,
     "connection_strategy": "individual",
     "report_frequency": 50000,
     "round_size": 200,

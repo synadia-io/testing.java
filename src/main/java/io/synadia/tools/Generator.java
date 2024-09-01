@@ -150,28 +150,25 @@ public class Generator {
         }
 
         // PUBLISH
-        template = readTemplate("publish.json");
-        generate("publish-private.json", fillPublish(template, privateBootstrap, privateAdmin));
-        if (doPublic) {
-            generate("publish-public.json", fillPublish(template, publicBootstrap, publicAdmin));
-        }
-
-        template = readTemplate("publish-limited.json");
-        generate("publish-limited-private.json", fillPublish(template, privateBootstrap, privateAdmin));
-        if (doPublic) {
-            generate("publish-limited-public.json", fillPublish(template, publicBootstrap, publicAdmin));
-        }
-
-        template = readTemplate("publish-sh-bat.txt");
-        writeRunners("publish", template.replace("<Qualifier>", "-private"), WHICH_PRIVATE, os);
-        writeRunners("publish-limited", template.replace("<Qualifier>", "-limited-private"), WHICH_PRIVATE, os);
-        if (doPublic) {
-            writeRunners("publish", template.replace("<Qualifier>", "-public"), WHICH_PUBLIC, os);
-            writeRunners("publish-limited", template.replace("<Qualifier>", "-limited-public"), WHICH_PUBLIC, os);
-        }
+        workload("publish", "publish", privateBootstrap, privateAdmin, publicBootstrap, publicAdmin, doPublic, os);
+        workload("publish-limited", "publish", privateBootstrap, privateAdmin, publicBootstrap, publicAdmin, doPublic, os);
+        workload("consume", "consume", privateBootstrap, privateAdmin, publicBootstrap, publicAdmin, doPublic, os);
 
         // CLIENT SCRIPT
         generate("client", readTemplate("client.sh"));
+    }
+
+    private static void workload(String workName, String scriptTemplateName, StringBuilder privateBootstrap, String privateAdmin, StringBuilder publicBootstrap, String publicAdmin, boolean doPublic, String os) throws IOException {
+        String template = readTemplate(workName + ".json");
+        generate(workName + "-private.json", fillPublish(template, privateBootstrap, privateAdmin));
+        if (doPublic) {
+            generate(workName + "-public.json", fillPublish(template, publicBootstrap, publicAdmin));
+        }
+        String scriptTemplate = readTemplate(scriptTemplateName + "-sh-bat.txt");
+        writeRunners(workName, scriptTemplate.replace("<Qualifier>", "-private"), WHICH_PRIVATE, os);
+        if (doPublic) {
+            writeRunners(workName, scriptTemplate.replace("<Qualifier>", "-public"), WHICH_PUBLIC, os);
+        }
     }
 
     private static String fillPublish(String template, StringBuilder publicBootstrap, String publicAdmin) {
@@ -217,9 +214,8 @@ public class Generator {
     }
 
     private static void generate(String fn, String data) throws IOException {
-        byte[] bytes = data.getBytes(StandardCharsets.US_ASCII);
         FileOutputStream out = new FileOutputStream(Paths.get("gen", fn).toString());
-        out.write(bytes);
+        out.write(data.getBytes(StandardCharsets.US_ASCII));
         out.flush();
         out.close();
     }

@@ -4,11 +4,14 @@ import io.nats.client.Connection;
 import io.nats.client.JetStreamApiException;
 import io.nats.client.JetStreamManagement;
 import io.nats.client.Nats;
+import io.nats.jsmulti.JsMulti;
+import io.nats.jsmulti.settings.Arguments;
+import io.nats.jsmulti.settings.Context;
 import io.synadia.CommandLine;
 import io.synadia.Params;
 import io.synadia.tools.Debug;
 
-public abstract class Workload {
+public class Workload {
     protected final CommandLine commandLine;
     protected final Params params;
 
@@ -18,7 +21,13 @@ public abstract class Workload {
         params = new Params(commandLine.paramsFile);
     }
 
-    abstract void subRunWorkload() throws Exception;
+    protected void subRunWorkload() throws Exception {
+        Arguments a = Arguments.instance()
+            .addJsonConfig(params.jvMultiConfig.toJson());
+        Context ctx = new Context(a);
+        a.printCommandLineFormatted();
+        JsMulti.run(ctx);
+    }
 
     public void runWorkload() throws Exception {
         if (params.createStream) {
