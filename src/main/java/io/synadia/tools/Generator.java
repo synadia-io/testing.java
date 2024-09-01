@@ -53,16 +53,17 @@ public class Generator {
         }
         else {
             jv = JsonValueUtils.mapBuilder()
-                .put("client", false)
+                .put("client_mode", true)
                 .put("dev_os", "win")
                 .put("key_file", NA)
                 .put("server_user", "ubuntu")
                 .put("client_user", "ec2-user")
                 .put("server_filter", "-server-")
-                .put("client_filter", "-client-")
+                .put("client_filter", NA)
                 .toJsonValue();
         }
 
+        boolean clientMode = jv.map.get("client_mode").bool != null && jv.map.get("client_mode").bool;
         String devOs = jv.map.get("dev_os").string.equals("win") ? OS_WIN : OS_UNIX;
         String keyFile = jv.map.get("key_file").string;
         String serverUser = jv.map.get("server_user").string;
@@ -120,8 +121,10 @@ public class Generator {
             privateBootstrap.append("nats://").append(current.privateIpAddr);
             publicBootstrap.append("nats://").append(current.publicIpAddr);
 
-            printSsh(scriptName, current, serverUser, keyFile);
-            printNatsCli(scriptName, current);
+            if (!clientMode) {
+                printSsh(scriptName, current, serverUser, keyFile);
+                printNatsCli(scriptName, current);
+            }
 
             deployTestPrivateJson = deployTestPrivateJson.replace("<Server" + x + ">", current.privateIpAddr);
             deployTestPublicJson = deployTestPublicJson.replace("<Server" + x + ">", current.publicIpAddr);
