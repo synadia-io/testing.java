@@ -53,8 +53,8 @@ public class Generator {
         }
         else {
             jv = JsonValueUtils.mapBuilder()
-                .put("client_mode", true)
-                .put("dev_os", "unix")
+                .put("dev_mode", false)
+                .put("os", "unix")
                 .put("key_file", NA)
                 .put("server_user", "ubuntu")
                 .put("client_user", "ec2-user")
@@ -63,16 +63,16 @@ public class Generator {
                 .toJsonValue();
         }
 
-        boolean clientMode = jv.map.get("client_mode").bool != null && jv.map.get("client_mode").bool;
-        String devOs = jv.map.get("dev_os").string.equals("win") ? OS_WIN : OS_UNIX;
+        boolean devMode = jv.map.get("dev_mode") == null || jv.map.get("dev_mode").bool;
+        String os = jv.map.get("os").string.equals("win") ? OS_WIN : OS_UNIX;
         String keyFile = jv.map.get("key_file").string;
         String serverUser = jv.map.get("server_user").string;
         String clientUser = jv.map.get("client_user").string;
         String serverFilter = jv.map.get("server_filter").string;
         String clientFilter = jv.map.get("client_filter").string;
 
-        System.out.println("clientMode: " + clientMode);
-        System.out.println("devOs: " + devOs);
+        System.out.println("devMode: " + devMode);
+        System.out.println("os: " + os);
         System.out.println("keyFile: " + keyFile);
         System.out.println("serverUser: " + serverUser);
         System.out.println("clientUser: " + clientUser);
@@ -121,21 +121,21 @@ public class Generator {
             privateBootstrap.append("nats://").append(current.privateIpAddr);
             publicBootstrap.append("nats://").append(current.publicIpAddr);
 
-            if (!clientMode) {
-                heading(scriptName + " " + current.name);
-                printSsh(scriptName, current, serverUser, keyFile);
-                printNatsCli(scriptName, current);
-            }
-
             deployTestPrivateJson = deployTestPrivateJson.replace("<Server" + x + ">", current.privateIpAddr);
             deployTestPublicJson = deployTestPublicJson.replace("<Server" + x + ">", current.publicIpAddr);
 
-            // SERVER x SCRIPT
-            String template = readTemplate("server.sh")
-                .replace("<InstanceId>", "" + x)
-                .replace("<PrivateIpRoute1>", gens.get(1).privateIpAddr)
-                .replace("<PrivateIpRoute2>", gens.get(2).privateIpAddr);
-            generate("server" + x, template);
+            if (devMode) {
+                heading(scriptName + " " + current.name);
+                printSsh(scriptName, current, serverUser, keyFile);
+                printNatsCli(scriptName, current);
+
+                // SERVER x SCRIPT
+                String template = readTemplate("server.sh")
+                    .replace("<InstanceId>", "" + x)
+                    .replace("<PrivateIpRoute1>", gens.get(1).privateIpAddr)
+                    .replace("<PrivateIpRoute2>", gens.get(2).privateIpAddr);
+                generate("server" + x, template);
+            }
 
             gens.add(gens.removeFirst());
         }
@@ -144,23 +144,25 @@ public class Generator {
         String template = readTemplate("deploy-test-sh-bat.txt");
         generate("deploy-test-private.json", deployTestPrivateJson);
         generate("deploy-test-public.json", deployTestPublicJson);
-        writeRunners("deploy-test", template, WHICH_PRIVATE, devOs);
-        writeRunners("deploy-test", template, WHICH_PUBLIC, devOs);
+        writeRunners("deploy-test", template, WHICH_PRIVATE, os);
+        writeRunners("deploy-test", template, WHICH_PUBLIC, os);
 
         // PUBLISH
         template = readTemplate("publish.json");
         generate("publish-private.json", fillPublish(template, privateBootstrap, privateAdmin));
-        generate("publish-public.json", fillPublish(template, publicBootstrap, publicAdmin));
+        if (devMode) {
+            generate("publish-public.json", fillPublish(template, publicBootstrap, publicAdmin));
+        }
 
         template = readTemplate("publish-limited.json");
         generate("publish-limited-private.json", fillPublish(template, privateBootstrap, privateAdmin));
         generate("publish-limited-public.json", fillPublish(template, publicBootstrap, publicAdmin));
 
         template = readTemplate("publish-sh-bat.txt");
-        writeRunners("publish", template.replace("<Qualifier>", "-private"), WHICH_PRIVATE, devOs);
-        writeRunners("publish", template.replace("<Qualifier>", "-public"), WHICH_PUBLIC, devOs);
-        writeRunners("publish-limited", template.replace("<Qualifier>", "-limited-private"), WHICH_PRIVATE, devOs);
-        writeRunners("publish-limited", template.replace("<Qualifier>", "-limited-public"), WHICH_PUBLIC, devOs);
+        writeRunners("publish", template.replace("<Qualifier>", "-private"), WHICH_PRIVATE, os);
+        writeRunners("publish", template.replace("<Qualifier>", "-public"), WHICH_PUBLIC, os);
+        writeRunners("publish-limited", template.replace("<Qualifier>", "-limited-private"), WHICH_PRIVATE, os);
+        writeRunners("publish-limited", template.replace("<Qualifier>", "-limited-public"), WHICH_PUBLIC, os);
 
         // CLIENT SCRIPT
         generate("client", readTemplate("client.sh"));
