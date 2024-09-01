@@ -15,39 +15,54 @@ import java.util.Map;
 public class Generator {
 
     // aws ec2 describe-instances --output json > aws.json
-    private static final String KEY_FILE = "C:\\Users\\batman\\.ssh\\scottf-faber-dev.pem";
-    private static final String SERVER_USER = "ubuntu";
-    private static final String CLIENT_USER = "ec2-user";
+
+    private static final int WHICH_PUBLIC = 1;
+    private static final int WHICH_PRIVATE = -1;
+    private static final String OS_WIN = "win";
+    private static final String OS_UNIX = "unix";
 
     final String name;
     final String publicDnsName;
-    final String publicIpAddress;
-    final String privateIps;
+    final String privateIpAddr;
+    final String publicIpAddr;
 
     public Generator(String name, Map<String, JsonValue> map) {
         this.name = name;
         this.publicDnsName = map.get("PublicDnsName").string;
-        this.publicIpAddress = map.get("PublicIpAddress").string;
-        this.privateIps = map.get("PrivateIpAddress").string;
+        this.privateIpAddr = map.get("PrivateIpAddress").string;
+        this.publicIpAddr = map.get("PublicIpAddress").string;
     }
 
     public static void main(String[] args) throws Exception {
-        String serverFilters = "scottf-server-";
-        String clientName = "scottf-client";
+        JsonValue jv = JsonParser.parse(Files.readAllBytes(Paths.get("generator.json")));
+
+        String devOs = jv.map.get("dev_os").string.equals("win") ? OS_WIN : OS_UNIX;
+        String keyFile = jv.map.get("key_file").string;
+        String serverUser = jv.map.get("server_user").string;
+        String clientUser = jv.map.get("client_user").string;
+        String serverFilter = jv.map.get("server_filter").string;
+        String clientFilter = jv.map.get("client_filter").string;
+        System.out.println("devOs: " + devOs);
+        System.out.println("keyFile: " + keyFile);
+        System.out.println("serverUser: " + serverUser);
+        System.out.println("clientUser: " + clientUser);
+        System.out.println("serverFilter: " + serverFilter);
+        System.out.println("clientFilter: " + clientFilter);
+
         List<Generator> gens = new ArrayList<>();
 
-        JsonValue jv = JsonParser.parse(Files.readAllBytes(Paths.get("aws.json")));
+        jv = JsonParser.parse(Files.readAllBytes(Paths.get("aws.json")));
         for (JsonValue jvRes : jv.map.get("Reservations").array) {
             for (JsonValue jvInstances : jvRes.map.get("Instances").array) {
                 String name = jvInstances.map.get("Tags").array.getFirst().map.get("Value").string;
-                if (name.contains(serverFilters)) {
+                if (name.contains(serverFilter)) {
                     gens.add(new Generator(name, jvInstances.map));
                 }
-                else if (name.equals(clientName)) {
+                else if (name.contains(clientFilter)) {
                     try {
                         Generator current = new Generator(name, jvInstances.map);
-                        heading("client");
-                        printSsh("client", current, CLIENT_USER);
+                        heading("client " + name);
+                        printSsh("client", current, clientUser, keyFile);
                     }
                     catch (Exception ignore) {}
                 }
@@ -55,33 +70,38 @@ public class Generator {
         }
 
         String privateAdmin = null;
+        String publicAdmin = null;
         StringBuilder privateBootstrap = new StringBuilder();
+        StringBuilder publicBootstrap = new StringBuilder();
         String deployTestPrivateJson = readTemplate("deploy-test.json");
-        String deployTestRemoteJson = deployTestPrivateJson;
+        String deployTestPublicJson = deployTestPrivateJson;
         for (int x = 0; x < 3; x++) {
-            String name = "server" + x;
-            heading(name);
+            String scriptName = "server" + x;
 
             Generator current = gens.getFirst();
+            heading(scriptName + " " + current.name);
             if (x == 0) {
-                privateAdmin = current.privateIps;
+                privateAdmin = current.privateIpAddr;
+                publicAdmin = current.publicIpAddr;
             }
             else {
                 privateBootstrap.append(",");
+                publicBootstrap.append(",");
             }
+            privateBootstrap.append("nats://").append(current.privateIpAddr);
+            publicBootstrap.append("nats://").append(current.publicIpAddr);
 
-            printSsh(name, current, SERVER_USER);
-            printNatsCli(name, current);
+            printSsh(scriptName, current, serverUser, keyFile);
+            printNatsCli(scriptName, current);
 
-            privateBootstrap.append("nats://").append(current.privateIps);
-            deployTestPrivateJson = deployTestPrivateJson.replace("<Server" + x + ">", current.privateIps);
-            deployTestRemoteJson = deployTestRemoteJson.replace("<Server" + x + ">", current.publicIpAddress);
+            deployTestPrivateJson = deployTestPrivateJson.replace("<Server" + x + ">", current.privateIpAddr);
+            deployTestPublicJson = deployTestPublicJson.replace("<Server" + x + ">", current.publicIpAddr);
 
             // SERVER x SCRIPT
             String template = readTemplate("server.sh")
                 .replace("<InstanceId>", "" + x)
-                .replace("<PrivateIpRoute1>", gens.get(1).privateIps)
-                .replace("<PrivateIpRoute2>", gens.get(2).privateIps);
+                .replace("<PrivateIpRoute1>", gens.get(1).privateIpAddr)
+                .replace("<PrivateIpRoute2>", gens.get(2).privateIpAddr);
             generate("server" + x, template);
 
             gens.add(gens.removeFirst());
@@ -90,19 +110,31 @@ public class Generator {
         // DEPLOY TEST
         String template = readTemplate("deploy-test-sh-bat.txt");
         generate("deploy-test-private.json", deployTestPrivateJson);
-        generate("deploy-test-remote.json", deployTestRemoteJson);
-        writeRunner("deploy-test", template);
+        generate("deploy-test-public.json", deployTestPublicJson);
+        writeRunners("deploy-test", template, WHICH_PRIVATE, devOs);
+        writeRunners("deploy-test", template, WHICH_PUBLIC, devOs);
 
         // PUBLISH
         template = readTemplate("publish.json");
-        String pj = template
-            .replace("<PrivateBootstrap>", privateBootstrap)
-            .replace("<PrivateAdmin>", privateAdmin);
-        generate("publish.json", pj);
-        writeRunner("publish", template);
+        generate("publish-private.json", fillPublish(template, privateBootstrap, privateAdmin));
+        generate("publish-public.json", fillPublish(template, publicBootstrap, publicAdmin));
+
+        template = readTemplate("publish-limited.json");
+        generate("publish-limited-private.json", fillPublish(template, privateBootstrap, privateAdmin));
+        generate("publish-limited-public.json", fillPublish(template, publicBootstrap, publicAdmin));
+
+        template = readTemplate("publish-sh-bat.txt");
+        writeRunners("publish", template.replace("<Qualifier>", "-private"), WHICH_PRIVATE, devOs);
+        writeRunners("publish", template.replace("<Qualifier>", "-public"), WHICH_PUBLIC, devOs);
+        writeRunners("publish-limited", template.replace("<Qualifier>", "-limited-private"), WHICH_PRIVATE, devOs);
+        writeRunners("publish-limited", template.replace("<Qualifier>", "-limited-public"), WHICH_PUBLIC, devOs);
 
         // CLIENT SCRIPT
         generate("client", readTemplate("client.sh"));
+    }
+
+    private static String fillPublish(String template, StringBuilder publicBootstrap, String publicAdmin) {
+        return template.replace("<Bootstrap>", publicBootstrap).replace("<Admin>", publicAdmin);
     }
 
     private static void heading(String label) {
@@ -110,12 +142,12 @@ public class Generator {
         System.out.println(label);
     }
 
-    private static void printNatsCli(String name, Generator current) throws IOException {
-        writeBatch(name, "nats", "nats s info -s " + current.publicIpAddress);
+    private static void printNatsCli(String scriptName, Generator current) throws IOException {
+        writeBatch(scriptName, "nats", "nats s info -s " + current.publicIpAddr);
     }
 
-    private static void printSsh(String name, Generator current, String user) throws IOException {
-        writeBatch(name, "ssh", "ssh -oStrictHostKeyChecking=no -i " + KEY_FILE + " " + user + "@" + current.publicDnsName);
+    private static void printSsh(String scriptName, Generator current, String user, String keyFile) throws IOException {
+        writeBatch(scriptName, "ssh", "ssh -oStrictHostKeyChecking=no -i " + keyFile + " " + user + "@" + current.publicDnsName);
     }
 
     private static void writeBatch(String name, String prefix, String cmd) throws IOException {
@@ -123,13 +155,18 @@ public class Generator {
         generate(prefix + "-" + name + ".bat", cmd);
     }
 
-    private static void writeRunner(String name, String template) throws IOException {
-        generate(name + ".bat", template.replace("<Gradle>", "call gradle")
-            .replace("<SEP>", "\\")
-            .replace("<Location>", "remote"));
-        generate(name, template.replace("<Gradle>", "gradle")
-            .replace("<SEP>", "/")
-            .replace("<Location>", "private"));
+    private static void writeRunners(String name, String template, int pubPri, String devOs) throws IOException {
+        if (pubPri == WHICH_PUBLIC) {
+            String genName = devOs.equals(OS_UNIX) ? name + "-public" : name + ".bat";
+            generate(genName, template.replace("<Gradle>", "call gradle")
+                .replace("<SEP>", "\\")
+                .replace("<Location>", "public"));
+        }
+        if (pubPri == WHICH_PRIVATE) {
+            generate(name, template.replace("<Gradle>", "gradle")
+                .replace("<SEP>", "/")
+                .replace("<Location>", "private"));
+        }
     }
 
     private static String readTemplate(String tpl) throws IOException {

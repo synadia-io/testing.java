@@ -1,6 +1,6 @@
 {
   "multi_config": {
-    "server": "nats://172.31.93.160:4222,nats://172.31.81.147:4222,nats://172.31.89.116:4222",
+    "server": "<Bootstrap>",
     "subject": "tj",
     "action": "PubAsync",
     "message_count": 1000000,
@@ -11,7 +11,7 @@
     "round_size": 200,
     "options_factory_class_name": "io.synadia.VirtualExecutorOptionsFactory"
   },
-  "management_server": "nats://172.31.93.160:4222",
+  "management_server": "<Admin>",
   "create_stream": true,
   "stream_config":{
     "name": "testing-java",

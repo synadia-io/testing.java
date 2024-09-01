@@ -12,7 +12,6 @@ sudo mv nats-server /usr/bin/
 nats-server -v
 which nats-server
 
-
 # 2 create nats-server.service
 cat > nats-server.service <<EOF
 [Unit]
