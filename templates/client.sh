@@ -32,5 +32,5 @@ cd testing.java
 
 echo ""
 echo "TODO: Export AWS security"
-echo "TODO: chmod +x bin/generate && bin/generate"
+echo "TODO: chmod +x bin/generate && bin/generate && rm gen/*.bat && chmod +x gen/* && chmod -x gen/*.json && chmod -x gen/*.txt"
 echo ""

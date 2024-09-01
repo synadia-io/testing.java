@@ -4,6 +4,7 @@ import io.nats.client.support.JsonParser;
 import io.nats.client.support.JsonValue;
 import io.nats.client.support.JsonValueUtils;
 
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -37,6 +38,14 @@ public class Generator {
     }
 
     public static void main(String[] args) throws Exception {
+        File gen = new File("gen");
+        if (!gen.exists()) {
+            if (!gen.mkdirs()) {
+                System.err.println("Could not make \"gen\" directory");
+                System.exit(-1);
+            }
+        }
+
         Path p = Paths.get("generator.json");
         JsonValue jv;
         if (p.toFile().exists()) {
@@ -44,12 +53,13 @@ public class Generator {
         }
         else {
             jv = JsonValueUtils.mapBuilder()
+                .put("client", false)
                 .put("dev_os", "win")
                 .put("key_file", NA)
                 .put("server_user", "ubuntu")
                 .put("client_user", "ec2-user")
-                .put("server_filter", "scottf-server-")
-                .put("client_filter", "scottf-client-")
+                .put("server_filter", NA)
+                .put("client_filter", "client-")
                 .toJsonValue();
         }
 
