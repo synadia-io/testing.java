@@ -1,7 +1,7 @@
 # 0. SHELL STUFF
-echo "alias l='ls -la'" >> /home/ubuntu/.bash_profile
-echo "alias dir='ls -la'" >> /home/ubuntu/.bash_profile
-echo "alias cls='clear'" >> /home/ubuntu/.bash_profile
+#echo "alias l='ls -la'" >> /home/ubuntu/.bash_profile
+#echo "alias dir='ls -la'" >> /home/ubuntu/.bash_profile
+#echo "alias cls='clear'" >> /home/ubuntu/.bash_profile
 alias l='ls -la'
 alias dir='ls -la'
 alias cls='clear'
