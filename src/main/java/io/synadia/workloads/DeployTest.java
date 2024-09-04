@@ -9,15 +9,15 @@ import io.nats.client.api.StorageType;
 import io.nats.client.api.StreamConfiguration;
 import io.nats.client.api.StreamInfo;
 import io.synadia.CommandLine;
-import io.synadia.tools.DebugListener;
+import io.synadia.Workload;
 
 public class DeployTest extends Workload {
     public DeployTest(CommandLine commandLine) {
-        super(commandLine);
+        super("Deploy Test", commandLine);
     }
 
     @Override
-    protected void subRunWorkload() throws Exception {
+    public void runWorkload() throws Exception {
         System.out.println("Deploy Test");
         System.out.println("CLIENT_VERSION: " + Nats.CLIENT_VERSION);
         connect(params.jv.map.get("server0").string);
@@ -25,16 +25,8 @@ public class DeployTest extends Workload {
         connect(params.jv.map.get("server2").string);
     }
 
-    private static void connect(String ip) {
-        String server ="nats://" + ip + ":4222";
-        System.out.println();
-        System.out.println("connecting to: " + server);
-        DebugListener l = new DebugListener();
-        Options options = new Options.Builder()
-            .server(server)
-            .connectionListener((x, y) -> {})
-            .errorListener(new ErrorListener() {})
-            .build();
+    private void connect(String server) {
+        Options options = getAdminOptions("Deploy Test");
         try (Connection nc = Nats.connect(options)) {
             System.out.println("server: " + getServerInfo(nc));
             String stream = NUID.nextGlobalSequence();

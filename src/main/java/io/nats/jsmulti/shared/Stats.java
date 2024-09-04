@@ -2,6 +2,8 @@ package io.nats.jsmulti.shared;
 
 import io.nats.client.Message;
 import io.nats.client.impl.Headers;
+import io.nats.client.support.JsonValue;
+import io.nats.client.support.JsonValueUtils;
 import io.nats.jsmulti.settings.Action;
 import io.nats.jsmulti.settings.Context;
 
@@ -12,12 +14,15 @@ import java.nio.charset.StandardCharsets;
 import java.text.NumberFormat;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static io.nats.jsmulti.shared.Utils.HDR_PUB_TIME;
+import static io.nats.jsmulti.shared.Utils.makeId;
 
 public class Stats {
+
     private static final double MILLIS_PER_SECOND = 1000;
     private static final double NANOS_PER_MILLI = 1000000;
 
@@ -43,9 +48,17 @@ public class Stats {
 
     private static final String LCSV_HEADER = "Publish Time,Server Time,Received Time,Publish to Server,Server to Consumer,Publish to Consumer\n";
 
+    // Misc
+    public final String id;
+    public final String label;
+    public final String key;
+
+    private String exceptionMessage;
+
+    // running numbers
     private long elapsed = 0;
     private long bytes = 0;
-    private int messageCount = 0;
+    private long messageCount = 0;
 
     // latency
     private long messagePubToServerTimeElapsed = 0;
@@ -64,22 +77,23 @@ public class Stats {
     // Time keeping
     private long milliNow;
 
-    // Misc
     private final Context ctx;
-    private final String hdrLabel;
-
-    private final ExecutorService countService = Executors.newSingleThreadExecutor();
     private final FileOutputStream lout;
+    private final ExecutorService countService = Executors.newSingleThreadExecutor();
 
     public Stats() {
+        id = makeId("stats");
+        label = "";
+        key = "";
         ctx = null;
-        hdrLabel = "";
         lout = null;
     }
 
     public Stats(Context ctx) throws IOException {
+        id = makeId("stats");
         this.ctx = ctx;
-        hdrLabel = ctx.action.getLabel();
+        label = ctx.action.getLabel();
+        key = label + "."  + ctx.id + "." + id;
         if (ctx.lcsv == null) {
             lout = null;
         }
@@ -87,6 +101,60 @@ public class Stats {
             lout = new FileOutputStream(ctx.lcsv);
             lout.write(LCSV_HEADER.getBytes(StandardCharsets.US_ASCII));
         }
+    }
+
+    public Stats(JsonValue jv) {
+        ctx = null;
+        lout = null;
+        id = JsonValueUtils.readString(jv, "id", null);
+        label = JsonValueUtils.readString(jv, "hdrLabel", null);
+        key = JsonValueUtils.readString(jv, "subject", null);
+        exceptionMessage = JsonValueUtils.readString(jv, "exceptionMessage", null);
+        messageCount = JsonValueUtils.readLong(jv, "messageCount", 0);
+        messagePubToServerTimeElapsed = JsonValueUtils.readLong(jv, "messagePubToServerTimeElapsed", 0);
+        messageServerToReceiverElapsed = JsonValueUtils.readLong(jv, "messageServerToReceiverElapsed", 0);
+        messageFullElapsed = JsonValueUtils.readLong(jv, "messageFullElapsed", 0);
+        messagePubToServerTimeElapsedForAverage = JsonValueUtils.readLong(jv, "messagePubToServerTimeElapsedForAverage", 0);
+        messageServerToReceiverElapsedForAverage = JsonValueUtils.readLong(jv, "messageServerToReceiverElapsedForAverage", 0);
+        messageFullElapsedForAverage = JsonValueUtils.readLong(jv, "messageFullElapsedForAverage", 0);
+        maxMessagePubToServerTimeElapsed = JsonValueUtils.readLong(jv, "maxMessagePubToServerTimeElapsed", 0);
+        maxMessageServerToReceiverElapsed = JsonValueUtils.readLong(jv, "maxMessageServerToReceiverElapsed", 0);
+        maxMessageFullElapsed = JsonValueUtils.readLong(jv, "maxMessageFullElapsed", 0);
+        minMessagePubToServerTimeElapsed = JsonValueUtils.readLong(jv, "minMessagePubToServerTimeElapsed", 0);
+        minMessageServerToReceiverElapsed = JsonValueUtils.readLong(jv, "minMessageServerToReceiverElapsed", 0);
+        minMessageFullElapsed = JsonValueUtils.readLong(jv, "minMessageFullElapsed", 0);
+    }
+
+    public Map<String, JsonValue> toJsonValueMap() {
+        return JsonValueUtils.mapBuilder()
+            .put("id", id)
+            .put("hdrLabel", label)
+            .put("subject", key)
+            .put("exceptionMessage", exceptionMessage)
+            .put("elapsed", elapsed)
+            .put("bytes", bytes)
+            .put("messageCount", messageCount)
+            .put("messagePubToServerTimeElapsed", messagePubToServerTimeElapsed)
+            .put("messageServerToReceiverElapsed", messageServerToReceiverElapsed)
+            .put("messageFullElapsed", messageFullElapsed)
+            .put("messagePubToServerTimeElapsedForAverage", messagePubToServerTimeElapsedForAverage)
+            .put("messageServerToReceiverElapsedForAverage", messageServerToReceiverElapsedForAverage)
+            .put("messageFullElapsedForAverage", messageFullElapsedForAverage)
+            .put("maxMessagePubToServerTimeElapsed", maxMessagePubToServerTimeElapsed)
+            .put("maxMessageServerToReceiverElapsed", maxMessageServerToReceiverElapsed)
+            .put("maxMessageFullElapsed", maxMessageFullElapsed)
+            .put("minMessagePubToServerTimeElapsed", minMessagePubToServerTimeElapsed)
+            .put("minMessageServerToReceiverElapsed", minMessageServerToReceiverElapsed)
+            .put("minMessageFullElapsed", minMessageFullElapsed)
+            .toJsonValue().map;
+    }
+
+    public void setException(Exception e){
+        exceptionMessage = e.getMessage();
+    }
+
+    public String getException() {
+        return exceptionMessage;
     }
 
     public void shutdown() {
@@ -177,7 +245,7 @@ public class Stats {
         double bytesPerSecond = MILLIS_PER_SECOND * (stats.bytes) / (stats.elapsed);
         if (header) {
             out.println("\n" + REPORT_SEP_LINE);
-            out.printf(REPORT_LINE_HEADER, stats.hdrLabel);
+            out.printf(REPORT_LINE_HEADER, stats.label);
             out.println(REPORT_SEP_LINE);
         }
         out.printf(REPORT_LINE_FORMAT, label,
@@ -193,7 +261,7 @@ public class Stats {
     public static void rttReport(Stats stats, String tlabel, boolean header, boolean footer, PrintStream out) {
         if (header) {
             out.println("\n" + RTT_REPORT_SEP_LINE);
-            out.printf(RTT_REPORT_LINE_HEADER, stats.hdrLabel);
+            out.printf(RTT_REPORT_LINE_HEADER, stats.label);
             out.println(RTT_REPORT_SEP_LINE);
         }
         out.printf(RTT_REPORT_LINE_FORMAT, tlabel,

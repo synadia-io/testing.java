@@ -101,6 +101,20 @@ public class Arguments {
         return add("ca", customActionClassName);
     }
 
+    @SuppressWarnings("rawtypes")
+    public Arguments customAction(Class clazz) {
+        return add("ca", clazz.getCanonicalName());
+    }
+
+    public Arguments appClass(String customAppClass) {
+        return add("app", customAppClass);
+    }
+
+    @SuppressWarnings("rawtypes")
+    public Arguments appClass(Class clazz) {
+        return add("app", clazz.getCanonicalName());
+    }
+
     public Arguments server(String server) {
         return add("s", server);
     }

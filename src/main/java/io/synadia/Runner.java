@@ -2,7 +2,7 @@ package io.synadia;
 
 import io.synadia.tools.Debug;
 import io.synadia.workloads.DeployTest;
-import io.synadia.workloads.Workload;
+import io.synadia.workloads.SetupTracking;
 
 public class Runner {
 
@@ -10,13 +10,17 @@ public class Runner {
         CommandLine commandLine = new CommandLine(args);
 
         switch (commandLine.workload) {
-            case "workload":
             case "publisher":
+                new MultiWorkload("Publisher", commandLine).runWorkload();
+                break;
             case "consumer":
-                new Workload(commandLine).runWorkload();
+                new MultiWorkload("Consumer", commandLine).runWorkload();
                 break;
             case "deployTest":
                 new DeployTest(commandLine).runWorkload();
+                break;
+            case "setupTracking":
+                new SetupTracking(commandLine).runWorkload();
                 break;
             default:
                 Debug.info("Runner", "Workload not implemented: " + commandLine.workload);

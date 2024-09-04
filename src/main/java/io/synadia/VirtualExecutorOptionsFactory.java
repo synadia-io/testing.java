@@ -8,8 +8,8 @@ import java.util.concurrent.Executors;
 
 public class VirtualExecutorOptionsFactory implements OptionsFactory {
     @Override
-    public Options getOptions(Context ctx) throws Exception {
-        return this.getOptionsBuilder(ctx)
+    public Options getOptions(Context ctx, OptionsType ot) {
+        return this.getOptionsBuilder(ctx, ot)
             .executor(Executors.newVirtualThreadPerTaskExecutor())
             .build();
     }

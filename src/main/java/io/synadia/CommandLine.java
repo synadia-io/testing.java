@@ -16,6 +16,9 @@ package io.synadia;
 import io.nats.client.Options;
 import io.synadia.tools.Debug;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import static java.lang.Integer.parseInt;
 
 public class CommandLine {
@@ -35,7 +38,7 @@ public class CommandLine {
     public final String server;
     public final String id;
     public final String workload;
-    public final String paramsFile;
+    public final List<String> paramsFiles;
 
     // ----------------------------------------------------------------------------------------------------
     // ToString
@@ -52,7 +55,7 @@ public class CommandLine {
         append(sb, "server", server, true);
         append(sb, "id", id, true);
         append(sb, "workload", workload, true);
-        append(sb, "paramsFile", paramsFile, true);
+        append(sb, "paramsFile", paramsFiles, true);
         return sb.toString().trim();
     }
 
@@ -60,7 +63,7 @@ public class CommandLine {
         Debug.info("Command Line", "server", server);
         Debug.info("Command Line", "id", id);
         Debug.info("Command Line", "workload", workload);
-        Debug.info("Command Line", "paramsFile", paramsFile);
+        Debug.info("Command Line", "paramsFile", paramsFiles);
     }
 
     // ----------------------------------------------------------------------------------------------------
@@ -70,7 +73,7 @@ public class CommandLine {
         String _server = Options.DEFAULT_URL;
         String _id = null;
         String _workload = null;
-        String _paramsFile = null;
+        List<String> _paramsFiles = new ArrayList<>();
 
         if (args != null && args.length > 0) {
             try {
@@ -87,7 +90,7 @@ public class CommandLine {
                             _workload = asString(args[++x]);
                             break;
                         case "--params":
-                            _paramsFile = asString(args[++x]);
+                            _paramsFiles.add(asString(args[++x]));
                             break;
                         case "":
                             break;
@@ -105,7 +108,7 @@ public class CommandLine {
         server = _server;
         id = _id;
         workload = _workload;
-        paramsFile = _paramsFile;
+        paramsFiles = _paramsFiles;
     }
 
     private String asString(String val) {

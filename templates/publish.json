@@ -11,7 +11,7 @@
     "round_size": 200,
     "options_factory_class_name": "io.synadia.VirtualExecutorOptionsFactory"
   },
-  "management_server": "<Admin>",
+  "admin_server": "<Admin>",
   "create_stream": true,
   "stream_config":{
     "name": "testing-java",

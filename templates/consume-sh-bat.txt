@@ -1,2 +1,2 @@
 <Gradle> buildDeploy
-java -cp "build/libs/*" io.synadia.Runner --workload consumer --id id1 --params gen<SEP>consume<Qualifier>.json
+java -cp "build/libs/*" io.synadia.Runner --workload consumer --params gen<SEP>consume<Qualifier>.json --params gen<SEP>setup-tracking<Qualifier>.json

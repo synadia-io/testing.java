@@ -13,12 +13,15 @@
 
 package io.nats.jsmulti.settings;
 
+import io.nats.client.Connection;
 import io.nats.client.JetStreamOptions;
+import io.nats.client.Nats;
 import io.nats.client.Options;
 import io.nats.client.api.AckPolicy;
 import io.nats.jsmulti.shared.ActionRunner;
 import io.nats.jsmulti.shared.Application;
 import io.nats.jsmulti.shared.OptionsFactory;
+import io.nats.jsmulti.shared.Utils;
 
 import java.lang.reflect.Constructor;
 import java.time.Duration;
@@ -29,8 +32,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static io.nats.jsmulti.settings.Arguments.INDIVIDUAL;
 import static io.nats.jsmulti.settings.Arguments.SHARED;
-import static io.nats.jsmulti.shared.Utils.parseInt;
-import static io.nats.jsmulti.shared.Utils.randomString;
+import static io.nats.jsmulti.shared.Utils.*;
 
 public class Context {
 
@@ -42,6 +44,7 @@ public class Context {
     // ----------------------------------------------------------------------------------------------------
     // Settings
     // ----------------------------------------------------------------------------------------------------
+    public final String id;
     public final Action action;
     public final ActionRunner customActionRunner;
 
@@ -102,11 +105,31 @@ public class Context {
     private int lastServerIndex;
 
     public Options getOptions() throws Exception {
-        return optionsFactory.getOptions(this);
+        return optionsFactory.getOptions(this, OptionsFactory.OptionsType.DEFAULT);
+    }
+
+    public Options getOptions(OptionsFactory.OptionsType ot) {
+        return optionsFactory.getOptions(this, ot);
     }
 
     public JetStreamOptions getJetStreamOptions() throws Exception {
         return optionsFactory.getJetStreamOptions(this);
+    }
+
+    public Connection connect() throws Exception {
+        return connect(OptionsFactory.OptionsType.DEFAULT);
+    }
+
+    public Connection connect( OptionsFactory.OptionsType ot) throws Exception {
+        Options options = getOptions(ot);
+        Connection nc = Nats.connect(options);
+        for (long x = 0; x < 100; x++) { // waits up to 10 seconds (100 * 100 = 10000) millis to be connected
+            Utils.sleep(100);
+            if (nc.getStatus() == Connection.Status.CONNECTED) {
+                return nc;
+            }
+        }
+        return nc;
     }
 
     final ReentrantLock gplock = new ReentrantLock();
@@ -223,27 +246,15 @@ public class Context {
     // Construction
     // ----------------------------------------------------------------------------------------------------
     public Context(Arguments args) {
-        this(args.toStringArray(), null);
-    }
-
-    public Context(Arguments args, Application app) {
-        this(args.toStringArray(), app);
+        this(args.toStringArray());
     }
 
     public Context(String[] args) {
-        this(args, null);
-    }
-
-    public Context(String[] args, Application inApp) {
-        this.app = inApp == null ? new Application() {} : inApp;
-
-        if (args == null || args.length == 0) {
-            app.usage();
-            app.exit(-1);
-        }
+        id = makeId("ctx");
 
         Action _action = null;
         String _customActionClassName = null;
+        String _customAppClassName = null;
         boolean _latencyFlag = false;
         String[] _servers = new String[]{Options.DEFAULT_URL};
         String _credsFile = null;
@@ -297,6 +308,9 @@ public class Context {
                         case "-_custom_action_class_name":
                             _action = Action.CUSTOM;
                             _customActionClassName = asString(args[++x]);
+                            break;
+                        case "-app":
+                            _customAppClassName = asString(args[++x]);
                             break;
                         case "-lf":
                         case "-latency_flag":
@@ -467,19 +481,6 @@ public class Context {
         subNameWhenQueue = _subDurableWhenQueue;
         lastServerIndex = servers.length;   // will roll to 0 first use, see getNextServer
 
-        if (_optionsFactoryClassName == null) {
-            OptionsFactory appOf = app.getOptionsFactory();
-            if (appOf == null) {
-                optionsFactory = new OptionsFactory() {};
-            }
-            else {
-                optionsFactory = appOf;
-            }
-        }
-        else {
-            optionsFactory = (OptionsFactory)classForName(_optionsFactoryClassName, "Options Factory");
-        }
-
         payloads = new ArrayList<>();
         if (payloadVariants == 1) {
             payloads.add(new byte[payloadSize]);
@@ -499,11 +500,37 @@ public class Context {
             total += perThread[x];
         }
 
-        int ix = 0;
+        int ix = -1;
         while (total < messageCount) {
-            perThread[ix++]++;
+            if (++ix == threads) {
+                ix = 0;
+            }
+            perThread[ix]++;
             total++;
         }
+
+        //
+        if (_customAppClassName == null) {
+            app = new Application() {};
+        }
+        else {
+            app = (Application)classForName(_customAppClassName, "Custom Application");
+        }
+
+        if (_optionsFactoryClassName == null) {
+            OptionsFactory appOf = app.getOptionsFactory();
+            if (appOf == null) {
+                optionsFactory = new OptionsFactory() {};
+            }
+            else {
+                optionsFactory = appOf;
+            }
+        }
+        else {
+            optionsFactory = (OptionsFactory)classForName(_optionsFactoryClassName, "Options Factory");
+        }
+
+        app.init(this);
     }
 
     @SuppressWarnings("SameParameterValue")
@@ -514,9 +541,9 @@ public class Context {
             return cons.newInstance();
         }
         catch (Exception e) {
-            error("Error creating " + label + ": " + e);
+            System.err.println("Error creating " + label + ": " + e);
+            throw new RuntimeException();
         }
-        return null;
     }
 
     private void error(String errMsg) {
