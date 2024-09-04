@@ -122,8 +122,8 @@ public class Generator {
             String scriptName = "server" + x;
 
             Instance current = runningServers.getFirst();
-            String privateServer = natsProto + current.privateIpAddr + natsPort;
-            String publicServer = natsProto + current.publicIpAddr + natsPort;
+            String privateServer = natsProto + current.privateIpAddr + ":" + natsPort;
+            String publicServer = natsProto + current.publicIpAddr + ":" + natsPort;
 
             if (x == 0) {
                 privateAdmin = privateServer;
