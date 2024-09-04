@@ -173,7 +173,8 @@ public class Generator {
             workload("setup-tracking", privateBootstrap, privateAdmin, publicBootstrap, publicAdmin, doPublic, os);
 
             // CLIENT SCRIPT
-            generate("client", readTemplate("client.sh"));
+            generate("client-init", readTemplate("client-init.sh"));
+            generate("client-work", readTemplate("client-work.sh"));
         }
     }
 

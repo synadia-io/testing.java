@@ -17,20 +17,3 @@ echo 'export GRADLE_HOME=/opt/gradle/gradle-8.10' >> .bash_profile
 echo 'export PATH=${GRADLE_HOME}/bin:${PATH}' >> .bash_profile
 export GRADLE_HOME=/opt/gradle/gradle-8.10
 export PATH=${GRADLE_HOME}/bin:${PATH}
-
-set +x
-cls
-gradle -version
-echo ""
-java -version
-
-echo ""
-cd ~
-rm -rf testing.java
-git clone https://github.com/synadia-io/testing.java
-cd testing.java
-
-echo ""
-echo "TODO: Export AWS security"
-echo "TODO: chmod +x bin/generate && bin/generate && chmod +x gen/* && chmod -x gen/*.json"
-echo ""
