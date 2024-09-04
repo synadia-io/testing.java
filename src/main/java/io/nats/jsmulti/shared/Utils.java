@@ -22,8 +22,12 @@ public abstract class Utils {
 
     public static final String HDR_PUB_TIME = "pt";
 
+    public static String makeId() {
+        return NUID.nextGlobalSequence();
+    }
+
     public static String makeId(String name) {
-        return name + "-" + NUID.nextGlobalSequence();
+        return name + NUID.nextGlobalSequence();
     }
 
     public static void report(Context ctx, int total, String message) {

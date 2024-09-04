@@ -23,7 +23,9 @@ public class Params {
     public final String server0;
     public final String server1;
     public final String server2;
-    public final String bucket;
+    public final String streamName;
+    public final String streamSubject;
+    public final String trackingBucket;
 
     public Params(List<String> paramsFiles) {
         jv = mapBuilder().jv;
@@ -44,7 +46,9 @@ public class Params {
         server0 = readString(jv, "server0");
         server1 = readString(jv, "server1");
         server2 = readString(jv, "server2");
-        bucket = readString(jv, "tracking_bucket");
+        streamName = readString(jv, "stream_name");
+        streamSubject = readString(jv, "stream_subject");
+        trackingBucket = readString(jv, "tracking_bucket");
 
         System.out.println(jv.toJson());
     }

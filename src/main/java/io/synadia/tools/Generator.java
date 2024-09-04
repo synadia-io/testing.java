@@ -19,6 +19,7 @@ public class Generator {
 
     // aws ec2 describe-instances --output json > aws.json
 
+    private static final int WHICH_NA = 0;
     private static final int WHICH_PUBLIC = 1;
     private static final int WHICH_PRIVATE = -1;
     private static final String OS_WIN = "win";
@@ -63,6 +64,10 @@ public class Generator {
 
         boolean doPublic = jv.map.get("do_public") == null || jv.map.get("do_public").bool;
         String os = jv.map.get("os").string.equals("win") ? OS_WIN : OS_UNIX;
+        String shellExt = jv.map.get("shell_ext").string;
+        if (shellExt == null) {
+            shellExt = "";
+        }
         String keyFile = jv.map.get("key_file").string;
         String serverUser = jv.map.get("server_user").string;
         String clientUser = jv.map.get("client_user").string;
@@ -100,7 +105,7 @@ public class Generator {
                     try {
                         heading("client " + instance.name + " [" + instance.stateName + "]");
                         if (instance.isRunning()) {
-                            printSsh("client", instance, clientUser, keyFile);
+                            printSsh(instance, clientUser, keyFile);
                         }
                     }
                     catch (Exception ignore) {}
@@ -116,8 +121,8 @@ public class Generator {
         String publicAdmin = null;
         StringBuilder privateBootstrap = new StringBuilder();
         StringBuilder publicBootstrap = new StringBuilder();
-        String serverPrivateJson = readTemplate("servers.json");
-        String serverPublicJson = serverPrivateJson;
+        String configTemplatePrivate = readTemplate("config.json", os);
+        String configTemplatePublic = configTemplatePrivate;
         for (int x = 0; x < 3; x++) {
             String scriptName = "server" + x;
 
@@ -136,17 +141,17 @@ public class Generator {
             privateBootstrap.append(privateServer);
             publicBootstrap.append(publicServer);
 
-            serverPrivateJson = serverPrivateJson.replace("<Server" + x + ">", privateServer);
-            serverPublicJson = serverPublicJson.replace("<Server" + x + ">", publicServer);
+            configTemplatePrivate = configTemplatePrivate.replace("<Server" + x + ">", privateServer);
+            configTemplatePublic = configTemplatePublic.replace("<Server" + x + ">", publicServer);
 
             if (doPublic) {
                 heading(scriptName + " " + current.stateName);
-                printSsh(scriptName, current, serverUser, keyFile);
-                printNatsCli(scriptName, current);
+                printSsh(current, serverUser, keyFile);
+                printNatsCli(current);
 
                 // SERVER x SCRIPT
                 if (generate) {
-                    String template = readTemplate("server.sh")
+                    String template = readTemplate("server.sh", os)
                         .replace("<InstanceId>", "" + x)
                         .replace("<PrivateIpRoute1>", runningServers.get(1).privateIpAddr)
                         .replace("<PrivateIpRoute2>", runningServers.get(2).privateIpAddr);
@@ -156,25 +161,27 @@ public class Generator {
 
             runningServers.add(runningServers.removeFirst());
         }
+        configTemplatePrivate = templateMore(configTemplatePrivate, privateBootstrap, privateAdmin);
+        configTemplatePublic = templateMore(configTemplatePublic, publicBootstrap, publicAdmin);
 
         if (generate) {
-            // SERVERS
-            generate("servers-private.json", serverPrivateJson);
+            // CONFIG
             if (doPublic) {
-                generate("servers-public.json", serverPublicJson);
+                generate("config.json", configTemplatePublic);
+            }
+            else {
+                generate("config.json", configTemplatePrivate);
             }
 
-            script("deploy-test", os, doPublic);
+            // ADMIN
+            script("deploy-test", os, shellExt, doPublic);
+            script("setup-tracking", os, shellExt, doPublic);
+            script("watch-tracking", os, shellExt, doPublic);
 
             // PUBLISH
-            workload("publish", privateBootstrap, privateAdmin, publicBootstrap, publicAdmin, doPublic, os);
-            workload("publish-limited", "publish", privateBootstrap, privateAdmin, publicBootstrap, publicAdmin, doPublic, os);
-            workload("consume", privateBootstrap, privateAdmin, publicBootstrap, publicAdmin, doPublic, os);
-            workload("setup-tracking", privateBootstrap, privateAdmin, publicBootstrap, publicAdmin, doPublic, os);
-
-            // CLIENT SCRIPT
-            generate("client-init", readTemplate("client-init.sh"));
-            generate("client-work", readTemplate("client-work.sh"));
+            workload("publish", "publish", privateBootstrap, privateAdmin, publicBootstrap, publicAdmin, doPublic, os, shellExt);
+            workload("publish-limited", "publish", privateBootstrap, privateAdmin, publicBootstrap, publicAdmin, doPublic, os, shellExt);
+            workload("consume", "consume", privateBootstrap, privateAdmin, publicBootstrap, publicAdmin, doPublic, os, shellExt);
         }
     }
 
@@ -206,6 +213,7 @@ public class Generator {
             jv = JsonValueUtils.mapBuilder()
                 .put("do_public", false)
                 .put("os", "unix")
+                .put("shell_ext", ".sh")
                 .put("key_file", NA)
                 .put("server_user", "ubuntu")
                 .put("client_user", "ec2-user")
@@ -218,33 +226,28 @@ public class Generator {
         return jv;
     }
 
-    private static void script(String workName, String os, boolean doPublic) throws IOException {
-        script(workName, workName, os, doPublic);
-    }
-
-    private static void script(String workName, String scriptTemplateName, String os, boolean doPublic) throws IOException {
-        String scriptTemplate = readTemplate(scriptTemplateName + "-sh-bat.txt");
-        writeRunners(workName, scriptTemplate.replace("<Qualifier>", "-private"), WHICH_PRIVATE, os);
+    private static void script(String name, String os, String shellExt, boolean doPublic) throws IOException {
+        String scriptTemplate = readTemplate(name + "-sh-bat.txt", os);
         if (doPublic) {
-            writeRunners(workName, scriptTemplate.replace("<Qualifier>", "-public"), WHICH_PUBLIC, os);
+            scriptTemplate = scriptTemplate.replace("<Gradle>", "call gradle");
         }
+        else {
+            scriptTemplate = scriptTemplate.replace("<Gradle>", "gradle");
+        }
+        String genName = os.equals(OS_UNIX) ? name + shellExt : name + ".bat";
+        generate(genName, scriptTemplate);
     }
 
-    private static void workload(String workName, StringBuilder privateBootstrap, String privateAdmin, StringBuilder publicBootstrap, String publicAdmin, boolean doPublic, String os) throws IOException {
-        workload(workName, workName, privateBootstrap, privateAdmin, publicBootstrap, publicAdmin, doPublic, os);
-    }
-
-    private static void workload(String workName, String scriptTemplateName, StringBuilder privateBootstrap, String privateAdmin, StringBuilder publicBootstrap, String publicAdmin, boolean doPublic, String os) throws IOException {
-        String template = readTemplate(workName + ".json");
-        generate(workName + "-private.json", fillPublish(template, privateBootstrap, privateAdmin));
+    private static void workload(String name, String templateName, StringBuilder privateBootstrap, String privateAdmin, StringBuilder publicBootstrap, String publicAdmin, boolean doPublic, String os, String shellExt) throws IOException {
+        String jsonTemplate = readTemplate(templateName + ".json", os);
         if (doPublic) {
-            generate(workName + "-public.json", fillPublish(template, publicBootstrap, publicAdmin));
+            jsonTemplate = templateMore(jsonTemplate, publicBootstrap, publicAdmin);
         }
-        script(workName, scriptTemplateName, os, doPublic);
-    }
-
-    private static String fillPublish(String template, StringBuilder publicBootstrap, String publicAdmin) {
-        return template.replace("<Bootstrap>", publicBootstrap).replace("<Admin>", publicAdmin);
+        else {
+            jsonTemplate = templateMore(jsonTemplate, privateBootstrap, privateAdmin);
+        }
+        generate(name + ".json", jsonTemplate);
+        script(name, os, shellExt, doPublic);
     }
 
     private static void heading(String label) {
@@ -252,37 +255,26 @@ public class Generator {
         System.out.println(label);
     }
 
-    private static void printNatsCli(String scriptName, Instance current) throws IOException {
-        writeBatch(scriptName, "nats", "nats s info -s " + current.publicIpAddr);
+    private static void printNatsCli(Instance current) throws IOException {
+        System.out.println("nats s info -a -s " + current.publicIpAddr);
     }
 
-    private static void printSsh(String scriptName, Instance current, String user, String keyFile) throws IOException {
+    private static void printSsh(Instance current, String user, String keyFile) throws IOException {
         if (!NA.equals(keyFile)) {
-            writeBatch(scriptName, "ssh", "ssh -oStrictHostKeyChecking=no -i " + keyFile + " " + user + "@" + current.publicDnsName);
+            System.out.println("ssh -oStrictHostKeyChecking=no -i " + keyFile + " " + user + "@" + current.publicDnsName);
         }
     }
 
-    private static void writeBatch(String name, String prefix, String cmd) throws IOException {
-        System.out.println(cmd);
-        generate(prefix + "-" + name + ".bat", cmd);
+    private static String readTemplate(String tpl, String os) throws IOException {
+        String template = Files.readString(Paths.get("templates", tpl));
+        if (OS_WIN.equals(os)) {
+            return template.replace("<SEP>", "\\");
+        }
+        return template.replace("<SEP>", "/");
     }
 
-    private static void writeRunners(String name, String template, int pubPri, String devOs) throws IOException {
-        if (pubPri == WHICH_PUBLIC) {
-            String genName = devOs.equals(OS_UNIX) ? name + "-public" : name + ".bat";
-            generate(genName, template.replace("<Gradle>", "call gradle")
-                .replace("<SEP>", "\\")
-                .replace("<Location>", "public"));
-        }
-        if (pubPri == WHICH_PRIVATE) {
-            generate(name, template.replace("<Gradle>", "gradle")
-                .replace("<SEP>", "/")
-                .replace("<Location>", "private"));
-        }
-    }
-
-    private static String readTemplate(String tpl) throws IOException {
-        return Files.readString(Paths.get("templates", tpl));
+    private static String templateMore(String template, StringBuilder bootstrap, String admin) {
+        return template.replace("<Bootstrap>", bootstrap).replace("<Admin>", admin);
     }
 
     private static void generate(String fn, String data) throws IOException {

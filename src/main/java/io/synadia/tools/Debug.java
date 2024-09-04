@@ -17,7 +17,7 @@ import java.util.List;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-// MODIFIED 07/05/2024 1
+// MODIFIED 09/04/2024 1
 
 @SuppressWarnings("SameParameterValue")
 public abstract class Debug {
@@ -220,8 +220,8 @@ public abstract class Debug {
             }
 
             String xtra = getString(extras[i]);
-            while (xtra.contains("{}")) {
-                xtra = xtra.replaceFirst("\\Q{}\\E", getString(extras[++i]));
+            while (xtra.contains("%s")) {
+                xtra = xtra.replaceFirst("\\Q%s\\E", getString(extras[++i]));
             }
             sb.append(xtra);
         }

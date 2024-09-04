@@ -15,22 +15,27 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 public class TestingApplication implements Application, AutoCloseable {
-    String bucket;
-    Connection nc;
-    KeyValue kv;
+    private Context ctx;
+    private Connection nc;
+    private KeyValue kv;
 
     public void setBucket(String bucket) {
-        this.bucket = bucket;
-    }
-
-    @Override
-    public void init(Context ctx) {
         try {
             nc = ctx.connect(OptionsFactory.OptionsType.ADMIN);
             KeyValueOptions kvo = KeyValueOptions.builder()
                 .jetStreamOptions(ctx.getJetStreamOptions())
                 .build();
             kv = nc.keyValue(bucket, kvo);
+        }
+        catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void init(Context ctx) {
+        try {
+            this.ctx = ctx;
         }
         catch (Exception e) {
             throw new RuntimeException(e);

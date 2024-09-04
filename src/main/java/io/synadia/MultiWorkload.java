@@ -23,10 +23,14 @@ public class MultiWorkload extends Workload {
 
         Arguments a = Arguments.instance().addJsonConfig(params.jvMultiConfig.toJson());
         a.appClass(TestingApplication.class);
+        Debug.info(workloadName, "Multi-Arguments");
         a.printCommandLineFormatted();
         Context ctx = new Context(a);
-        String bucket = params.jv.map.get("tracking_bucket").string;
-        ((TestingApplication) ctx.app).setBucket(bucket);
+
+        System.out.println("\n\n");
+        Debug.info(workloadName, "trackingBucket %s", params.trackingBucket);
+        ((TestingApplication) ctx.app).setBucket(params.trackingBucket);
+
         JsMulti.run(ctx);
     }
 

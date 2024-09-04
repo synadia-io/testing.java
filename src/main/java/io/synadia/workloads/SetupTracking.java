@@ -25,12 +25,12 @@ public class SetupTracking extends Workload {
         try (Connection nc = Nats.connect(options)) {
             KeyValueManagement kvm = nc.keyValueManagement();
             List<String> names = kvm.getBucketNames();
-            if (names.contains(params.bucket)) {
+            if (names.contains(params.trackingBucket)) {
                 Debug.info(workloadName, "Bucket already exists.");
             }
             else {
                 KeyValueConfiguration kvc = KeyValueConfiguration.builder()
-                    .name(params.bucket)
+                    .name(params.trackingBucket)
                     .maxHistoryPerKey(1)
                     .build();
                 Debug.info(workloadName, kvm.create(kvc));

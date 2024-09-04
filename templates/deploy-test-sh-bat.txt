@@ -1,3 +1,2 @@
 <Gradle> buildDeploy
-java -cp "build/libs/*" io.synadia.Runner --workload deployTest --params gen<SEP>servers-<Location>.json
-
+java -cp "build/libs/*" io.synadia.Runner --workload deployTest --params gen<SEP>config.json

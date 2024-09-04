@@ -82,7 +82,7 @@ public class Stats {
     private final ExecutorService countService = Executors.newSingleThreadExecutor();
 
     public Stats() {
-        id = makeId("stats");
+        id = makeId();
         label = "";
         key = "";
         ctx = null;
@@ -90,7 +90,7 @@ public class Stats {
     }
 
     public Stats(Context ctx) throws IOException {
-        id = makeId("stats");
+        id = makeId();
         this.ctx = ctx;
         label = ctx.action.getLabel();
         key = label + "."  + ctx.id + "." + id;
@@ -110,6 +110,8 @@ public class Stats {
         label = JsonValueUtils.readString(jv, "hdrLabel", null);
         key = JsonValueUtils.readString(jv, "subject", null);
         exceptionMessage = JsonValueUtils.readString(jv, "exceptionMessage", null);
+        elapsed = JsonValueUtils.readLong(jv, "elapsed", 0);
+        bytes = JsonValueUtils.readLong(jv, "bytes", 0);
         messageCount = JsonValueUtils.readLong(jv, "messageCount", 0);
         messagePubToServerTimeElapsed = JsonValueUtils.readLong(jv, "messagePubToServerTimeElapsed", 0);
         messageServerToReceiverElapsed = JsonValueUtils.readLong(jv, "messageServerToReceiverElapsed", 0);
@@ -364,12 +366,21 @@ public class Stats {
     }
 
     public static void report(List<Stats> statList, PrintStream out) {
+        report(statList, out, false);
+    }
+
+    public static void report(List<Stats> statList, boolean idAsColumnLabel) {
+        report(statList, System.out, idAsColumnLabel);
+    }
+
+    public static void report(List<Stats> statList, PrintStream out, boolean idAsColumnLabel) {
         Stats totalStats = total(statList);
 
         Context ctx = statList.get(0).ctx;
         if (ctx != null && ctx.action == Action.RTT) {
             for (int x = 0; x < statList.size(); x++) {
-                rttReport(statList.get(x), "Thread " + (x+1), x == 0, false, out);
+                Stats stats = statList.get(x);
+                rttReport(stats, mainLabel(x, idAsColumnLabel, stats), x == 0, false, out);
             }
             out.println(RTT_REPORT_SEP_LINE);
             rttReport(totalStats, "Total", false, true, out);
@@ -377,23 +388,33 @@ public class Stats {
         }
 
         for (int x = 0; x < statList.size(); x++) {
-            report(statList.get(x), "Thread " + (x+1), x == 0, false, out);
+            Stats stats = statList.get(x);
+            report(stats, mainLabel(x, idAsColumnLabel, stats), x == 0, false, out);
         }
         out.println(REPORT_SEP_LINE);
         report(totalStats, "Total", false, true, out);
 
         if (statList.get(0).messagePubToServerTimeElapsed > 0) {
             for (int x = 0; x < statList.size(); x++) {
-                ltReport(statList.get(x), "Thread " + (x+1), x == 0, false, out);
+                Stats stats = statList.get(x);
+                ltReport(stats, mainLabel(x, idAsColumnLabel, stats), x == 0, false, out);
             }
             out.println(LT_REPORT_SEP_LINE);
             ltReport(totalStats, "Total", false, true, out);
 
             for (int x = 0; x < statList.size(); x++) {
-                lmReport(statList.get(x), "Thread " + (x+1), x == 0, false, out);
+                Stats stats = statList.get(x);
+                lmReport(stats, mainLabel(x, idAsColumnLabel, stats), x == 0, false, out);
             }
             lmReport(totalStats, "Total", false, true, out);
         }
+    }
+
+    private static String mainLabel(int x, boolean idAsColumnLabel, Stats stats) {
+        if (idAsColumnLabel) {
+            return stats.id;
+        }
+        return "Thread " + (x + 1);
     }
 
     public static String humanBytes(double bytes) {
