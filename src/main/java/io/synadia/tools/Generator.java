@@ -15,16 +15,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import static io.synadia.tools.Constants.*;
+
 public class Generator {
 
     // aws ec2 describe-instances --output json > aws.json
-
-    private static final int WHICH_NA = 0;
-    private static final int WHICH_PUBLIC = 1;
-    private static final int WHICH_PRIVATE = -1;
-    private static final String OS_WIN = "win";
-    private static final String OS_UNIX = "unix";
-    private static final String NA = "na";
 
     static class Instance {
         final String name;
@@ -121,7 +116,7 @@ public class Generator {
         String publicAdmin = null;
         StringBuilder privateBootstrap = new StringBuilder();
         StringBuilder publicBootstrap = new StringBuilder();
-        String configTemplatePrivate = readTemplate("config.json", os);
+        String configTemplatePrivate = readTemplate(CONFIG_JSON, os);
         String configTemplatePublic = configTemplatePrivate;
         for (int x = 0; x < 3; x++) {
             String scriptName = "server" + x;
@@ -141,8 +136,8 @@ public class Generator {
             privateBootstrap.append(privateServer);
             publicBootstrap.append(publicServer);
 
-            configTemplatePrivate = configTemplatePrivate.replace("<Server" + x + ">", privateServer);
-            configTemplatePublic = configTemplatePublic.replace("<Server" + x + ">", publicServer);
+            configTemplatePrivate = configTemplatePrivate.replace(SERVER_PREFIX + x + TAG_END, privateServer);
+            configTemplatePublic = configTemplatePublic.replace(SERVER_PREFIX + x + TAG_END, publicServer);
 
             if (doPublic) {
                 heading(scriptName + " " + current.stateName);
@@ -167,26 +162,87 @@ public class Generator {
         if (generate) {
             // CONFIG
             if (doPublic) {
-                generate("config.json", configTemplatePublic);
+                generate(CONFIG_JSON, configTemplatePublic);
             }
             else {
-                generate("config.json", configTemplatePrivate);
+                generate(CONFIG_JSON, configTemplatePrivate);
             }
 
-            // ADMIN
-            script("deploy-test", os, shellExt, doPublic);
-            script("setup-tracking", os, shellExt, doPublic);
-            script("watch-tracking", os, shellExt, doPublic);
-
-            // PUBLISH
-            workload("publish", "publish", privateBootstrap, privateAdmin, publicBootstrap, publicAdmin, doPublic, os, shellExt);
-            workload("publish-limited", "publish", privateBootstrap, privateAdmin, publicBootstrap, publicAdmin, doPublic, os, shellExt);
-            workload("consume", "consume", privateBootstrap, privateAdmin, publicBootstrap, publicAdmin, doPublic, os, shellExt);
+            // WORKLOADS always have a pair of -sh-bat.txt and .json
+            // ADMIN/SCRIPTS just have the -sh-bat.txt
+            File[] files = new File(INPUT_DIR).listFiles();
+            if (files != null) {
+                for (File f : files) {
+                    String name = f.getName();
+                    if (name.endsWith(SH_BAT_DOT_TXT)) {
+                        name = name.replace(SH_BAT_DOT_TXT, "");
+                        File pair = new File(INPUT_DIR + File.separator + name + DOT_JSON);
+                        if (pair.exists()) {
+                            workload(name, os, shellExt, doPublic, publicBootstrap, publicAdmin, privateBootstrap, privateAdmin);
+                        }
+                        else {
+                            script(name, os, shellExt, doPublic);
+                        }
+                    }
+                }
+            }
         }
     }
 
+    private static void workload(String name, String os, String shellExt, boolean doPublic, StringBuilder publicBootstrap, String publicAdmin, StringBuilder privateBootstrap, String privateAdmin) throws IOException {
+        String jsonTemplate = readTemplate(name + DOT_JSON, os);
+        if (doPublic) {
+            jsonTemplate = templateMore(jsonTemplate, publicBootstrap, publicAdmin);
+        }
+        else {
+            jsonTemplate = templateMore(jsonTemplate, privateBootstrap, privateAdmin);
+        }
+        generate(name + DOT_JSON, jsonTemplate);
+        script(name, os, shellExt, doPublic);
+    }
+
+    private static void script(String name, String os, String shellExt, boolean doPublic) throws IOException {
+        String scriptTemplate = readTemplate(name + SH_BAT_DOT_TXT, os);
+        String genName = os.equals(OS_UNIX) ? name + shellExt : name + ".bat";
+        generate(genName, scriptTemplate);
+    }
+
+    private static void heading(String label) {
+        System.out.println();
+        System.out.println(label);
+    }
+
+    private static void printNatsCli(Instance current) throws IOException {
+        System.out.println("nats s info -a -s " + current.publicIpAddr);
+    }
+
+    private static void printSsh(Instance current, String user, String keyFile) throws IOException {
+        if (!NA.equals(keyFile)) {
+            System.out.println("ssh -oStrictHostKeyChecking=no -i " + keyFile + " " + user + "@" + current.publicDnsName);
+        }
+    }
+
+    private static String readTemplate(String tpl, String os) throws IOException {
+        String template = Files.readString(Paths.get(INPUT_DIR, tpl));
+        if (OS_WIN.equals(os)) {
+            return template.replace(PATH_SEP, "\\");
+        }
+        return template.replace(PATH_SEP, "/");
+    }
+
+    private static String templateMore(String template, StringBuilder bootstrap, String admin) {
+        return template.replace(BOOTSTRAP, bootstrap).replace(ADMIN, admin);
+    }
+
+    private static void generate(String fn, String data) throws IOException {
+        FileOutputStream out = new FileOutputStream(Paths.get(OUTPUT_DIR, fn).toString());
+        out.write(data.getBytes(StandardCharsets.US_ASCII));
+        out.flush();
+        out.close();
+    }
+
     private static void prepareOutputDir() {
-        File gen = new File("gen");
+        File gen = new File(OUTPUT_DIR);
         if (gen.exists()) {
             // clear directory
             File[] files = gen.listFiles();
@@ -224,63 +280,5 @@ public class Generator {
                 .toJsonValue();
         }
         return jv;
-    }
-
-    private static void script(String name, String os, String shellExt, boolean doPublic) throws IOException {
-        String scriptTemplate = readTemplate(name + "-sh-bat.txt", os);
-        if (doPublic) {
-            scriptTemplate = scriptTemplate.replace("<Gradle>", "call gradle");
-        }
-        else {
-            scriptTemplate = scriptTemplate.replace("<Gradle>", "gradle");
-        }
-        String genName = os.equals(OS_UNIX) ? name + shellExt : name + ".bat";
-        generate(genName, scriptTemplate);
-    }
-
-    private static void workload(String name, String templateName, StringBuilder privateBootstrap, String privateAdmin, StringBuilder publicBootstrap, String publicAdmin, boolean doPublic, String os, String shellExt) throws IOException {
-        String jsonTemplate = readTemplate(templateName + ".json", os);
-        if (doPublic) {
-            jsonTemplate = templateMore(jsonTemplate, publicBootstrap, publicAdmin);
-        }
-        else {
-            jsonTemplate = templateMore(jsonTemplate, privateBootstrap, privateAdmin);
-        }
-        generate(name + ".json", jsonTemplate);
-        script(name, os, shellExt, doPublic);
-    }
-
-    private static void heading(String label) {
-        System.out.println();
-        System.out.println(label);
-    }
-
-    private static void printNatsCli(Instance current) throws IOException {
-        System.out.println("nats s info -a -s " + current.publicIpAddr);
-    }
-
-    private static void printSsh(Instance current, String user, String keyFile) throws IOException {
-        if (!NA.equals(keyFile)) {
-            System.out.println("ssh -oStrictHostKeyChecking=no -i " + keyFile + " " + user + "@" + current.publicDnsName);
-        }
-    }
-
-    private static String readTemplate(String tpl, String os) throws IOException {
-        String template = Files.readString(Paths.get("templates", tpl));
-        if (OS_WIN.equals(os)) {
-            return template.replace("<SEP>", "\\");
-        }
-        return template.replace("<SEP>", "/");
-    }
-
-    private static String templateMore(String template, StringBuilder bootstrap, String admin) {
-        return template.replace("<Bootstrap>", bootstrap).replace("<Admin>", admin);
-    }
-
-    private static void generate(String fn, String data) throws IOException {
-        FileOutputStream out = new FileOutputStream(Paths.get("gen", fn).toString());
-        out.write(data.getBytes(StandardCharsets.US_ASCII));
-        out.flush();
-        out.close();
     }
 }

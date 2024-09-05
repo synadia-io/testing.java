@@ -46,7 +46,7 @@ task copyToLib(type: Copy) {
     from configurations.runtimeClasspath
 }
 
-task buildDeploy(type: Copy) {
+task make(type: Copy) {
     dependsOn clean
     dependsOn copyToLib
     dependsOn jar

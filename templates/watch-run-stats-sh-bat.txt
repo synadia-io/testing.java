@@ -1,0 +1,1 @@
+java -cp "build/libs/*" io.synadia.Runner --workload watchRunStats --params gen<PathSep>config.json

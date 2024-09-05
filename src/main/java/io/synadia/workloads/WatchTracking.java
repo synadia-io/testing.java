@@ -9,8 +9,10 @@ import io.nats.client.Nats;
 import io.nats.client.Options;
 import io.nats.client.api.KeyValueEntry;
 import io.nats.client.api.KeyValueWatcher;
+import io.nats.client.support.JsonParseException;
 import io.nats.client.support.JsonParser;
 import io.nats.client.support.JsonValue;
+import io.nats.jsmulti.shared.ProfileStats;
 import io.nats.jsmulti.shared.Stats;
 import io.synadia.CommandLine;
 import io.synadia.Workload;
@@ -22,74 +24,163 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 
-public class WatchTracking extends Workload implements KeyValueWatcher {
-    public WatchTracking(CommandLine commandLine) {
-        super("Watch Tracking", commandLine);
+import static io.synadia.tools.Constants.FINAL;
+
+public class WatchTracking extends Workload {
+    public enum Which {
+        Stats("Stats"),
+        RunStats("Run Stats");
+
+        final String workloadName;
+
+        Which(String workloadName) {
+            this.workloadName = workloadName;
+        }
+    }
+
+    private final Which which;
+    private final String bucket;
+
+    public WatchTracking(Which which, CommandLine commandLine) {
+        super(which.workloadName, commandLine);
+        this.which = which;
+        if (which == Which.Stats) {
+            bucket = params.statsBucket;
+        }
+        else {
+            bucket = params.runStatsBucket;
+        }
     }
 
     @Override
     public void runWorkload() throws Exception {
-        Options options = getAdminOptions("Setup Tracking");
+        Options options = getAdminOptions();
         try (Connection nc = Nats.connect(options)) {
-            KeyValue kv = nc.keyValue(params.trackingBucket);
-            kv.watchAll(this);
-            while (true) {
-                Thread.sleep(1000);
-                report();
+            KeyValue kv = nc.keyValue(bucket);
+            WtWatcher watcher;
+            if (which == Which.Stats) {
+                watcher = new StatsWatcher();
             }
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-            System.exit(-1);
+            else {
+                watcher = new RunStatsWatcher();
+            }
+            kv.watchAll(watcher);
+
+            //noinspection InfiniteLoopStatement
+            while (true) {
+                //noinspection BusyWait
+                Thread.sleep(params.watchWaitTime);
+                watcher.report();
+            }
         }
     }
 
-    Map<String, List<Stats>> byType = new HashMap<>();
-    Map<String, List<Stats>> byContext = new HashMap<>();
-    ReentrantLock lock = new ReentrantLock();
+    static class ParsedEntry {
+        final JsonValue jv;
+        final boolean fin;
+        final String statType;
+        final String contextId;
 
-    @Override
-    public void watch(KeyValueEntry kve) {
-        try {
-            JsonValue jv = JsonParser.parse(kve.getValue());
-            Boolean b = jv.map.get("final").bool;
-            boolean fin = b != null && b;
+        public ParsedEntry(KeyValueEntry kve) throws JsonParseException {
+            System.out.println(kve.getValueAsString());
+
+            jv = JsonParser.parse(kve.getValue());
+
+            JsonValue jvFinal = jv.map.get(FINAL);
+            if (jvFinal == null) {
+                fin = false;
+            }
+            else {
+                fin = jvFinal.bool != null && jvFinal.bool;
+            }
+
             String[] key = kve.getKey().split("\\.");
-            String statType = key[0];
-            String ctx = key[1];
-            Stats stats = new Stats(jv);
+            statType = key[0];
+            contextId = key[1];
+        }
+    }
+
+    class StatsWatcher extends WtWatcher {
+        Map<String, List<Stats>> byType = new HashMap<>();
+        Map<String, List<Stats>> byContext = new HashMap<>();
+        ReentrantLock lock = new ReentrantLock();
+
+        @Override
+        void subWatch(ParsedEntry p) {
+            Stats stats = new Stats(p.jv);
+
+            if (!p.fin) {
+                allFinal = false;
+            }
 
             lock.lock();
             try {
-                byType.computeIfAbsent(statType, k -> new ArrayList<>()).add(stats);
-                byContext.computeIfAbsent(ctx, k -> new ArrayList<>()).add(stats);
+                byType.computeIfAbsent(p.statType, k -> new ArrayList<>()).add(stats);
+                byContext.computeIfAbsent(p.contextId, k -> new ArrayList<>()).add(stats);
             }
             finally {
                 lock.unlock();
             }
 
-            Debug.info(workloadName, stats.label, stats.key, "Final? %s", fin);
+            Debug.info(workloadName, stats.action, stats.key, "Final? %s", p.fin);
         }
-        catch (Exception e) {
-            Debug.info(workloadName, "Exception", e);
-        }
-    }
 
-    @Override
-    public void endOfData() {
-//        report();
-//        System.exit(0);
-    }
-
-    private void report() {
-        lock.lock();
-        try {
+        @Override
+        void subReport() {
             for (List<Stats> list : byType.values()) {
                 Stats.report(list, true);
             }
         }
-        finally {
-            lock.unlock();
+    }
+
+    class RunStatsWatcher extends WtWatcher {
+        @Override
+        void subWatch(ParsedEntry p) {
+            ProfileStats profileStats = new ProfileStats(p.jv);
+            Debug.info(workloadName, profileStats.statsAction, profileStats.statsKey, p.jv);
+        }
+
+        @Override
+        void subReport() {
+        }
+    }
+
+    abstract class WtWatcher implements KeyValueWatcher {
+        ReentrantLock lock = new ReentrantLock();
+        boolean allFinal = true;
+
+        abstract void subWatch(ParsedEntry parsedEntry);
+
+        @Override
+        public void watch(KeyValueEntry kve) {
+            try {
+                subWatch(new ParsedEntry(kve));
+            }
+            catch (Exception e) {
+                Debug.info(workloadName, e);
+                Debug.stackTrace(workloadName, e);
+                System.exit(-1);
+            }
+        }
+
+        @Override
+        public void endOfData() {
+            if (allFinal) {
+                report();
+                System.exit(0);
+            }
+        }
+
+        abstract void subReport();
+
+        void report() {
+            lock.lock();
+            try {
+                subReport();
+            }
+            finally {
+                lock.unlock();
+            }
         }
     }
 }

@@ -1,8 +1,8 @@
 :JsMultiTool_Get_Repo
-rd temp /S /Q
-md temp
+rd temp_get_tools /S /Q
+md temp_get_tools
 rd java/io/nats/jsmulti /S /Q
-cd temp
+cd temp_get_tools
 git clone https://github.com/nats-io/java-nats-examples
 cd ..
 
@@ -10,7 +10,7 @@ cd ..
 git rm src\main\java\io\nats\jsmulti -rf
 
 :JsMultiTool_Copy_Repo_To_Src
-xcopy temp\java-nats-examples\js-multi-tool\src\main src\main /S /Y
+xcopy temp_get_tools\java-nats-examples\js-multi-tool\src\main src\main /S /Y
 
 :JsMultiTool_Remove_Unecessary_Code
 rd src\main\java\io\nats\jsmulti\examples /S /Q
@@ -19,4 +19,4 @@ rd src\main\java\io\nats\jsmulti\examples /S /Q
 git add src\main\java\io\nats\jsmulti\*
 
 :JsMultiTool_4_Remove_Temp
-rd temp /S /Q
+rd temp_get_tools /S /Q

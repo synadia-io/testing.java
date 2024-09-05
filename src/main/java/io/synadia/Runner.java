@@ -9,33 +9,40 @@ public class Runner {
 
     public static void main(String[] args) throws Exception {
         CommandLine commandLine = new CommandLine(args);
-
+        Workload workload = null;
+        switch (commandLine.workload) {
+            case "publisher":
+                workload = new MultiWorkload("Publisher", commandLine);
+                break;
+            case "consumer":
+                workload = new MultiWorkload("Consumer", commandLine);
+                break;
+            case "deployTest":
+                workload = new DeployTest(commandLine);
+                break;
+            case "setupTracking":
+                workload = new SetupTracking(commandLine);
+                break;
+            case "watchStats":
+                workload = new WatchTracking(WatchTracking.Which.Stats, commandLine);
+                break;
+            case "watchRunStats":
+                workload = new WatchTracking(WatchTracking.Which.RunStats, commandLine);
+                break;
+            default:
+                Debug.info("Runner", "Workload not implemented: " + commandLine.workload);
+                break;
+        }
         try {
-            switch (commandLine.workload) {
-                case "publisher":
-                    new MultiWorkload("Publisher", commandLine).runWorkload();
-                    break;
-                case "consumer":
-                    new MultiWorkload("Consumer", commandLine).runWorkload();
-                    break;
-                case "deployTest":
-                    new DeployTest(commandLine).runWorkload();
-                    break;
-                case "setupTracking":
-                    new SetupTracking(commandLine).runWorkload();
-                    break;
-                case "watchTracking":
-                    new WatchTracking(commandLine).runWorkload();
-                    break;
-
-                default:
-                    Debug.info("Runner", "Workload not implemented: " + commandLine.workload);
-                    break;
+            if (workload != null) {
+                workload.runWorkload();
             }
+            System.exit(0);
         }
         catch (Exception e) {
-            //noinspection CallToPrintStackTrace
-            e.printStackTrace();
+            String wn = workload == null ? "Runner" : workload.workloadName;
+            Debug.info(wn, e);
+            Debug.stackTrace(wn, e);
             System.exit(-1);
         }
     }

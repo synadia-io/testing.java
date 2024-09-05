@@ -27,9 +27,9 @@ public class MultiWorkload extends Workload {
         a.printCommandLineFormatted();
         Context ctx = new Context(a);
 
-        System.out.println("\n\n");
-        Debug.info(workloadName, "trackingBucket %s", params.trackingBucket);
-        ((TestingApplication) ctx.app).setBucket(params.trackingBucket);
+        System.out.println("\n");
+        Debug.info(workloadName, "Stats Bucket %s", params.statsBucket, "Run Stats Bucket %s", params.runStatsBucket);
+        ((TestingApplication) ctx.app).initTesting(this);
 
         JsMulti.run(ctx);
     }

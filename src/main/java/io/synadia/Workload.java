@@ -5,9 +5,9 @@ import io.nats.client.Options;
 import io.synadia.tools.Debug;
 
 public abstract class Workload {
-    protected final String workloadName;
-    protected final CommandLine commandLine;
-    protected final Params params;
+    public final String workloadName;
+    public final CommandLine commandLine;
+    public final Params params;
 
     public Workload(String workloadName, CommandLine commandLine) {
         this.workloadName = workloadName;
@@ -18,10 +18,14 @@ public abstract class Workload {
 
     public abstract void runWorkload() throws Exception;
 
-    protected Options getAdminOptions(String label) {
-        Debug.info(label, "connecting to: " + params.adminServer);
+    protected Options getAdminOptions() {
+        return getAdminOptions(params.adminServer);
+    }
+
+    protected Options getAdminOptions(String server) {
+        Debug.info(workloadName, "admin options", server);
         return new Options.Builder()
-            .server(params.adminServer)
+            .server(server)
             .connectionListener((x, y) -> {})
             .errorListener(new ErrorListener() {})
             .build();

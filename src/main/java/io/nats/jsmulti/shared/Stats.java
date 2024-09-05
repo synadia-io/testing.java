@@ -50,7 +50,7 @@ public class Stats {
 
     // Misc
     public final String id;
-    public final String label;
+    public final String action;
     public final String key;
 
     private String exceptionMessage;
@@ -83,7 +83,7 @@ public class Stats {
 
     public Stats() {
         id = makeId();
-        label = "";
+        action = "";
         key = "";
         ctx = null;
         lout = null;
@@ -92,8 +92,8 @@ public class Stats {
     public Stats(Context ctx) throws IOException {
         id = makeId();
         this.ctx = ctx;
-        label = ctx.action.getLabel();
-        key = label + "."  + ctx.id + "." + id;
+        action = ctx.action.getLabel();
+        key = action + "."  + ctx.id + "." + id;
         if (ctx.lcsv == null) {
             lout = null;
         }
@@ -107,7 +107,7 @@ public class Stats {
         ctx = null;
         lout = null;
         id = JsonValueUtils.readString(jv, "id", null);
-        label = JsonValueUtils.readString(jv, "hdrLabel", null);
+        action = JsonValueUtils.readString(jv, " action", null);
         key = JsonValueUtils.readString(jv, "subject", null);
         exceptionMessage = JsonValueUtils.readString(jv, "exceptionMessage", null);
         elapsed = JsonValueUtils.readLong(jv, "elapsed", 0);
@@ -130,7 +130,7 @@ public class Stats {
     public Map<String, JsonValue> toJsonValueMap() {
         return JsonValueUtils.mapBuilder()
             .put("id", id)
-            .put("hdrLabel", label)
+            .put(" action", action)
             .put("subject", key)
             .put("exceptionMessage", exceptionMessage)
             .put("elapsed", elapsed)
@@ -247,7 +247,7 @@ public class Stats {
         double bytesPerSecond = MILLIS_PER_SECOND * (stats.bytes) / (stats.elapsed);
         if (header) {
             out.println("\n" + REPORT_SEP_LINE);
-            out.printf(REPORT_LINE_HEADER, stats.label);
+            out.printf(REPORT_LINE_HEADER, stats.action);
             out.println(REPORT_SEP_LINE);
         }
         out.printf(REPORT_LINE_FORMAT, label,
@@ -263,7 +263,7 @@ public class Stats {
     public static void rttReport(Stats stats, String tlabel, boolean header, boolean footer, PrintStream out) {
         if (header) {
             out.println("\n" + RTT_REPORT_SEP_LINE);
-            out.printf(RTT_REPORT_LINE_HEADER, stats.label);
+            out.printf(RTT_REPORT_LINE_HEADER, stats.action);
             out.println(RTT_REPORT_SEP_LINE);
         }
         out.printf(RTT_REPORT_LINE_FORMAT, tlabel,

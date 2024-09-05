@@ -25,7 +25,9 @@ public class Params {
     public final String server2;
     public final String streamName;
     public final String streamSubject;
-    public final String trackingBucket;
+    public final String statsBucket;
+    public final String runStatsBucket;
+    public final long watchWaitTime;
 
     public Params(List<String> paramsFiles) {
         jv = mapBuilder().jv;
@@ -48,7 +50,9 @@ public class Params {
         server2 = readString(jv, "server2");
         streamName = readString(jv, "stream_name");
         streamSubject = readString(jv, "stream_subject");
-        trackingBucket = readString(jv, "tracking_bucket");
+        statsBucket = readString(jv, "stats_bucket");
+        runStatsBucket = readString(jv, "run_stats_bucket");
+        watchWaitTime = readLong(jv, "watch_wait_time", 1000);
 
         System.out.println(jv.toJson());
     }

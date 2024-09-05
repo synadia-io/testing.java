@@ -53,7 +53,7 @@ public class CommandLine {
     public String toString() {
         StringBuilder sb = new StringBuilder("Client Test Config: ");
         append(sb, "server", server, true);
-        append(sb, "id", id, true);
+        append(sb, "id", id, id != null);
         append(sb, "workload", workload, true);
         append(sb, "paramsFile", paramsFiles, true);
         return sb.toString().trim();

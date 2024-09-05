@@ -1,2 +1,1 @@
-<Gradle> buildDeploy
-java -cp "build/libs/*" io.synadia.Runner --workload setupTracking --params gen<SEP>config.json
+java -cp "build/libs/*" io.synadia.Runner --workload setupTracking --params gen<PathSep>config.json

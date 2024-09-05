@@ -3,15 +3,13 @@
  */
 package io.synadia.workloads;
 
-import io.nats.client.Connection;
-import io.nats.client.KeyValueManagement;
-import io.nats.client.Nats;
-import io.nats.client.Options;
+import io.nats.client.*;
 import io.nats.client.api.KeyValueConfiguration;
 import io.synadia.CommandLine;
 import io.synadia.Workload;
 import io.synadia.tools.Debug;
 
+import java.io.IOException;
 import java.util.List;
 
 public class SetupTracking extends Workload {
@@ -21,24 +19,30 @@ public class SetupTracking extends Workload {
 
     @Override
     public void runWorkload() throws Exception {
-        Options options = getAdminOptions("Setup Tracking");
+        Options options = getAdminOptions();
         try (Connection nc = Nats.connect(options)) {
             KeyValueManagement kvm = nc.keyValueManagement();
-            List<String> names = kvm.getBucketNames();
-            if (names.contains(params.trackingBucket)) {
-                Debug.info(workloadName, "Bucket already exists.");
-            }
-            else {
-                KeyValueConfiguration kvc = KeyValueConfiguration.builder()
-                    .name(params.trackingBucket)
-                    .maxHistoryPerKey(1)
-                    .build();
-                Debug.info(workloadName, kvm.create(kvc));
-            }
+            List<String> bucketNames = kvm.getBucketNames();
+            setupBucket(params.statsBucket, 1, kvm, bucketNames);
+            setupBucket(params.runStatsBucket, 32, kvm, bucketNames);
         }
         catch (Exception e) {
             e.printStackTrace();
             System.exit(-1);
         }
+    }
+
+    private void setupBucket(String bucket, int maxHistoryPerKey, KeyValueManagement kvm, List<String> bucketNames) throws IOException, JetStreamApiException, InterruptedException {
+        if (bucketNames.contains(bucket)) {
+            Debug.info(workloadName, "Removing existing bucket: " + bucket);
+            kvm.delete(bucket);
+            Thread.sleep(200); // the server needs time to process the delete
+        }
+        Debug.info(workloadName, "Creating bucket: " + bucket);
+        KeyValueConfiguration kvc = KeyValueConfiguration.builder()
+            .name(bucket)
+            .maxHistoryPerKey(maxHistoryPerKey)
+            .build();
+        Debug.info(workloadName, kvm.create(kvc));
     }
 }

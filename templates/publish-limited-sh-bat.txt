@@ -1,2 +1,1 @@
-<Gradle> buildDeploy
-java -cp "build/libs/*" io.synadia.Runner --workload publisher --params gen<SEP>publish-limited.json --params gen<SEP>config.json
+java -cp "build/libs/*" io.synadia.Runner --workload publisher --params gen<PathSep>config.json --params gen<PathSep>publish-limited.json
