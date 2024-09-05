@@ -61,7 +61,9 @@ public class CommandLine {
 
     public void debug() {
         Debug.info("Command Line", "server", server);
-        Debug.info("Command Line", "id", id);
+        if (id != null) {
+            Debug.info("Command Line", "id", id);
+        }
         Debug.info("Command Line", "workload", workload);
         Debug.info("Command Line", "paramsFile", paramsFiles);
     }

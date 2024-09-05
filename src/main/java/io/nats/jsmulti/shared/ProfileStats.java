@@ -16,6 +16,7 @@ package io.nats.jsmulti.shared;
 import io.nats.client.support.JsonValue;
 import io.nats.client.support.JsonValueUtils;
 
+import java.io.PrintStream;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryUsage;
@@ -27,27 +28,33 @@ import java.util.Map;
 import static io.nats.jsmulti.shared.Utils.makeId;
 
 public class ProfileStats {
-    public final String id;
-    public final String statsAction;
-    public final String statsKey;
+    private final String id;
+    private String statsAction;
+    private String statsKey;
 
-    public final long maxMemory;
-    public final long allocatedMemory;
-    public final long freeMemory;
-    public final long heapInit;
-    public final long heapUsed;
-    public final long heapCommitted;
-    public final long heapMax;
-    public final long nonHeapInit;
-    public final long nonHeapUsed;
-    public final long nonHeapCommitted;
-    public final long nonHeapMax;
-    public final int threadCount;
-    public final List<String> deadThreads;
-    public final List<String> liveThreads;
+    private long maxMemory;
+    private long allocatedMemory;
+    private long freeMemory;
+    private long heapInit;
+    private long heapUsed;
+    private long heapCommitted;
+    private long heapMax;
+    private long nonHeapInit;
+    private long nonHeapUsed;
+    private long nonHeapCommitted;
+    private long nonHeapMax;
+    private int threadCount;
+    private List<String> deadThreads;
+    private List<String> liveThreads;
+
+    private ProfileStats() {
+        id = makeId();
+        deadThreads = new ArrayList<>();
+        liveThreads = new ArrayList<>();
+    }
 
     public ProfileStats(String statsAction, String statsKey) {
-        id = makeId();
+        this();
         this.statsAction = statsAction;
         this.statsKey = statsKey;
 
@@ -70,8 +77,6 @@ public class ProfileStats {
         nonHeapCommitted = usage.getCommitted();
         nonHeapMax = usage.getMax();
 
-        deadThreads = new ArrayList<>();
-        liveThreads = new ArrayList<>();
         threadCount = threadBean.getThreadCount();
         long[] deadThreadIds = threadBean.findDeadlockedThreads();
         if (deadThreadIds == null) {
@@ -120,6 +125,8 @@ public class ProfileStats {
 
         return JsonValueUtils.mapBuilder()
             .put("id", id)
+            .put("statsAction", statsAction)
+            .put("statsKey", statsKey)
             .put("maxMemory", maxMemory)
             .put("allocatedMemory", allocatedMemory)
             .put("freeMemory", freeMemory)
@@ -135,6 +142,14 @@ public class ProfileStats {
             .put("deadThreads", deadBuilder.toJsonValue())
             .put("liveThreads", liveBuilder.toJsonValue())
             .toJsonValue().map;
+    }
+
+    public String getStatsAction() {
+        return statsAction;
+    }
+
+    public String getStatsKey() {
+        return statsKey;
     }
 
     private static boolean isAlive(long id, long[] deadThreadIds) {
@@ -205,5 +220,60 @@ public class ProfileStats {
             }
         }
         return true;
+    }
+
+    private static final String REPORT_SEP_LINE = "| --------------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ------- | ------- |";
+    private static final String REPORT_LINE_HEADER = "| %-15s | Max         | Allocated   | Free        | Heap Init   | Heap Used   | Heap Cmtd   | Heap Max    | Non Init    | Non Used    | Non Cmtd    | Non Max     | Alive   | Dead    |\n";
+    private static final String REPORT_LINE_FORMAT = "| %-15s | %11s | %11s | %11s | %11s | %11s | %11s | %11s | %11s | %11s | %11s | %11s | %7s | %7s |\n";
+
+    public static void report(ProfileStats p, String label, boolean header, boolean footer, PrintStream out) {
+        if (header) {
+            out.println("\n" + REPORT_SEP_LINE);
+            out.printf(REPORT_LINE_HEADER, p.statsAction);
+            out.println(REPORT_SEP_LINE);
+        }
+        out.printf(REPORT_LINE_FORMAT, label,
+            Stats.humanBytes(p.maxMemory),
+            Stats.humanBytes(p.allocatedMemory),
+            Stats.humanBytes(p.freeMemory),
+            Stats.humanBytes(p.heapInit),
+            Stats.humanBytes(p.heapUsed),
+            Stats.humanBytes(p.heapCommitted),
+            Stats.humanBytes(p.heapMax),
+            Stats.humanBytes(p.nonHeapInit),
+            Stats.humanBytes(p.nonHeapUsed),
+            Stats.humanBytes(p.nonHeapCommitted),
+            Stats.humanBytes(p.nonHeapMax),
+            p.liveThreads.size() + "/" + p.threadCount,
+            p.deadThreads.size() + "/" + p.threadCount);
+
+        if (footer) {
+            out.println(REPORT_SEP_LINE);
+        }
+    }
+
+    public static ProfileStats total(List<ProfileStats> list) {
+        ProfileStats total = new ProfileStats();
+        for (ProfileStats p : list) {
+            total.maxMemory = Math.max(total.maxMemory, p.maxMemory);
+            total.allocatedMemory = Math.max(total.allocatedMemory, p.allocatedMemory);
+            total.freeMemory = Math.max(total.freeMemory, p.freeMemory);
+            total.heapInit = Math.max(total.heapInit, p.heapInit);
+            total.heapUsed = Math.max(total.heapUsed, p.heapUsed);
+            total.heapCommitted = Math.max(total.heapCommitted, p.heapCommitted);
+            total.heapMax = Math.max(total.heapMax, p.heapMax);
+            total.nonHeapInit = Math.max(total.nonHeapInit, p.nonHeapInit);
+            total.nonHeapUsed = Math.max(total.nonHeapUsed, p.nonHeapUsed);
+            total.nonHeapCommitted = Math.max(total.nonHeapCommitted, p.nonHeapCommitted);
+            total.nonHeapMax = Math.max(total.nonHeapMax, p.nonHeapMax);
+            total.threadCount = Math.max(total.threadCount, p.threadCount);
+            if (p.deadThreads.size() > total.deadThreads.size()) {
+                total.deadThreads = p.deadThreads;
+            }
+            if (p.liveThreads.size() > total.liveThreads.size()) {
+                total.liveThreads = p.liveThreads;
+            }
+        }
+        return total;
     }
 }

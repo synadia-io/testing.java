@@ -75,35 +75,9 @@ public class WatchTracking extends Workload {
         }
     }
 
-    static class ParsedEntry {
-        final JsonValue jv;
-        final boolean fin;
-        final String statType;
-        final String contextId;
-
-        public ParsedEntry(KeyValueEntry kve) throws JsonParseException {
-            System.out.println(kve.getValueAsString());
-
-            jv = JsonParser.parse(kve.getValue());
-
-            JsonValue jvFinal = jv.map.get(FINAL);
-            if (jvFinal == null) {
-                fin = false;
-            }
-            else {
-                fin = jvFinal.bool != null && jvFinal.bool;
-            }
-
-            String[] key = kve.getKey().split("\\.");
-            statType = key[0];
-            contextId = key[1];
-        }
-    }
-
     class StatsWatcher extends WtWatcher {
         Map<String, List<Stats>> byType = new HashMap<>();
         Map<String, List<Stats>> byContext = new HashMap<>();
-        ReentrantLock lock = new ReentrantLock();
 
         @Override
         void subWatch(ParsedEntry p) {
@@ -121,8 +95,7 @@ public class WatchTracking extends Workload {
             finally {
                 lock.unlock();
             }
-
-            Debug.info(workloadName, stats.action, stats.key, "Final? %s", p.fin);
+//            Debug.info(workloadName, stats.action, stats.key, "Final? %s", p.fin);
         }
 
         @Override
@@ -134,14 +107,55 @@ public class WatchTracking extends Workload {
     }
 
     class RunStatsWatcher extends WtWatcher {
+        Map<String, List<ProfileStats>> byType = new HashMap<>();
+        Map<String, List<ProfileStats>> byContext = new HashMap<>();
+
         @Override
         void subWatch(ParsedEntry p) {
             ProfileStats profileStats = new ProfileStats(p.jv);
-            Debug.info(workloadName, profileStats.statsAction, profileStats.statsKey, p.jv);
+
+            lock.lock();
+            try {
+                byType.computeIfAbsent(p.statType, k -> new ArrayList<>()).add(profileStats);
+                byContext.computeIfAbsent(p.contextId, k -> new ArrayList<>()).add(profileStats);
+            }
+            finally {
+                lock.unlock();
+            }
+//            Debug.info(workloadName, profileStats.getStatsAction(), profileStats.getStatsKey());
         }
 
         @Override
         void subReport() {
+            for (List<ProfileStats> list : byType.values()) {
+                for (ProfileStats p : list) {
+                    ProfileStats.report(p, p.getStatsAction(), true, true, System.out);
+                }
+            }
+        }
+    }
+
+    static class ParsedEntry {
+        final JsonValue jv;
+        final boolean fin;
+        final String statType;
+        final String contextId;
+
+        public ParsedEntry(KeyValueEntry kve) throws JsonParseException {
+            Debug.info("!!!", kve.getKey(), kve.getValueAsString());
+            jv = JsonParser.parse(kve.getValue());
+
+            JsonValue jvFinal = jv.map.get(FINAL);
+            if (jvFinal == null) {
+                fin = false;
+            }
+            else {
+                fin = jvFinal.bool != null && jvFinal.bool;
+            }
+
+            String[] key = kve.getKey().split("\\.");
+            statType = key[0];
+            contextId = key[1];
         }
     }
 
