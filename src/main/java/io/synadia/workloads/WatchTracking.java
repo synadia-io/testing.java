@@ -107,8 +107,7 @@ public class WatchTracking extends Workload {
     }
 
     class RunStatsWatcher extends WtWatcher {
-        Map<String, List<ProfileStats>> byType = new HashMap<>();
-        Map<String, List<ProfileStats>> byContext = new HashMap<>();
+        Map<String, ProfileStats> byContext = new HashMap<>();
 
         @Override
         void subWatch(ParsedEntry p) {
@@ -116,22 +115,17 @@ public class WatchTracking extends Workload {
 
             lock.lock();
             try {
-                byType.computeIfAbsent(p.statType, k -> new ArrayList<>()).add(profileStats);
-                byContext.computeIfAbsent(p.contextId, k -> new ArrayList<>()).add(profileStats);
+                byContext.put(p.contextId, profileStats);
             }
             finally {
                 lock.unlock();
             }
-//            Debug.info(workloadName, profileStats.getStatsAction(), profileStats.getStatsKey());
+            Debug.info(workloadName, p.contextId, profileStats.getAction(), profileStats.getContextId());
         }
 
         @Override
         void subReport() {
-            for (List<ProfileStats> list : byType.values()) {
-                for (ProfileStats p : list) {
-                    ProfileStats.report(p, p.getStatsAction(), true, true, System.out);
-                }
-            }
+            ProfileStats.report(new ArrayList<>(byContext.values()));
         }
     }
 
@@ -142,7 +136,6 @@ public class WatchTracking extends Workload {
         final String contextId;
 
         public ParsedEntry(KeyValueEntry kve) throws JsonParseException {
-            Debug.info("!!!", kve.getKey(), kve.getValueAsString());
             jv = JsonParser.parse(kve.getValue());
 
             JsonValue jvFinal = jv.map.get(FINAL);

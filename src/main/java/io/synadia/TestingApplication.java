@@ -67,7 +67,7 @@ public class TestingApplication implements Application, AutoCloseable {
         JsonValue jv = new JsonValue(map);
         byte[] statsData = jv.toJson().getBytes(StandardCharsets.US_ASCII);
 
-        ProfileStats ps = new ProfileStats(stats.action, stats.key);
+        ProfileStats ps = new ProfileStats(ctx.id, stats.action);
         map = ps.toJsonValueMap();
         map.put(TIME, sTime);
         map.put(TIME_MS, jvTime);

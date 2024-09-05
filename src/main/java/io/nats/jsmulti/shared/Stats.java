@@ -23,6 +23,8 @@ import static io.nats.jsmulti.shared.Utils.makeId;
 
 public class Stats {
 
+    private static final int VERSION = 1;
+
     private static final double MILLIS_PER_SECOND = 1000;
     private static final double NANOS_PER_MILLI = 1000000;
 
@@ -49,6 +51,7 @@ public class Stats {
     private static final String LCSV_HEADER = "Publish Time,Server Time,Received Time,Publish to Server,Server to Consumer,Publish to Consumer\n";
 
     // Misc
+    public final int version;
     public final String id;
     public final String action;
     public final String key;
@@ -82,6 +85,7 @@ public class Stats {
     private final ExecutorService countService = Executors.newSingleThreadExecutor();
 
     public Stats() {
+        version = VERSION;
         id = makeId();
         action = "";
         key = "";
@@ -90,6 +94,7 @@ public class Stats {
     }
 
     public Stats(Context ctx) throws IOException {
+        version = VERSION;
         id = makeId();
         this.ctx = ctx;
         action = ctx.action.getLabel();
@@ -106,6 +111,7 @@ public class Stats {
     public Stats(JsonValue jv) {
         ctx = null;
         lout = null;
+        version = JsonValueUtils.readInteger(jv, "version", 0);
         id = JsonValueUtils.readString(jv, "id", null);
         action = JsonValueUtils.readString(jv, " action", null);
         key = JsonValueUtils.readString(jv, "subject", null);
@@ -129,6 +135,7 @@ public class Stats {
 
     public Map<String, JsonValue> toJsonValueMap() {
         return JsonValueUtils.mapBuilder()
+            .put("version", version)
             .put("id", id)
             .put(" action", action)
             .put("subject", key)
