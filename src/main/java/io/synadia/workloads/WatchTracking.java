@@ -79,15 +79,14 @@ public class WatchTracking extends Workload {
         @Override
         void subWatch(ParsedEntry p) {
             Stats stats = new Stats(p.jv);
-            String key = p.statType + p.contextId + p.statId;
-            map.put(key, stats);
+            map.put(p.key, stats);
             // Debug.info(workloadName, stats.action, stats.key, "Final? %s", p.fin);
         }
 
         @Override
         void subReport() {
             List<Stats> list = new ArrayList<>(map.values());
-            Stats.report(list, System.out, false, true);
+            Stats.report(list, System.out, true, true);
         }
     }
 
@@ -104,7 +103,6 @@ public class WatchTracking extends Workload {
         @Override
         void subReport() {
             ProfileStats.report(new ArrayList<>(byContext.values()));
-            byContext.clear();
         }
     }
 
@@ -114,6 +112,7 @@ public class WatchTracking extends Workload {
         final String statType;
         final String contextId;
         final String statId;
+        final String key;
 
         public ParsedEntry(KeyValueEntry kve) throws JsonParseException {
             jv = JsonParser.parse(kve.getValue());
@@ -130,6 +129,7 @@ public class WatchTracking extends Workload {
             statType = keys[0];
             contextId = keys[1];
             statId = keys.length == 3 ? keys[2] : "";
+            key = statType + contextId + statId;
         }
     }
 
