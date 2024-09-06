@@ -1,7 +1,7 @@
 package io.synadia;
 
 import io.nats.client.Connection;
-import io.nats.client.JetStreamApiException;
+import io.nats.client.JetStream;
 import io.nats.client.KeyValue;
 import io.nats.client.KeyValueOptions;
 import io.nats.client.support.JsonValue;
@@ -12,7 +12,6 @@ import io.nats.jsmulti.shared.ProfileStats;
 import io.nats.jsmulti.shared.Stats;
 import io.synadia.tools.Debug;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -25,19 +24,21 @@ public class TestingApplication implements Application, AutoCloseable {
 
     private Context ctx;
     private Connection nc;
-    private String workloadName;
+    private Workload workload;
+    private JetStream js;
     private KeyValue kvStats;
     private KeyValue kvRunStats;
 
     public void initTesting(Workload workload) {
-        this.workloadName = workload.workloadName;
+        this.workload = workload;
         try {
             nc = ctx.connect(OptionsFactory.OptionsType.ADMIN);
+            js = nc.jetStream(ctx.getJetStreamOptions());
             KeyValueOptions kvo = KeyValueOptions.builder()
                 .jetStreamOptions(ctx.getJetStreamOptions())
                 .build();
             kvStats = nc.keyValue(workload.params.statsBucket, kvo);
-            kvRunStats = nc.keyValue(workload.params.runStatsBucket, kvo);
+            kvRunStats = nc.keyValue(workload.params.profileBucket, kvo);
         }
         catch (Exception e) {
             throw new RuntimeException(e);
@@ -72,26 +73,27 @@ public class TestingApplication implements Application, AutoCloseable {
         map.put(TIME, sTime);
         map.put(TIME_MS, jvTime);
         jv = new JsonValue(map);
-        byte[] runStatsData = jv.toJson().getBytes(StandardCharsets.US_ASCII);
+        byte[] profileData = jv.toJson().getBytes(StandardCharsets.US_ASCII);
 
         if (statsAreFinal) {
-            publish(key, statsData, runStatsData);
+            publish(key, statsData, profileData);
         }
         else {
             nc.getOptions().getExecutor().submit(() -> {
-                publish(key, runStatsData, runStatsData);
+                publish(key, statsData, profileData);
             });
         }
     }
 
-    private void publish(String key, byte[] statsData, byte[] runStatsData) {
+    private void publish(String key, byte[] statsData, byte[] profileData) {
         try {
             kvStats.put(key, statsData);
-            kvRunStats.put(key, runStatsData);
+            kvRunStats.put(key, profileData);
+            js.publish(workload.params.profileStreamSubject, profileData);
         }
-        catch (IOException | JetStreamApiException e) {
-            Debug.info(workloadName, "Error publishing tracking.", e);
-            Debug.stackTrace(workloadName, e);
+        catch (Exception e) {
+            Debug.info(workload.workloadName, "Error publishing tracking.", e);
+            Debug.stackTrace(workload.workloadName, e);
             throw new RuntimeException(e);
         }
     }

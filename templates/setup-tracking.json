@@ -1,0 +1,11 @@
+{
+  "stream_config":{
+    "name": "<ProfileStreamName>",
+    "subjects": ["<ProfileStreamSubject>"],
+    "retention":"limits",
+    "max_msgs":1000000,
+    "storage":"file",
+    "num_replicas":1,
+    "discard":"old"
+  }
+}

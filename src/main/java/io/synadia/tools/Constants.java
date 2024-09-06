@@ -16,6 +16,15 @@ public interface Constants {
     String SERVER_PREFIX = "<Server";
     String TAG_END = ">";
 
+    String TESTING_STREAM_NAME = "<TestingStreamName>";
+    String TESTING_STREAM_SUBJECT = "<TestingStreamSubject>";
+    String STATS_BUCKET = "<StatsBucket>";
+    String STATS_WATCH_WAIT_TIME = "<StatsWatchWaitTime>";
+    String PROFILE_BUCKET = "<ProfileBucket>";
+    String PROFILE_STREAM_NAME = "<ProfileStreamName>";
+    String PROFILE_STREAM_SUBJECT = "<ProfileStreamSubject>";
+    String PROFILE_WATCH_WAIT_TIME = "<ProfileWatchWaitTime>";
+
     String OS_WIN = "win";
     String OS_UNIX = "unix";
     String NA = "na";

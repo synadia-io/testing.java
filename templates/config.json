@@ -4,9 +4,12 @@
   "server2": "<Server2>",
   "admin_server": "<Admin>",
   "bootstrap": "<Bootstrap>",
-  "stream_name": "testing-java",
-  "stream_subject": "tj",
-  "stats_bucket" : "stats",
-  "run_stats_bucket" : "runstats",
-  "watch_wait_time": 1000
+  "testing_stream_name": "<TestingStreamName>",
+  "testing_stream_subject": "<TestingStreamSubject>",
+  "stats_bucket" : "<StatsBucket>",
+  "stats_watch_wait_time": <StatsWatchWaitTime>,
+  "profile_bucket" : "<ProfileBucket>",
+  "profile_stream_name": "<ProfileStreamName>",
+  "profile_stream_subject": "<ProfileStreamSubject>",
+  "profile_watch_wait_time": <ProfileWatchWaitTime>
 }

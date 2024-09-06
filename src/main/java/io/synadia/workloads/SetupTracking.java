@@ -3,14 +3,11 @@
  */
 package io.synadia.workloads;
 
-import io.nats.client.*;
-import io.nats.client.api.KeyValueConfiguration;
+import io.nats.client.Connection;
+import io.nats.client.KeyValueManagement;
+import io.nats.client.Nats;
 import io.synadia.CommandLine;
 import io.synadia.Workload;
-import io.synadia.tools.Debug;
-
-import java.io.IOException;
-import java.util.List;
 
 public class SetupTracking extends Workload {
     public SetupTracking(CommandLine commandLine) {
@@ -19,30 +16,11 @@ public class SetupTracking extends Workload {
 
     @Override
     public void runWorkload() throws Exception {
-        Options options = getAdminOptions();
-        try (Connection nc = Nats.connect(options)) {
+        try (Connection nc = Nats.connect(getAdminOptions())) {
             KeyValueManagement kvm = nc.keyValueManagement();
-            List<String> bucketNames = kvm.getBucketNames();
-            setupBucket(params.statsBucket, 1, kvm, bucketNames);
-            setupBucket(params.runStatsBucket, 32, kvm, bucketNames);
+            createBucket(params.statsBucket, kvm);
+            createBucket(params.profileBucket, kvm);
+            createStream(params.streamConfig, nc.jetStreamManagement());
         }
-        catch (Exception e) {
-            e.printStackTrace();
-            System.exit(-1);
-        }
-    }
-
-    private void setupBucket(String bucket, int maxHistoryPerKey, KeyValueManagement kvm, List<String> bucketNames) throws IOException, JetStreamApiException, InterruptedException {
-        if (bucketNames.contains(bucket)) {
-            Debug.info(workloadName, "Removing existing bucket: " + bucket);
-            kvm.delete(bucket);
-            Thread.sleep(200); // the server needs time to process the delete
-        }
-        Debug.info(workloadName, "Creating bucket: " + bucket);
-        KeyValueConfiguration kvc = KeyValueConfiguration.builder()
-            .name(bucket)
-            .maxHistoryPerKey(maxHistoryPerKey)
-            .build();
-        Debug.info(workloadName, kvm.create(kvc));
     }
 }

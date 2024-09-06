@@ -23,10 +23,12 @@ public class Params {
     public final String server0;
     public final String server1;
     public final String server2;
-    public final String streamName;
-    public final String streamSubject;
+    public final String testingStreamName;
+    public final String testingStreamSubject;
     public final String statsBucket;
-    public final String runStatsBucket;
+    public final String profileBucket;
+    public final String profileStreamName;
+    public final String profileStreamSubject;
     public final long watchWaitTime;
 
     public Params(List<String> paramsFiles) {
@@ -48,13 +50,13 @@ public class Params {
         server0 = readString(jv, "server0");
         server1 = readString(jv, "server1");
         server2 = readString(jv, "server2");
-        streamName = readString(jv, "stream_name");
-        streamSubject = readString(jv, "stream_subject");
+        testingStreamName = readString(jv, "testing_stream_name");
+        testingStreamSubject = readString(jv, "testing_stream_subject");
         statsBucket = readString(jv, "stats_bucket");
-        runStatsBucket = readString(jv, "run_stats_bucket");
-        watchWaitTime = readLong(jv, "watch_wait_time", 1000);
-
-        System.out.println(jv.toJson());
+        profileBucket = readString(jv, "profile_bucket");
+        profileStreamName = readString(jv, "profile_stream_name");
+        profileStreamSubject = readString(jv, "profile_stream_subject");
+        watchWaitTime = readLong(jv, "watch_wait_time", 5000);
     }
 
     public StreamConfiguration loadStreamConfig(String fieldName) {

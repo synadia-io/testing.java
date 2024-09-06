@@ -1,7 +1,7 @@
 {
   "multi_config": {
     "server": "<Bootstrap>",
-    "subject": "tj",
+    "subject": "<TestingStreamSubject>",
     "action": "PubAsync",
     "message_count": 1000000,
     "payload_size": 100,
@@ -13,8 +13,8 @@
   },
   "create_stream": true,
   "stream_config":{
-    "name": "testing-java",
-    "subjects": ["tj"],
+    "name": "<TestingStreamName>",
+    "subjects": ["<TestingStreamSubject>"],
     "storage":"file",
     "num_replicas":1,
     "discard":"old"
