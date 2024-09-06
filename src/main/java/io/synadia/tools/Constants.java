@@ -5,7 +5,9 @@ public interface Constants {
     String TIME = "time";
     String TIME_MS = "time_ms";
     String INPUT_DIR = "templates";
-    String OUTPUT_DIR = "gen";
+    String SCRIPT_OUTPUT_DIR = "gen";
+    String PARAMS_OUTPUT_DIR = "gen-params";
+    String SERVER_SETUP_OUTPUT_DIR = "gen-server";
     String DOT_JSON = ".json";
     String SH_BAT_DOT_TXT = "-sh-bat.txt";
     String CONFIG_JSON = "config.json";

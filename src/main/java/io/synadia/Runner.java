@@ -2,6 +2,7 @@ package io.synadia;
 
 import io.synadia.tools.Debug;
 import io.synadia.workloads.DeployTest;
+import io.synadia.workloads.SetupTesting;
 import io.synadia.workloads.SetupTracking;
 import io.synadia.workloads.WatchTracking;
 
@@ -19,6 +20,9 @@ public class Runner {
                 break;
             case "deployTest":
                 workload = new DeployTest(commandLine);
+                break;
+            case "setupTesting":
+                workload = new SetupTesting(commandLine);
                 break;
             case "setupTracking":
                 workload = new SetupTracking(commandLine);

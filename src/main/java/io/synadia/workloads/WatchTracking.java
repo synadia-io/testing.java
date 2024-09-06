@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
 import static io.synadia.tools.Constants.FINAL;
@@ -74,7 +75,12 @@ public class WatchTracking extends Workload {
     }
 
     class StatsWatcher extends WtWatcher {
-        Map<String, Stats> map = new HashMap<>();
+        Map<String, Stats> map;
+
+        public StatsWatcher() {
+            super("Stats");
+            map = new HashMap<>();
+        }
 
         @Override
         void subWatch(ParsedEntry p) {
@@ -91,7 +97,12 @@ public class WatchTracking extends Workload {
     }
 
     class ProfileWatcher extends WtWatcher {
-        Map<String, ProfileStats> byContext = new HashMap<>();
+        Map<String, ProfileStats> byContext;
+
+        public ProfileWatcher() {
+            super("Profile");
+            byContext = new HashMap<>();
+        }
 
         @Override
         void subWatch(ParsedEntry p) {
@@ -107,6 +118,9 @@ public class WatchTracking extends Workload {
     }
 
     static class ParsedEntry {
+        static final AtomicInteger ID = new AtomicInteger(0);
+
+        final String name;
         final JsonValue jv;
         final boolean fin;
         final String statType;
@@ -114,7 +128,8 @@ public class WatchTracking extends Workload {
         final String statId;
         final String key;
 
-        public ParsedEntry(KeyValueEntry kve) throws JsonParseException {
+        public ParsedEntry(String label, KeyValueEntry kve) throws JsonParseException {
+            name = label + "-" + ID.incrementAndGet();
             jv = JsonParser.parse(kve.getValue());
 
             JsonValue jvFinal = jv.map.get(FINAL);
@@ -135,7 +150,12 @@ public class WatchTracking extends Workload {
 
     abstract class WtWatcher implements KeyValueWatcher {
         private final ReentrantLock lock = new ReentrantLock();
+        private final String label;
         boolean changed = false;
+
+        WtWatcher(String label) {
+            this.label = label;
+        }
 
         abstract void subWatch(ParsedEntry parsedEntry);
 
@@ -145,7 +165,7 @@ public class WatchTracking extends Workload {
                 lock.lock();
                 try {
                     changed = true;
-                    subWatch(new ParsedEntry(kve));
+                    subWatch(new ParsedEntry(label, kve));
                 }
                 finally {
                     lock.unlock();

@@ -52,17 +52,19 @@ public class Generator {
     }
 
     public static void main(String[] args) throws Exception {
-        // any arg on the command line meant to just do getInstances
+        // any arg on the command line meant to just do "show"
         boolean generate = args == null || args.length == 0;
 
         GeneratorConfig gc = new GeneratorConfig();
         gc.show();
 
         if (generate) {
-            prepareOutputDir();
+            prepareOutputDirs();
         }
 
         List<Instance> runningServers = new ArrayList<>();
+
+        // parse the aws json
         JsonValue jv = JsonParser.parse(Files.readAllBytes(Paths.get("aws.json")));
         for (JsonValue jvRes : jv.map.get("Reservations").array) {
             for (JsonValue jvInstance : jvRes.map.get("Instances").array) {
@@ -121,13 +123,13 @@ public class Generator {
                 printSsh(current, gc);
                 printNatsCli(current);
 
-                // SERVER x SCRIPT
+                // SERVER SCRIPT
                 if (generate) {
                     String template = readTemplate("server.sh", gc)
                         .replace("<InstanceId>", "" + x)
                         .replace("<PrivateIpRoute1>", runningServers.get(1).privateIpAddr)
                         .replace("<PrivateIpRoute2>", runningServers.get(2).privateIpAddr);
-                    generate("server" + x, template);
+                    generate("server" + x, template, SERVER_SETUP_OUTPUT_DIR);
                 }
             }
 
@@ -137,51 +139,45 @@ public class Generator {
         configTemplatePublic = finishJsonTemplatePopulate(configTemplatePublic, gc, publicBootstrap, publicAdmin);
 
         if (generate) {
-            // CONFIG
-            if (gc.doPublic) {
-                generate(CONFIG_JSON, configTemplatePublic);
-            }
-            else {
-                generate(CONFIG_JSON, configTemplatePrivate);
-            }
-
-            // WORKLOADS always have a pair of -sh-bat.txt and .json
-            // ADMIN/SCRIPTS just have the -sh-bat.txt
             File[] files = new File(INPUT_DIR).listFiles();
             if (files != null) {
                 for (File f : files) {
-                    String name = f.getName();
-                    if (name.endsWith(SH_BAT_DOT_TXT)) {
-                        name = name.replace(SH_BAT_DOT_TXT, "");
-                        File pair = new File(INPUT_DIR + File.separator + name + DOT_JSON);
-                        if (pair.exists()) {
-                            workload(name, gc, publicBootstrap, publicAdmin, privateBootstrap, privateAdmin);
+                    String filename = f.getName();
+                    if (filename.equals(CONFIG_JSON)) {
+                        if (gc.doPublic) {
+                            generate(CONFIG_JSON, configTemplatePublic, PARAMS_OUTPUT_DIR);
                         }
                         else {
-                            script(name, gc);
+                            generate(CONFIG_JSON, configTemplatePrivate, PARAMS_OUTPUT_DIR);
                         }
+                    }
+                    else if (filename.endsWith(DOT_JSON)) {
+                        writeJson(filename, gc, publicBootstrap, publicAdmin, privateBootstrap, privateAdmin);
+                    }
+                    else if (filename.endsWith(SH_BAT_DOT_TXT)) {
+                        script(filename, gc);
                     }
                 }
             }
         }
     }
 
-    private static void workload(String name, GeneratorConfig gc, StringBuilder publicBootstrap, String publicAdmin, StringBuilder privateBootstrap, String privateAdmin) throws IOException {
-        String jsonTemplate = readTemplate(name + DOT_JSON, gc);
+    private static void writeJson(String filename, GeneratorConfig gc, StringBuilder publicBootstrap, String publicAdmin, StringBuilder privateBootstrap, String privateAdmin) throws IOException {
+        String jsonTemplate = readTemplate(filename, gc);
         if (gc.doPublic) {
             jsonTemplate = finishJsonTemplatePopulate(jsonTemplate, gc, publicBootstrap, publicAdmin);
         }
         else {
             jsonTemplate = finishJsonTemplatePopulate(jsonTemplate, gc, privateBootstrap, privateAdmin);
         }
-        generate(name + DOT_JSON, jsonTemplate);
-        script(name, gc);
+        generate(filename, jsonTemplate, PARAMS_OUTPUT_DIR);
     }
 
-    private static void script(String name, GeneratorConfig gc) throws IOException {
-        String scriptTemplate = readTemplate(name + SH_BAT_DOT_TXT, gc);
+    private static void script(String filename, GeneratorConfig gc) throws IOException {
+        String name = filename.replace(SH_BAT_DOT_TXT, "");
+        String scriptTemplate = readTemplate(filename, gc);
         String genName = gc.os.equals(OS_UNIX) ? name + gc.shellExt : name + ".bat";
-        generate(genName, scriptTemplate);
+        generate(genName, scriptTemplate, SCRIPT_OUTPUT_DIR);
     }
 
     private static void heading(String label) {
@@ -190,7 +186,7 @@ public class Generator {
     }
 
     private static void printNatsCli(Instance instance) {
-        System.out.println("nats s info -a -s " + instance.publicIpAddr);
+        System.out.println("nats s list -a -s " + instance.publicIpAddr);
     }
 
     private static void printSsh(Instance current, GeneratorConfig gc) {
@@ -211,18 +207,24 @@ public class Generator {
         return gc.populate(template.replace(BOOTSTRAP, bootstrap).replace(ADMIN, admin));
     }
 
-    private static void generate(String fn, String data) throws IOException {
-        FileOutputStream out = new FileOutputStream(Paths.get(OUTPUT_DIR, fn).toString());
+    private static void generate(String fn, String data, String dir) throws IOException {
+        FileOutputStream out = new FileOutputStream(Paths.get(dir, fn).toString());
         out.write(data.getBytes(StandardCharsets.US_ASCII));
         out.flush();
         out.close();
     }
 
-    private static void prepareOutputDir() {
-        File gen = new File(OUTPUT_DIR);
-        if (gen.exists()) {
+    private static void prepareOutputDirs() {
+        prepareOutputDir(PARAMS_OUTPUT_DIR);
+        prepareOutputDir(SCRIPT_OUTPUT_DIR);
+        prepareOutputDir(SERVER_SETUP_OUTPUT_DIR);
+    }
+
+    private static void prepareOutputDir(String dir) {
+        File fDir = new File(dir);
+        if (fDir.exists()) {
             // clear directory
-            File[] files = gen.listFiles();
+            File[] files = fDir.listFiles();
             if (files != null) {
                 for (File f : files) {
                     //noinspection ResultOfMethodCallIgnored
@@ -230,8 +232,8 @@ public class Generator {
                 }
             }
         }
-        else if (!gen.mkdirs()) {
-            System.err.println("Could not make \"gen\" directory");
+        else if (!fDir.mkdirs()) {
+            System.err.println("Could not make \"" + dir + "\" directory");
             System.exit(-1);
         }
     }
@@ -326,7 +328,7 @@ public class Generator {
                 .put("client_filter", NA)
                 .put("nats_proto", "nats://")
                 .put("nats_port", "4222")
-                .put("testing_stream_name", "testing")
+                .put("testing_stream_name", "testingStream")
                 .put("testing_stream_subject", "t")
                 .put("stats_bucket", "statsBucket")
                 .put("stats_watch_wait_time", 5000)

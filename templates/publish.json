@@ -3,22 +3,12 @@
     "server": "<Bootstrap>",
     "subject": "<TestingStreamSubject>",
     "action": "PubAsync",
-    "message_count": 100000000,
+    "message_count": 1000000,
     "payload_size": 100,
     "threads": 6,
     "connection_strategy": "individual",
     "report_frequency": 50000,
     "round_size": 200,
     "options_factory_class_name": "io.synadia.VirtualExecutorOptionsFactory"
-  },
-  "create_stream": true,
-  "stream_config":{
-    "name": "<TestingStreamName>",
-    "subjects": ["<TestingStreamSubject>"],
-    "retention":"limits",
-    "max_msgs":10000000,
-    "storage":"file",
-    "num_replicas":1,
-    "discard":"old"
   }
 }

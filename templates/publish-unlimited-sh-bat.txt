@@ -1,1 +1,0 @@
-java -cp "build/libs/*" io.synadia.Runner --workload publisher --params gen<PathSep>config.json --params gen<PathSep>publish.json

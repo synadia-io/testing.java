@@ -1,0 +1,11 @@
+{
+  "stream_config":{
+    "name": "<TestingStreamName>",
+    "subjects": ["<TestingStreamSubject>"],
+    "retention":"limits",
+    "max_msgs":10000000,
+    "storage":"file",
+    "num_replicas":1,
+    "discard":"old"
+  }
+}

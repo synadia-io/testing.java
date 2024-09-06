@@ -1,1 +1,1 @@
-java -cp "build/libs/*" io.synadia.Runner --workload consumer --params gen<PathSep>config.json --params gen<PathSep>consume.json
+java -cp "build/libs/*" io.synadia.Runner --workload consumer --params gen-params<PathSep>config.json --params gen-params<PathSep>consume.json
