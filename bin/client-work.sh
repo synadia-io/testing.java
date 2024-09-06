@@ -13,4 +13,4 @@ rm -rf testing.java
 git clone https://github.com/synadia-io/testing.java
 cd testing.java
 
-chmod +x bin/generate && generate && chmod +x gen/* && chmod -x gen/*.json
+chmod +x bin/generate && bin/make && bin/generate && chmod +x gen/* && chmod -x gen/*.json
