@@ -18,10 +18,7 @@ import io.synadia.CommandLine;
 import io.synadia.Workload;
 import io.synadia.tools.Debug;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -75,88 +72,111 @@ public class WatchTracking extends Workload {
     }
 
     class StatsWatcher extends WtWatcher {
-        Map<String, Stats> map;
+        private static final String REPORT_HEAD_LINE   = "| =================== | ================= | =============== | ======================== | ================ |";
+        private static final String REPORT_SEP_LINE    = "| ------------------- | ----------------- | --------------- | ------------------------ | ---------------- |";
+        private static final String REPORT_LINE_HEADER = "| %-19s |             count |            time |                 msgs/sec |        bytes/sec |\n";
+        private static final String REPORT_LINE_FORMAT = "| %-19s | %12s msgs | %12s ms | %15s msgs/sec | %12s/sec |\n";
+
+        Map<String, ParsedEntry> map;
 
         public StatsWatcher() {
-            super("Stats");
             map = new HashMap<>();
         }
 
         @Override
         void subWatch(ParsedEntry p) {
-            Stats stats = new Stats(p.jv);
-            map.put(p.key, stats);
-            // Debug.info(workloadName, stats.action, stats.key, "Final? %s", p.fin);
+            p.targetAndLabel(new Stats(p.jv), false);
+            map.put(p.label, p);
         }
 
         @Override
         void subReport() {
-            List<Stats> list = new ArrayList<>(map.values());
-            Stats.report(list, System.out, true, true);
+            List<ParsedEntry> list = new ArrayList<>(map.values());
+            list.sort(Comparator.comparing(p -> p.label));
+
+            System.out.println("\n\n\n" + REPORT_HEAD_LINE);
+            System.out.printf(REPORT_LINE_HEADER, "");
+            System.out.println(REPORT_HEAD_LINE);
+
+            String lastMark = null;
+            Stats totalStats = new Stats();
+            for (ParsedEntry p : list) {
+                boolean alreadyReported = p.reported;
+                p.reported = true;
+                Stats stats = (Stats)p.target;
+                String mark = p.statType + p.contextId;
+                if (lastMark == null) {
+                    lastMark = mark;
+                }
+                else if (!lastMark.equals(mark)){
+                    lastMark = mark;
+                    System.out.println(REPORT_SEP_LINE);
+                    print("Total", totalStats);
+                    System.out.println(REPORT_HEAD_LINE);
+                    totalStats = new Stats();
+                }
+                Stats.totalOne(stats, totalStats);
+                print(p.label + (alreadyReported ? "" : "*"), stats);
+            }
+            System.out.println(REPORT_SEP_LINE);
+            print("Total", totalStats);
+            System.out.println(REPORT_SEP_LINE);
+        }
+
+        public void print(String label, Stats stats) {
+            long elapsed = stats.getElapsed();
+            long messageCount = stats.getMessageCount();
+            double messagesPerSecond = elapsed == 0 ? 0 : messageCount * Stats.MILLIS_PER_SECOND / elapsed;
+            double bytesPerSecond = Stats.MILLIS_PER_SECOND * (stats.getBytes()) / (elapsed);
+            System.out.printf(REPORT_LINE_FORMAT, label,
+                Stats.format(messageCount),
+                Stats.format3(elapsed),
+                Stats.format3(messagesPerSecond),
+                Stats.humanBytes(bytesPerSecond));
         }
     }
 
     class ProfileWatcher extends WtWatcher {
-        Map<String, ProfileStats> byContext;
+        Map<String, ParsedEntry> map;
 
         public ProfileWatcher() {
-            super("Profile");
-            byContext = new HashMap<>();
+            map = new HashMap<>();
         }
 
         @Override
         void subWatch(ParsedEntry p) {
-            ProfileStats profileStats = new ProfileStats(p.jv);
-            byContext.put(p.contextId, profileStats);
-//            Debug.info(workloadName, p.contextId, profileStats.getAction(), profileStats.getContextId());
+            p.targetAndLabel(new ProfileStats(p.jv), true);
+            map.put(p.label, p);
         }
 
         @Override
         void subReport() {
-            ProfileStats.report(new ArrayList<>(byContext.values()));
-        }
-    }
-
-    static class ParsedEntry {
-        static final AtomicInteger ID = new AtomicInteger(0);
-
-        final String name;
-        final JsonValue jv;
-        final boolean fin;
-        final String statType;
-        final String contextId;
-        final String statId;
-        final String key;
-
-        public ParsedEntry(String label, KeyValueEntry kve) throws JsonParseException {
-            name = label + "-" + ID.incrementAndGet();
-            jv = JsonParser.parse(kve.getValue());
-
-            JsonValue jvFinal = jv.map.get(FINAL);
-            if (jvFinal == null) {
-                fin = false;
+            System.out.println("\n\n");
+            List<ParsedEntry> list = new ArrayList<>(map.values());
+            list.sort(Comparator.comparing(p -> p.label));
+            String lastMark = null;
+            for (int x = 0; x < list.size(); x++) {
+                ParsedEntry p = list.get(x);
+                ProfileStats ps = (ProfileStats) p.target;
+                boolean alreadyReported = p.reported;
+                p.reported = true;
+                String mark = p.statType;
+                if (lastMark == null) {
+                    lastMark = mark;
+                }
+                else if (!lastMark.equals(mark)) {
+                    lastMark = mark;
+                    System.out.println(ProfileStats.REPORT_SEP_LINE);
+                }
+                ProfileStats.report(ps, p.label + (alreadyReported ? "" : "*"), x == 0, false, System.out);
             }
-            else {
-                fin = jvFinal.bool != null && jvFinal.bool;
-            }
-
-            String[] keys = kve.getKey().split("\\.");
-            statType = keys[0];
-            contextId = keys[1];
-            statId = keys.length == 3 ? keys[2] : "";
-            key = statType + contextId + statId;
+            System.out.println(ProfileStats.REPORT_SEP_LINE);
         }
     }
 
     abstract class WtWatcher implements KeyValueWatcher {
         private final ReentrantLock lock = new ReentrantLock();
-        private final String label;
-        boolean changed = false;
-
-        WtWatcher(String label) {
-            this.label = label;
-        }
-
+        private boolean changed = false;
         abstract void subWatch(ParsedEntry parsedEntry);
 
         @Override
@@ -165,7 +185,7 @@ public class WatchTracking extends Workload {
                 lock.lock();
                 try {
                     changed = true;
-                    subWatch(new ParsedEntry(label, kve));
+                    subWatch(new ParsedEntry(kve));
                 }
                 finally {
                     lock.unlock();
@@ -199,6 +219,69 @@ public class WatchTracking extends Workload {
             finally {
                 lock.unlock();
             }
+        }
+    }
+
+    static class ParsedEntry {
+        final JsonValue jv;
+        final boolean fin;
+        final String key;
+        final String statType;
+        final String contextId;
+        final String statId;
+        String label;
+        Object target;
+        boolean reported;
+
+        public ParsedEntry(KeyValueEntry kve) throws JsonParseException {
+            jv = JsonParser.parse(kve.getValue());
+
+            JsonValue jvFinal = jv.map.get(FINAL);
+            if (jvFinal == null) {
+                fin = false;
+            }
+            else {
+                fin = jvFinal.bool != null && jvFinal.bool;
+            }
+
+            key = kve.getKey();
+            String[] parts = key.split("\\.");
+            statType = parts[0];
+            contextId = parts[1];
+            statId = parts.length == 3 ? parts[2] : "";
+        }
+
+        static final AtomicInteger CONTEXT_ID = new AtomicInteger(0);
+        static final Map<String, Integer> idByContext = new HashMap<>();
+        static final Map<Integer, Map<String, Integer>> statIdsForContext = new HashMap<>();
+        static final Map<Integer, AtomicInteger> statsIdMakerForContext = new HashMap<>();
+
+        public void targetAndLabel(Object target, boolean contextOnly) {
+            this.target = target;
+            label = contextOnly
+                ? String.format("%s-%03d", statType, getContextCode(this))
+                : String.format("%s-%03d-%03d", statType, getContextCode(this), getStatIdCode(this));
+        }
+
+        static int getContextCode(ParsedEntry p) {
+            Integer cid = idByContext.get(p.contextId);
+            if (cid == null) {
+                cid = CONTEXT_ID.incrementAndGet();
+                idByContext.put(p.contextId, cid);
+            }
+            return cid;
+        }
+
+        static int getStatIdCode(ParsedEntry p) {
+            Integer cid = getContextCode(p);
+            Map<String, Integer> map = statIdsForContext.computeIfAbsent(cid, k -> new HashMap<>());
+            Integer sid = map.get(p.statId);
+            if (sid == null) {
+                AtomicInteger maker = statsIdMakerForContext.computeIfAbsent(cid, k -> new AtomicInteger());
+                sid = maker.incrementAndGet();
+                map.put(p.statId, sid);
+            }
+            return sid;
         }
     }
 }

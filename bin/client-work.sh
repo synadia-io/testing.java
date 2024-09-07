@@ -1,5 +1,5 @@
 echo "Todo: Export AWS security"
-echo "Todo Once: export PATH=\$PATH:~/testing/bin:~/testing/gen"
+echo "Todo Once: export PATH=\$PATH:~/testing.java/bin:~/testing.java/gen"
 
 set +x
 cls
@@ -13,4 +13,4 @@ rm -rf testing.java
 git clone https://github.com/synadia-io/testing.java
 cd testing.java
 
-chmod +x bin/generate && bin/make && bin/generate && chmod +x gen/* && chmod -x gen/*.json
+chmod +x bin/* && chmod -x bin/*.bat && bin/make && bin/generate && chmod +x gen/*
