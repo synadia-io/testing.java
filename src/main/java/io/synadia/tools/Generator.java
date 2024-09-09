@@ -204,7 +204,7 @@ public class Generator {
     }
 
     private static String finishJsonTemplatePopulate(String template, GeneratorConfig gc, StringBuilder bootstrap, String admin) {
-        return gc.populate(template.replace(BOOTSTRAP, bootstrap).replace(ADMIN, admin));
+        return gc.populate(template.replace(BOOTSTRAP, bootstrap).replace(ADMIN, admin).replace(OS, gc.os));
     }
 
     private static void generate(String fn, String data, String dir) throws IOException {
@@ -261,7 +261,7 @@ public class Generator {
         public GeneratorConfig() throws IOException {
             JsonValue jv = loadConfig();
             doPublic = jv.map.get("do_public") == null || jv.map.get("do_public").bool;
-            os = jv.map.get("os").string.equals("win") ? OS_WIN : OS_UNIX;
+            os = jv.map.get("os").string.equals(OS_WIN) ? OS_WIN : OS_UNIX;
             String temp = jv.map.get("shell_ext").string;
             shellExt = temp == null ? "" : temp;
             keyFile = jv.map.get("key_file").string;

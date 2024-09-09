@@ -14,6 +14,7 @@ public interface Constants {
 
     String BOOTSTRAP = "<Bootstrap>";
     String ADMIN = "<Admin>";
+    String OS = "<OS>";
     String PATH_SEP = "<PathSep>";
     String SERVER_PREFIX = "<Server";
     String TAG_END = ">";

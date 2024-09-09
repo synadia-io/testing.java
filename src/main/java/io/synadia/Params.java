@@ -13,12 +13,14 @@ import java.nio.file.Paths;
 import java.util.List;
 
 import static io.nats.client.support.JsonValueUtils.*;
+import static io.synadia.tools.Constants.OS_UNIX;
 
 public class Params {
     public final JsonValue jv;
     public final StreamConfiguration streamConfig;
     public final JsonValue jvMultiConfig;
     public final boolean createStream;
+    public final String os;
     public final String adminServer;
     public final String server0;
     public final String server1;
@@ -43,6 +45,7 @@ public class Params {
                 throw new RuntimeException(e);
             }
         }
+        os = readString(jv, "os", OS_UNIX);
         streamConfig = loadStreamConfig("stream_config");
         createStream = streamConfig != null && readBoolean(jv, "create_stream", false);
         jvMultiConfig = readObject(jv, "multi_config");

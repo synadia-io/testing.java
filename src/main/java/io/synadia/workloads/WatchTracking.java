@@ -17,12 +17,15 @@ import io.nats.jsmulti.shared.Stats;
 import io.synadia.CommandLine;
 import io.synadia.Workload;
 import io.synadia.tools.Debug;
+import io.synadia.tools.Displayable;
+import io.synadia.tools.WindowDisplay;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
 import static io.synadia.tools.Constants.FINAL;
+import static io.synadia.tools.Constants.OS_WIN;
 
 public class WatchTracking extends Workload {
     public enum Which {
@@ -36,16 +39,52 @@ public class WatchTracking extends Workload {
 
     private final Which which;
     private final String bucket;
+    private final Displayable out;
 
     public WatchTracking(Which which, CommandLine commandLine) {
         super(which.workloadName, commandLine);
         this.which = which;
         if (which == Which.Stats) {
             bucket = params.statsBucket;
+            out = initOutput(1000, 1000);
         }
         else {
             bucket = params.profileBucket;
+            out = initOutput(1400, 600);
         }
+    }
+
+    private Displayable initOutput(int width, int height) {
+        if (params.os.equals(OS_WIN)) {
+            return WindowDisplay.instance(workloadName, 100, 100, width, height);
+        }
+
+        return new Displayable() {
+            @Override
+            public void clear() {
+                System.out.println("\n\n");
+            }
+
+            @Override
+            public void print(String s) {
+                System.out.print(s);
+            }
+
+            @Override
+            public void printf(String format, Object... args) {
+                System.out.printf(format, args);
+            }
+
+            @Override
+            public void println() {
+                System.out.println();
+            }
+
+            @Override
+            public void println(String s) {
+                System.out.println(s);
+            }
+        };
     }
 
     @Override
@@ -74,7 +113,7 @@ public class WatchTracking extends Workload {
     class StatsWatcher extends WtWatcher {
         private static final String REPORT_HEAD_LINE   = "| =================== | ================= | =============== | ======================== | ================ |";
         private static final String REPORT_SEP_LINE    = "| ------------------- | ----------------- | --------------- | ------------------------ | ---------------- |";
-        private static final String REPORT_LINE_HEADER = "| %-19s |             count |            time |                 msgs/sec |        bytes/sec |\n";
+        private static final String REPORT_LINE_HEADER = "|                     |             count |            time |                 msgs/sec |        bytes/sec |";
         private static final String REPORT_LINE_FORMAT = "| %-19s | %12s msgs | %12s ms | %15s msgs/sec | %12s/sec |\n";
 
         Map<String, ParsedEntry> map;
@@ -94,9 +133,10 @@ public class WatchTracking extends Workload {
             List<ParsedEntry> list = new ArrayList<>(map.values());
             list.sort(Comparator.comparing(p -> p.label));
 
-            System.out.println("\n\n\n" + REPORT_HEAD_LINE);
-            System.out.printf(REPORT_LINE_HEADER, "");
-            System.out.println(REPORT_HEAD_LINE);
+            out.clear();
+            out.println(REPORT_HEAD_LINE);
+            out.println(REPORT_LINE_HEADER);
+            out.println(REPORT_HEAD_LINE);
 
             String lastMark = null;
             Stats totalStats = new Stats();
@@ -110,17 +150,17 @@ public class WatchTracking extends Workload {
                 }
                 else if (!lastMark.equals(mark)){
                     lastMark = mark;
-                    System.out.println(REPORT_SEP_LINE);
+                    out.println(REPORT_SEP_LINE);
                     print("Total", totalStats);
-                    System.out.println(REPORT_HEAD_LINE);
+                    out.println(REPORT_HEAD_LINE);
                     totalStats = new Stats();
                 }
                 Stats.totalOne(stats, totalStats);
                 print(p.label + (alreadyReported ? "" : "*"), stats);
             }
-            System.out.println(REPORT_SEP_LINE);
+            out.println(REPORT_SEP_LINE);
             print("Total", totalStats);
-            System.out.println(REPORT_SEP_LINE);
+            out.println(REPORT_SEP_LINE);
         }
 
         public void print(String label, Stats stats) {
@@ -128,7 +168,7 @@ public class WatchTracking extends Workload {
             long messageCount = stats.getMessageCount();
             double messagesPerSecond = elapsed == 0 ? 0 : messageCount * Stats.MILLIS_PER_SECOND / elapsed;
             double bytesPerSecond = Stats.MILLIS_PER_SECOND * (stats.getBytes()) / (elapsed);
-            System.out.printf(REPORT_LINE_FORMAT, label,
+            out.printf(REPORT_LINE_FORMAT, label,
                 Stats.format(messageCount),
                 Stats.format3(elapsed),
                 Stats.format3(messagesPerSecond),
@@ -151,7 +191,7 @@ public class WatchTracking extends Workload {
 
         @Override
         void subReport() {
-            System.out.println("\n\n");
+            out.clear();
             List<ParsedEntry> list = new ArrayList<>(map.values());
             list.sort(Comparator.comparing(p -> p.label));
             String lastMark = null;
@@ -166,11 +206,34 @@ public class WatchTracking extends Workload {
                 }
                 else if (!lastMark.equals(mark)) {
                     lastMark = mark;
-                    System.out.println(ProfileStats.REPORT_SEP_LINE);
+                    out.println(ProfileStats.REPORT_SEP_LINE);
                 }
-                ProfileStats.report(ps, p.label + (alreadyReported ? "" : "*"), x == 0, false, System.out);
+                profileStatsReport(ps, p.label + (alreadyReported ? "" : "*"), x == 0, false);
             }
-            System.out.println(ProfileStats.REPORT_SEP_LINE);
+            out.println(ProfileStats.REPORT_SEP_LINE);
+        }
+    }
+
+    public void profileStatsReport(ProfileStats p, String label, boolean header, boolean footer) {
+        if (header) {
+            out.println(ProfileStats.REPORT_SEP_LINE);
+            out.printf(ProfileStats.REPORT_LINE_HEADER, "");
+            out.println(ProfileStats.REPORT_SEP_LINE);
+        }
+        out.printf(ProfileStats.REPORT_LINE_FORMAT, label,
+            Stats.humanBytes(p.maxMemory),
+            Stats.humanBytes(p.heapMax),
+            Stats.humanBytes(p.allocatedMemory),
+            Stats.humanBytes(p.freeMemory),
+            Stats.humanBytes(p.heapUsed),
+            Stats.humanBytes(p.heapCommitted),
+            Stats.humanBytes(p.nonHeapUsed),
+            Stats.humanBytes(p.nonHeapCommitted),
+            p.liveThreads.size() + "/" + p.threadCount,
+            p.deadThreads.size() + "/" + p.threadCount);
+
+        if (footer) {
+            out.println(ProfileStats.REPORT_SEP_LINE);
         }
     }
 
@@ -209,11 +272,11 @@ public class WatchTracking extends Workload {
             try {
                 if (changed) {
                     changed = false;
-                    System.out.println();
+                    out.println();
                     subReport();
                 }
                 else {
-                    System.out.print(".");
+                    out.print(".");
                 }
             }
             finally {
