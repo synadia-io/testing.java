@@ -18,14 +18,13 @@ import io.synadia.CommandLine;
 import io.synadia.Workload;
 import io.synadia.tools.Debug;
 import io.synadia.tools.Displayable;
-import io.synadia.tools.WindowDisplay;
 
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
 import static io.synadia.tools.Constants.FINAL;
-import static io.synadia.tools.Constants.OS_WIN;
 
 public class WatchTracking extends Workload {
     public enum Which {
@@ -46,45 +45,11 @@ public class WatchTracking extends Workload {
         this.which = which;
         if (which == Which.Stats) {
             bucket = params.statsBucket;
-            out = initOutput(1000, 1000);
         }
         else {
             bucket = params.profileBucket;
-            out = initOutput(1400, 600);
         }
-    }
-
-    private Displayable initOutput(int width, int height) {
-        if (params.os.equals(OS_WIN)) {
-            return WindowDisplay.instance(workloadName, 100, 100, width, height);
-        }
-
-        return new Displayable() {
-            @Override
-            public void clear() {
-                System.out.println("\n\n");
-            }
-
-            @Override
-            public void print(String s) {
-                System.out.print(s);
-            }
-
-            @Override
-            public void printf(String format, Object... args) {
-                System.out.printf(format, args);
-            }
-
-            @Override
-            public void println() {
-                System.out.println();
-            }
-
-            @Override
-            public void println(String s) {
-                System.out.println(s);
-            }
-        };
+        out = initOutput();
     }
 
     @Override
@@ -110,11 +75,14 @@ public class WatchTracking extends Workload {
         }
     }
 
+    public static final SimpleDateFormat FORMATTER = new SimpleDateFormat("HH:mm:ss");
+
     class StatsWatcher extends WtWatcher {
-        private static final String REPORT_HEAD_LINE   = "| =================== | ================= | =============== | ======================== | ================ |";
-        private static final String REPORT_SEP_LINE    = "| ------------------- | ----------------- | --------------- | ------------------------ | ---------------- |";
-        private static final String REPORT_LINE_HEADER = "|                     |             count |            time |                 msgs/sec |        bytes/sec |";
-        private static final String REPORT_LINE_FORMAT = "| %-19s | %12s msgs | %12s ms | %15s msgs/sec | %12s/sec |\n";
+        private static final String STATS_TOP_LINE    = "┌─────────────────────┬───────────────────┬─────────────────┬──────────────────────────┬──────────────────┐";
+        private static final String STATS_SEP_LINE    = "├─────────────────────┼───────────────────┼─────────────────┼──────────────────────────┼──────────────────┤";
+        private static final String STATS_FOOT_LINE   = "└─────────────────────┴───────────────────┴─────────────────┴──────────────────────────┴──────────────────┘";
+        private static final String STATS_LINE_HEADER = "│ %-19s │             count │            time │                 msgs/sec │        bytes/sec │\n";
+        private static final String STATS_LINE_FORMAT = "│ %-19s │ %12s msgs │ %12s ms │ %15s msgs/sec │ %12s/sec │\n";
 
         Map<String, ParsedEntry> map;
 
@@ -132,11 +100,9 @@ public class WatchTracking extends Workload {
         void subReport() {
             List<ParsedEntry> list = new ArrayList<>(map.values());
             list.sort(Comparator.comparing(p -> p.label));
+            String date = FORMATTER.format(new Date());
 
             out.clear();
-            out.println(REPORT_HEAD_LINE);
-            out.println(REPORT_LINE_HEADER);
-            out.println(REPORT_HEAD_LINE);
 
             String lastMark = null;
             Stats totalStats = new Stats();
@@ -145,22 +111,25 @@ public class WatchTracking extends Workload {
                 p.reported = true;
                 Stats stats = (Stats)p.target;
                 String mark = p.statType + p.contextId;
-                if (lastMark == null) {
+                if (!mark.equals(lastMark)){
+                    if (lastMark != null) {
+                        out.println(STATS_SEP_LINE);
+                        print("Total", totalStats);
+                        out.println(STATS_FOOT_LINE);
+                        totalStats = new Stats();
+                    }
                     lastMark = mark;
-                }
-                else if (!lastMark.equals(mark)){
-                    lastMark = mark;
-                    out.println(REPORT_SEP_LINE);
-                    print("Total", totalStats);
-                    out.println(REPORT_HEAD_LINE);
-                    totalStats = new Stats();
+                    out.println(STATS_TOP_LINE);
+                    out.printf(STATS_LINE_HEADER, date);
+                    out.println(STATS_SEP_LINE);
                 }
                 Stats.totalOne(stats, totalStats);
                 print(p.label + (alreadyReported ? "" : "*"), stats);
             }
-            out.println(REPORT_SEP_LINE);
+
+            out.println(STATS_SEP_LINE);
             print("Total", totalStats);
-            out.println(REPORT_SEP_LINE);
+            out.println(STATS_FOOT_LINE);
         }
 
         public void print(String label, Stats stats) {
@@ -168,7 +137,7 @@ public class WatchTracking extends Workload {
             long messageCount = stats.getMessageCount();
             double messagesPerSecond = elapsed == 0 ? 0 : messageCount * Stats.MILLIS_PER_SECOND / elapsed;
             double bytesPerSecond = Stats.MILLIS_PER_SECOND * (stats.getBytes()) / (elapsed);
-            out.printf(REPORT_LINE_FORMAT, label,
+            out.printf(STATS_LINE_FORMAT, label,
                 Stats.format(messageCount),
                 Stats.format3(elapsed),
                 Stats.format3(messagesPerSecond),
@@ -192,6 +161,10 @@ public class WatchTracking extends Workload {
         @Override
         void subReport() {
             out.clear();
+            out.println(PROFILE_TOP_LINE);
+            out.printf(PROFILE_LINE_HEADER, FORMATTER.format(new Date()));
+            out.println(PROFILE_SEP_LINE);
+
             List<ParsedEntry> list = new ArrayList<>(map.values());
             list.sort(Comparator.comparing(p -> p.label));
             String lastMark = null;
@@ -206,21 +179,22 @@ public class WatchTracking extends Workload {
                 }
                 else if (!lastMark.equals(mark)) {
                     lastMark = mark;
-                    out.println(ProfileStats.REPORT_SEP_LINE);
+                    out.println(PROFILE_SEP_LINE);
                 }
-                profileStatsReport(ps, p.label + (alreadyReported ? "" : "*"), x == 0, false);
+                profileStatsReport(ps, p.label + (alreadyReported ? "" : "*"));
             }
-            out.println(ProfileStats.REPORT_SEP_LINE);
+            out.println(PROFILE_FOOT_LINE);
         }
     }
 
-    public void profileStatsReport(ProfileStats p, String label, boolean header, boolean footer) {
-        if (header) {
-            out.println(ProfileStats.REPORT_SEP_LINE);
-            out.printf(ProfileStats.REPORT_LINE_HEADER, "");
-            out.println(ProfileStats.REPORT_SEP_LINE);
-        }
-        out.printf(ProfileStats.REPORT_LINE_FORMAT, label,
+    private static final String PROFILE_TOP_LINE    = "┌─────────────────────┬────────────┬────────────┬────────────┬────────────┬────────────┬────────────┬────────────┬────────────┬─────────┬─────────┐";
+    private static final String PROFILE_SEP_LINE    = "├─────────────────────┼────────────┼────────────┼────────────┼────────────┼────────────┼────────────┼────────────┼────────────┼─────────┼─────────┤";
+    private static final String PROFILE_FOOT_LINE   = "└─────────────────────┴────────────┴────────────┴────────────┴────────────┴────────────┴────────────┴────────────┴────────────┴─────────┴─────────┘";
+    private static final String PROFILE_LINE_HEADER = "│ %-19s │        max │   heap max │  allocated │       free │  heap used │  heap cmtd │   non used │   non cmtd │   alive │    dead │\n";
+    private static final String PROFILE_LINE_FORMAT = "│ %-19s │ %10s │ %10s │ %10s │ %10s │ %10s │ %10s │ %10s │ %10s │ %7s │ %7s │\n";
+
+    public void profileStatsReport(ProfileStats p, String label) {
+        out.printf(PROFILE_LINE_FORMAT, label,
             Stats.humanBytes(p.maxMemory),
             Stats.humanBytes(p.heapMax),
             Stats.humanBytes(p.allocatedMemory),
@@ -231,10 +205,6 @@ public class WatchTracking extends Workload {
             Stats.humanBytes(p.nonHeapCommitted),
             p.liveThreads.size() + "/" + p.threadCount,
             p.deadThreads.size() + "/" + p.threadCount);
-
-        if (footer) {
-            out.println(ProfileStats.REPORT_SEP_LINE);
-        }
     }
 
     abstract class WtWatcher implements KeyValueWatcher {
@@ -276,7 +246,7 @@ public class WatchTracking extends Workload {
                     subReport();
                 }
                 else {
-                    out.print(".");
+                    out.showWait();
                 }
             }
             finally {
@@ -346,5 +316,39 @@ public class WatchTracking extends Workload {
             }
             return sid;
         }
+    }
+
+    private Displayable initOutput() {
+        return new Displayable() {
+            @Override
+            public void clear() {
+                System.out.println("\n\n");
+            }
+
+            @Override
+            public void showWait() {
+                System.out.print(".");
+            }
+
+            @Override
+            public void print(String s) {
+                System.out.print(s);
+            }
+
+            @Override
+            public void printf(String format, Object... args) {
+                System.out.printf(format, args);
+            }
+
+            @Override
+            public void println() {
+                System.out.println();
+            }
+
+            @Override
+            public void println(String s) {
+                System.out.println(s);
+            }
+        };
     }
 }

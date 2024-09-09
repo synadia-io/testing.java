@@ -15,8 +15,6 @@ package io.synadia.tools;
 
 import javax.swing.*;
 import java.awt.*;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 
 public class WindowDisplay extends JPanel implements Displayable {
 
@@ -30,6 +28,7 @@ public class WindowDisplay extends JPanel implements Displayable {
     static final String INDENT = "   ";
 
     final JTextArea area;
+    final JFrame frame;
     final String name;
 
     static {
@@ -58,7 +57,7 @@ public class WindowDisplay extends JPanel implements Displayable {
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
         //Add contents to the window.
-        WindowDisplay display = new WindowDisplay(name);
+        WindowDisplay display = new WindowDisplay(name, frame);
         frame.add(display);
 
         //WindowDisplay the window.
@@ -74,9 +73,10 @@ public class WindowDisplay extends JPanel implements Displayable {
         return display;
     }
 
-    private WindowDisplay(String name) {
+    private WindowDisplay(String name, JFrame frame) {
         super(new GridLayout(1, 1));
         this.name = name;
+        this.frame = frame;
         area = new JTextArea(ROWS, 40);
         area.setBackground(Color.BLACK);
         area.setForeground(Color.WHITE);
@@ -85,34 +85,43 @@ public class WindowDisplay extends JPanel implements Displayable {
         add(new JScrollPane(area));
     }
 
-    public static final SimpleDateFormat FORMATTER = new SimpleDateFormat("HH:mm:ss");
+    private boolean showingWait = false;
 
     public void clear() {
+        showingWait = false;
         area.setText(null);
-        area.append("\n");
-        area.append(INDENT);
-        area.append(name);
-        area.append(" @ ");
-        area.append(FORMATTER.format(new Date()));
         area.append("\n");
     }
 
+    @Override
+    public void showWait() {
+        if (!showingWait) {
+            showingWait = true;
+            area.append("\n");
+            area.append(INDENT);
+        }
+        area.append(".");
+    }
+
     public void print(String s) {
-        area.append(INDENT);
+        showingWait = false;
         area.append(s);
     }
 
     @Override
     public void printf(String format, Object... args) {
+        showingWait = false;
         area.append(INDENT);
         area.append(String.format(format, args));
     }
 
     public void println() {
+        showingWait = false;
         area.append("\n");
     }
 
     public void println(String s) {
+        showingWait = false;
         area.append(INDENT);
         area.append(s);
         area.append("\n");
