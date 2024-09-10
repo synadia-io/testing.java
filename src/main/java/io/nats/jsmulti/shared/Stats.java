@@ -26,7 +26,7 @@ public class Stats {
     public static final int VERSION = 1;
 
     public static final double MILLIS_PER_SECOND = 1000;
-    public static final double NANOS_PER_MILLI = 1000000;
+    public static final long NANOS_PER_MILLI = 1000000;
 
     public static final long HUMAN_BYTES_BASE = 1024;
     public static final String[] HUMAN_BYTES_UNITS = new String[] {"b", "kb", "mb", "gb", "tb", "pb", "eb"};
@@ -34,11 +34,11 @@ public class Stats {
 
     public static final String REPORT_SEP_LINE    = "| ------------------- | ----------------- | --------------- | ------------------------ | ---------------- |";
     public static final String REPORT_LINE_HEADER = "| %-19s |             count |            time |                 msgs/sec |        bytes/sec |\n";
-    public static final String REPORT_LINE_FORMAT = "| %-19s | %12s msgs | %12s ms | %15s msgs/sec | %12s/sec |\n";
+    public static final String REPORT_LINE_FORMAT = "| %-19s | %12s msgs | %15s | %15s msgs/sec | %12s/sec |\n";
 
     public static final String RTT_REPORT_SEP_LINE    = "| ------------------- | ------------ | ------------------ | ------------------ |";
     public static final String RTT_REPORT_LINE_HEADER = "| %-19s |        count |         total time |       average time |\n";
-    public static final String RTT_REPORT_LINE_FORMAT = "| %-19s | %12s |    %12s ms | %15s ms |\n";
+    public static final String RTT_REPORT_LINE_FORMAT = "| %-19s | %12s | %15s | %15s ms |\n";
 
     public static final String LT_REPORT_SEP_LINE    = "| ------------------- | ------------------------ | ---------------- | ------------------------ | ---------------- | ------------------------ | ---------------- |";
     public static final String LT_REPORT_LINE_HEADER = "| Latency Total   |                   Publish to Server Created |         Server Created to Consumer Received |                Publish to Consumer Received |";
@@ -250,7 +250,7 @@ public class Stats {
 
                 if (lout != null) {
                     try {
-                        lout.write(("" + messagePubTime + "," + messageStampTime + "," + mReceived
+                        lout.write((messagePubTime + "," + messageStampTime + "," + mReceived
                             + "," + pToS + "," + sToR + "," + full
                             + "\n").getBytes(StandardCharsets.US_ASCII));
                     } catch (IOException e) {
@@ -271,7 +271,7 @@ public class Stats {
         }
         out.printf(REPORT_LINE_FORMAT, label,
             format(stats.messageCount),
-            format3(stats.elapsed),
+            humanTime(stats.elapsed),
             format3(messagesPerSecond),
             humanBytes(bytesPerSecond));
         if (footer) {
@@ -287,7 +287,7 @@ public class Stats {
         }
         out.printf(RTT_REPORT_LINE_FORMAT, tlabel,
             format(stats.messageCount),
-            format3(stats.elapsed / NANOS_PER_MILLI),
+            humanTime(stats.elapsed / NANOS_PER_MILLI),
             format3(stats.elapsed / NANOS_PER_MILLI / stats.messageCount));
         if (footer) {
             out.println(RTT_REPORT_SEP_LINE);
@@ -454,6 +454,28 @@ public class Stats {
         }
     }
 
+    public static String humanTime(long millis) {
+        // HHh mmm sss ms
+        long h = millis / 3600000;
+        long left = millis - (h * 3600000);
+        long m = left / 60000;
+        left = left - (m * 60000);
+        long s = left / 1000;
+        left = left - (s * 1000);
+
+        if (h > 0) {
+            return h + ":" + pad2(m) + ":" + pad2(s) + "." + pad3(left);
+        }
+
+        if (m > 0) {
+            return m + ":" + pad2(s) + "." + pad3(left);
+        }
+        if (s > 0) {
+            return s + "." + pad3(left) + " sec";
+        }
+        return format3(millis) + " ms";
+    }
+
     public static String format(Number s) {
         return NumberFormat.getNumberInstance(Locale.getDefault()).format(s);
     }
@@ -471,5 +493,20 @@ public class Stats {
             return f + "." + ZEROS.substring(0, 3);
         }
         return (f + ZEROS).substring(0, at + 3 + 1);
+    }
+
+    public static String pad3(Number n) {
+        String f = format3(n);
+        if (f.length() >= 3) {
+            return f;
+        }
+        if (f.length() == 2) {
+            return "0" + f;
+        }
+        return "00" + f;
+    }
+
+    public static String pad2(long n) {
+        return n < 10 ? "0" + n : "" + n;
     }
 }

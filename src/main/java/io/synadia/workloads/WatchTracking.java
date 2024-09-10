@@ -82,7 +82,7 @@ public class WatchTracking extends Workload {
         private static final String STATS_SEP_LINE    = "├─────────────────────┼───────────────────┼─────────────────┼──────────────────────────┼──────────────────┤";
         private static final String STATS_FOOT_LINE   = "└─────────────────────┴───────────────────┴─────────────────┴──────────────────────────┴──────────────────┘";
         private static final String STATS_LINE_HEADER = "│ %-19s │             count │            time │                 msgs/sec │        bytes/sec │\n";
-        private static final String STATS_LINE_FORMAT = "│ %-19s │ %12s msgs │ %12s ms │ %15s msgs/sec │ %12s/sec │\n";
+        private static final String STATS_LINE_FORMAT = "│ %-19s │ %12s msgs │ %15s │ %15s msgs/sec │ %12s/sec │\n";
 
         Map<String, ParsedEntry> map;
 
@@ -139,7 +139,7 @@ public class WatchTracking extends Workload {
             double bytesPerSecond = Stats.MILLIS_PER_SECOND * (stats.getBytes()) / (elapsed);
             out.printf(STATS_LINE_FORMAT, label,
                 Stats.format(messageCount),
-                Stats.format3(elapsed),
+                Stats.humanTime(elapsed),
                 Stats.format3(messagesPerSecond),
                 Stats.humanBytes(bytesPerSecond));
         }
