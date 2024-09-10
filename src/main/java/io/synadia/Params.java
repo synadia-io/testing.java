@@ -5,7 +5,7 @@ import io.nats.client.api.StreamConfiguration;
 import io.nats.client.support.JsonParseException;
 import io.nats.client.support.JsonParser;
 import io.nats.client.support.JsonValue;
-import io.synadia.tools.Debug;
+import io.synadia.support.Debug;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -13,7 +13,7 @@ import java.nio.file.Paths;
 import java.util.List;
 
 import static io.nats.client.support.JsonValueUtils.*;
-import static io.synadia.tools.Constants.OS_UNIX;
+import static io.synadia.support.Constants.OS_UNIX;
 
 public class Params {
     public final JsonValue jv;

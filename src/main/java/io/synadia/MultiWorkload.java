@@ -5,8 +5,8 @@ import io.nats.jsmulti.settings.Arguments;
 import io.nats.jsmulti.settings.Context;
 
 public class MultiWorkload extends Workload {
-    public MultiWorkload(String workloadName, CommandLine commandLine) {
-        super(workloadName, commandLine);
+    public MultiWorkload(String defaultLabel, CommandLine commandLine) {
+        super(defaultLabel, commandLine);
     }
 
     public void runWorkload() throws Exception {

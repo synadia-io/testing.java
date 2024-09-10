@@ -14,7 +14,7 @@
 package io.synadia;
 
 import io.nats.client.Options;
-import io.synadia.tools.Debug;
+import io.synadia.support.Debug;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,12 +32,15 @@ public class CommandLine {
     //     --id foo-bar-baz-12345
     // ### --workload <WORKLOAD_NAME>
     //     --workload stay-connected
+    // ### --label <workload label>
+    //     --label what-is-being-done
     // ### --params <PATH_TO_JSON_FILE>
     //     --params /tmp/workload-92493-9983831-3-0913.json
     // ----------------------------------------------------------------------------------------------------
     public final String server;
     public final String id;
     public final String workload;
+    public final String label;
     public final List<String> paramsFiles;
 
     // ----------------------------------------------------------------------------------------------------
@@ -55,6 +58,7 @@ public class CommandLine {
         append(sb, "server", server, true);
         append(sb, "id", id, id != null);
         append(sb, "workload", workload, true);
+        append(sb, "label", label, label != null);
         append(sb, "paramsFile", paramsFiles, true);
         return sb.toString().trim();
     }
@@ -63,6 +67,9 @@ public class CommandLine {
         Debug.info("Command Line", "server", server);
         if (id != null) {
             Debug.info("Command Line", "id", id);
+        }
+        if (label != null) {
+            Debug.info("Command Line", "label", label);
         }
         Debug.info("Command Line", "workload", workload);
         Debug.info("Command Line", "paramsFile", paramsFiles);
@@ -74,6 +81,7 @@ public class CommandLine {
     public CommandLine(String[] args) {
         String _server = Options.DEFAULT_URL;
         String _id = null;
+        String _label = null;
         String _workload = null;
         List<String> _paramsFiles = new ArrayList<>();
 
@@ -87,6 +95,9 @@ public class CommandLine {
                             break;
                         case "--id":
                             _id = asString(args[++x]);
+                            break;
+                        case "--label":
+                            _label = asString(args[++x]);
                             break;
                         case "--workload":
                             _workload = asString(args[++x]);
@@ -110,6 +121,7 @@ public class CommandLine {
         server = _server;
         id = _id;
         workload = _workload;
+        label = _label;
         paramsFiles = _paramsFiles;
     }
 

@@ -1,4 +1,4 @@
-package io.synadia.tools;
+package io.synadia.support;
 
 public interface Constants {
     String FINAL = "final";

@@ -1,4 +1,4 @@
-package io.synadia;
+package io.synadia.support;
 
 import io.nats.client.Options;
 import io.nats.jsmulti.settings.Context;

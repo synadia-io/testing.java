@@ -1,4 +1,4 @@
-package io.synadia.tools;
+package io.synadia.support;
 
 import io.nats.client.support.JsonParser;
 import io.nats.client.support.JsonValue;
@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import static io.synadia.tools.Constants.*;
+import static io.synadia.support.Constants.*;
 
 public class Generator {
 

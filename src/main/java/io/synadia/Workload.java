@@ -3,32 +3,33 @@ package io.synadia;
 import io.nats.client.*;
 import io.nats.client.api.KeyValueConfiguration;
 import io.nats.client.api.StreamConfiguration;
-import io.synadia.tools.Debug;
+import io.synadia.support.Debug;
 
 import java.util.List;
 
 public abstract class Workload {
-    public final String workloadName;
+    public final String label;
     public final CommandLine commandLine;
     public final Params params;
 
-    public Workload(String workloadName, CommandLine commandLine) {
-        this.workloadName = workloadName;
+    public Workload(String defaultLabel, CommandLine commandLine) {
+        this.label = commandLine.label == null ? defaultLabel : commandLine.label;
         this.commandLine = commandLine;
-        commandLine.debug();
-        params = new Params(commandLine.paramsFiles);
+        this.params = new Params(commandLine.paramsFiles);
 
-        debug("Config",  "testingStreamName", params.testingStreamName);
-        debug("Config",  "testingStreamSubject", params.testingStreamSubject);
-        debug("Config",  "statsBucket", params.statsBucket);
-        debug("Config",  "profileBucket", params.profileBucket);
-        debug("Config",  "profileStreamName", params.profileStreamName);
-        debug("Config",  "profileStreamSubject", params.profileStreamSubject);
-        debug("Config",  "watchWaitTime", "" + params.watchWaitTime);
+        commandLine.debug();
+        String dl = "Config [" + label + "]";
+        debug(dl,  "testingStreamName", params.testingStreamName);
+        debug(dl,  "testingStreamSubject", params.testingStreamSubject);
+        debug(dl,  "statsBucket", params.statsBucket);
+        debug(dl,  "profileBucket", params.profileBucket);
+        debug(dl,  "profileStreamName", params.profileStreamName);
+        debug(dl,  "profileStreamSubject", params.profileStreamSubject);
+        debug(dl,  "watchWaitTime", "" + params.watchWaitTime);
     }
 
     public void debug(String label, String k, String v) {
-        Debug.info(workloadName + " " + label, k, v);
+        Debug.info(this.label + " " + label, k, v);
     }
 
     public abstract void runWorkload() throws Exception;
@@ -52,11 +53,11 @@ public abstract class Workload {
         }
     }
     protected void createStream(StreamConfiguration streamConfig, JetStreamManagement jsm) throws Exception {
-        Debug.info(workloadName, "Create Stream", streamConfig.getName());
+        Debug.info(label, "Create Stream", streamConfig.getName());
         String streamName = streamConfig.getName();
         List<String> streamNames = jsm.getStreamNames();
         if (streamNames.contains(streamName)) {
-            Debug.info(workloadName, "Removing existing stream", streamName);
+            Debug.info(label, "Removing existing stream", streamName);
             jsm.deleteStream(streamName);
             Thread.sleep(200); // the server needs time to process the delete
         }
@@ -64,10 +65,10 @@ public abstract class Workload {
     }
 
     protected void createBucket(String bucket, KeyValueManagement kvm) throws Exception {
-        Debug.info(workloadName, "Create Bucket", bucket);
+        Debug.info(label, "Create Bucket", bucket);
         List<String> bucketNames = kvm.getBucketNames();
         if (bucketNames.contains(bucket)) {
-            Debug.info(workloadName, "Removing existing bucket", bucket);
+            Debug.info(label, "Removing existing bucket", bucket);
             kvm.delete(bucket);
             Thread.sleep(200); // the server needs time to process the delete
         }
@@ -85,7 +86,7 @@ public abstract class Workload {
     private void create(Manager manager) throws Exception {
         while (true) {
             try {
-                Debug.info(workloadName, manager.manage());
+                Debug.info(label, manager.manage());
                 break;
             }
             catch (JetStreamApiException j) {

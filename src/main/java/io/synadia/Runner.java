@@ -1,10 +1,7 @@
 package io.synadia;
 
-import io.synadia.tools.Debug;
-import io.synadia.workloads.DeployTest;
-import io.synadia.workloads.SetupTesting;
-import io.synadia.workloads.SetupTracking;
-import io.synadia.workloads.WatchTracking;
+import io.synadia.support.Debug;
+import io.synadia.workloads.*;
 
 public class Runner {
 
@@ -12,11 +9,8 @@ public class Runner {
         CommandLine commandLine = new CommandLine(args);
         Workload workload = null;
         switch (commandLine.workload) {
-            case "publisher":
-                workload = new MultiWorkload("Publisher", commandLine);
-                break;
-            case "consumer":
-                workload = new MultiWorkload("Consumer", commandLine);
+            case "multi":
+                workload = new MultiWorkload("Multi", commandLine);
                 break;
             case "deployTest":
                 workload = new DeployTest(commandLine);
@@ -33,6 +27,9 @@ public class Runner {
             case "watchProfile":
                 workload = new WatchTracking(WatchTracking.Which.Profile, commandLine);
                 break;
+            case "saveTracking":
+                workload = new SaveTracking(commandLine);
+                break;
             default:
                 Debug.info("Runner", "Workload not implemented: " + commandLine.workload);
                 break;
@@ -44,7 +41,7 @@ public class Runner {
             System.exit(0);
         }
         catch (Exception e) {
-            String wn = workload == null ? "Runner" : workload.workloadName;
+            String wn = workload == null ? "Runner" : workload.label;
             Debug.info(wn, e);
             Debug.stackTrace(wn, e);
             System.exit(-1);

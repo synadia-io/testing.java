@@ -9,22 +9,18 @@ import io.nats.client.Nats;
 import io.nats.client.Options;
 import io.nats.client.api.KeyValueEntry;
 import io.nats.client.api.KeyValueWatcher;
-import io.nats.client.support.JsonParseException;
-import io.nats.client.support.JsonParser;
-import io.nats.client.support.JsonValue;
 import io.nats.jsmulti.shared.ProfileStats;
 import io.nats.jsmulti.shared.Stats;
 import io.synadia.CommandLine;
+import io.synadia.ParsedEntry;
 import io.synadia.Workload;
-import io.synadia.tools.Debug;
-import io.synadia.tools.Displayable;
+import io.synadia.support.Debug;
 
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
-import static io.synadia.tools.Constants.FINAL;
+import static io.synadia.support.Reporting.*;
 
 public class WatchTracking extends Workload {
     public enum Which {
@@ -38,7 +34,6 @@ public class WatchTracking extends Workload {
 
     private final Which which;
     private final String bucket;
-    private final Displayable out;
 
     public WatchTracking(Which which, CommandLine commandLine) {
         super(which.workloadName, commandLine);
@@ -49,7 +44,6 @@ public class WatchTracking extends Workload {
         else {
             bucket = params.profileBucket;
         }
-        out = initOutput();
     }
 
     @Override
@@ -78,12 +72,6 @@ public class WatchTracking extends Workload {
     public static final SimpleDateFormat FORMATTER = new SimpleDateFormat("HH:mm:ss");
 
     class StatsWatcher extends WtWatcher {
-        private static final String STATS_TOP_LINE    = "┌─────────────────────┬───────────────────┬─────────────────┬──────────────────────────┬──────────────────┐";
-        private static final String STATS_SEP_LINE    = "├─────────────────────┼───────────────────┼─────────────────┼──────────────────────────┼──────────────────┤";
-        private static final String STATS_FOOT_LINE   = "└─────────────────────┴───────────────────┴─────────────────┴──────────────────────────┴──────────────────┘";
-        private static final String STATS_LINE_HEADER = "│ %-19s │             count │            time │                 msgs/sec │        bytes/sec │\n";
-        private static final String STATS_LINE_FORMAT = "│ %-19s │ %12s msgs │ %15s │ %15s msgs/sec │ %12s/sec │\n";
-
         Map<String, ParsedEntry> map;
 
         public StatsWatcher() {
@@ -98,11 +86,11 @@ public class WatchTracking extends Workload {
 
         @Override
         void subReport() {
-            List<ParsedEntry> list = new ArrayList<>(map.values());
-            list.sort(Comparator.comparing(p -> p.label));
-            String date = FORMATTER.format(new Date());
+            startNewReport();
 
-            out.clear();
+            List<ParsedEntry> list = new ArrayList<>(map.values());
+            ParsedEntry.sort(list);
+            String date = FORMATTER.format(new Date());
 
             String lastMark = null;
             Stats totalStats = new Stats();
@@ -113,35 +101,23 @@ public class WatchTracking extends Workload {
                 String mark = p.statType + p.contextId;
                 if (!mark.equals(lastMark)){
                     if (lastMark != null) {
-                        out.println(STATS_SEP_LINE);
-                        print("Total", totalStats);
-                        out.println(STATS_FOOT_LINE);
+                        System.out.println(STATS_SEP_LINE);
+                        statsLineReport("Total", totalStats);
+                        System.out.println(STATS_FOOT_LINE);
                         totalStats = new Stats();
                     }
                     lastMark = mark;
-                    out.println(STATS_TOP_LINE);
-                    out.printf(STATS_LINE_HEADER, date);
-                    out.println(STATS_SEP_LINE);
+                    System.out.println(STATS_TOP_LINE);
+                    System.out.printf(STATS_LINE_HEADER, date);
+                    System.out.println(STATS_SEP_LINE);
                 }
                 Stats.totalOne(stats, totalStats);
-                print(p.label + (alreadyReported ? "" : "*"), stats);
+                statsLineReport(p.label + (alreadyReported ? "" : "*"), stats);
             }
 
-            out.println(STATS_SEP_LINE);
-            print("Total", totalStats);
-            out.println(STATS_FOOT_LINE);
-        }
-
-        public void print(String label, Stats stats) {
-            long elapsed = stats.getElapsed();
-            long messageCount = stats.getMessageCount();
-            double messagesPerSecond = elapsed == 0 ? 0 : messageCount * Stats.MILLIS_PER_SECOND / elapsed;
-            double bytesPerSecond = Stats.MILLIS_PER_SECOND * (stats.getBytes()) / (elapsed);
-            out.printf(STATS_LINE_FORMAT, label,
-                Stats.format(messageCount),
-                Stats.humanTime(elapsed),
-                Stats.format3(messagesPerSecond),
-                Stats.humanBytes(bytesPerSecond));
+            System.out.println(STATS_SEP_LINE);
+            statsLineReport("Total", totalStats);
+            System.out.println(STATS_FOOT_LINE);
         }
     }
 
@@ -160,16 +136,15 @@ public class WatchTracking extends Workload {
 
         @Override
         void subReport() {
-            out.clear();
-            out.println(PROFILE_TOP_LINE);
-            out.printf(PROFILE_LINE_HEADER, FORMATTER.format(new Date()));
-            out.println(PROFILE_SEP_LINE);
+            startNewReport();
+            System.out.println(PROFILE_TOP_LINE);
+            System.out.printf(PROFILE_LINE_HEADER, FORMATTER.format(new Date()));
+            System.out.println(PROFILE_SEP_LINE);
 
             List<ParsedEntry> list = new ArrayList<>(map.values());
-            list.sort(Comparator.comparing(p -> p.label));
+            ParsedEntry.sort(list);
             String lastMark = null;
-            for (int x = 0; x < list.size(); x++) {
-                ParsedEntry p = list.get(x);
+            for (ParsedEntry p : list) {
                 ProfileStats ps = (ProfileStats) p.target;
                 boolean alreadyReported = p.reported;
                 p.reported = true;
@@ -179,37 +154,18 @@ public class WatchTracking extends Workload {
                 }
                 else if (!lastMark.equals(mark)) {
                     lastMark = mark;
-                    out.println(PROFILE_SEP_LINE);
+                    System.out.println(PROFILE_SEP_LINE);
                 }
-                profileStatsReport(ps, p.label + (alreadyReported ? "" : "*"));
+                profileLineReport(p.label + (alreadyReported ? "" : "*"), ps);
             }
-            out.println(PROFILE_FOOT_LINE);
+            System.out.println(PROFILE_FOOT_LINE);
         }
-    }
-
-    private static final String PROFILE_TOP_LINE    = "┌─────────────────────┬────────────┬────────────┬────────────┬────────────┬────────────┬────────────┬────────────┬────────────┬─────────┬─────────┐";
-    private static final String PROFILE_SEP_LINE    = "├─────────────────────┼────────────┼────────────┼────────────┼────────────┼────────────┼────────────┼────────────┼────────────┼─────────┼─────────┤";
-    private static final String PROFILE_FOOT_LINE   = "└─────────────────────┴────────────┴────────────┴────────────┴────────────┴────────────┴────────────┴────────────┴────────────┴─────────┴─────────┘";
-    private static final String PROFILE_LINE_HEADER = "│ %-19s │        max │   heap max │  allocated │       free │  heap used │  heap cmtd │   non used │   non cmtd │   alive │    dead │\n";
-    private static final String PROFILE_LINE_FORMAT = "│ %-19s │ %10s │ %10s │ %10s │ %10s │ %10s │ %10s │ %10s │ %10s │ %7s │ %7s │\n";
-
-    public void profileStatsReport(ProfileStats p, String label) {
-        out.printf(PROFILE_LINE_FORMAT, label,
-            Stats.humanBytes(p.maxMemory),
-            Stats.humanBytes(p.heapMax),
-            Stats.humanBytes(p.allocatedMemory),
-            Stats.humanBytes(p.freeMemory),
-            Stats.humanBytes(p.heapUsed),
-            Stats.humanBytes(p.heapCommitted),
-            Stats.humanBytes(p.nonHeapUsed),
-            Stats.humanBytes(p.nonHeapCommitted),
-            p.liveThreads.size() + "/" + p.threadCount,
-            p.deadThreads.size() + "/" + p.threadCount);
     }
 
     abstract class WtWatcher implements KeyValueWatcher {
         private final ReentrantLock lock = new ReentrantLock();
         private boolean changed = false;
+        private boolean waiting = false;
         abstract void subWatch(ParsedEntry parsedEntry);
 
         @Override
@@ -225,15 +181,14 @@ public class WatchTracking extends Workload {
                 }
             }
             catch (Exception e) {
-                Debug.info(workloadName, e);
-                Debug.stackTrace(workloadName, e);
+                Debug.info(label, e);
+                Debug.stackTrace(label, e);
                 System.exit(-1);
             }
         }
 
         @Override
-        public void endOfData() {
-        }
+        public void endOfData() {}
 
         abstract void subReport();
 
@@ -242,113 +197,31 @@ public class WatchTracking extends Workload {
             try {
                 if (changed) {
                     changed = false;
-                    out.println();
+                    if (waiting) {
+                        endWait();
+                    }
                     subReport();
                 }
                 else {
-                    out.showWait();
+                    waiting = true;
+                    showWait();
                 }
             }
             finally {
                 lock.unlock();
             }
         }
-    }
 
-    static class ParsedEntry {
-        final JsonValue jv;
-        final boolean fin;
-        final String key;
-        final String statType;
-        final String contextId;
-        final String statId;
-        String label;
-        Object target;
-        boolean reported;
-
-        public ParsedEntry(KeyValueEntry kve) throws JsonParseException {
-            jv = JsonParser.parse(kve.getValue());
-
-            JsonValue jvFinal = jv.map.get(FINAL);
-            if (jvFinal == null) {
-                fin = false;
-            }
-            else {
-                fin = jvFinal.bool != null && jvFinal.bool;
-            }
-
-            key = kve.getKey();
-            String[] parts = key.split("\\.");
-            statType = parts[0];
-            contextId = parts[1];
-            statId = parts.length == 3 ? parts[2] : "";
+        void startNewReport() {
+            System.out.println("\n\n");
         }
 
-        static final AtomicInteger CONTEXT_ID = new AtomicInteger(0);
-        static final Map<String, Integer> idByContext = new HashMap<>();
-        static final Map<Integer, Map<String, Integer>> statIdsForContext = new HashMap<>();
-        static final Map<Integer, AtomicInteger> statsIdMakerForContext = new HashMap<>();
-
-        public void targetAndLabel(Object target, boolean contextOnly) {
-            this.target = target;
-            label = contextOnly
-                ? String.format("%s-%03d", statType, getContextCode(this))
-                : String.format("%s-%03d-%03d", statType, getContextCode(this), getStatIdCode(this));
+        void showWait() {
+            System.out.print(".");
         }
 
-        static int getContextCode(ParsedEntry p) {
-            Integer cid = idByContext.get(p.contextId);
-            if (cid == null) {
-                cid = CONTEXT_ID.incrementAndGet();
-                idByContext.put(p.contextId, cid);
-            }
-            return cid;
+        void endWait() {
+            System.out.println();
         }
-
-        static int getStatIdCode(ParsedEntry p) {
-            Integer cid = getContextCode(p);
-            Map<String, Integer> map = statIdsForContext.computeIfAbsent(cid, k -> new HashMap<>());
-            Integer sid = map.get(p.statId);
-            if (sid == null) {
-                AtomicInteger maker = statsIdMakerForContext.computeIfAbsent(cid, k -> new AtomicInteger());
-                sid = maker.incrementAndGet();
-                map.put(p.statId, sid);
-            }
-            return sid;
-        }
-    }
-
-    private Displayable initOutput() {
-        return new Displayable() {
-            @Override
-            public void clear() {
-                System.out.println("\n\n");
-            }
-
-            @Override
-            public void showWait() {
-                System.out.print(".");
-            }
-
-            @Override
-            public void print(String s) {
-                System.out.print(s);
-            }
-
-            @Override
-            public void printf(String format, Object... args) {
-                System.out.printf(format, args);
-            }
-
-            @Override
-            public void println() {
-                System.out.println();
-            }
-
-            @Override
-            public void println(String s) {
-                System.out.println(s);
-            }
-        };
     }
 }

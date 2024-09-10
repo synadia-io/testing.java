@@ -1,4 +1,4 @@
-package io.synadia.tools;
+package io.synadia.support;
 
 import io.nats.client.Connection;
 import io.nats.client.JetStreamApiException;

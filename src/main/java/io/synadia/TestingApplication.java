@@ -10,14 +10,14 @@ import io.nats.jsmulti.shared.Application;
 import io.nats.jsmulti.shared.OptionsFactory;
 import io.nats.jsmulti.shared.ProfileStats;
 import io.nats.jsmulti.shared.Stats;
-import io.synadia.tools.Debug;
+import io.synadia.support.Debug;
 
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Map;
 
-import static io.synadia.tools.Constants.*;
+import static io.synadia.support.Constants.*;
 
 public class TestingApplication implements Application, AutoCloseable {
     public static final SimpleDateFormat FORMATTER = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
@@ -92,8 +92,8 @@ public class TestingApplication implements Application, AutoCloseable {
             js.publish(workload.params.profileStreamSubject, profileData);
         }
         catch (Exception e) {
-            Debug.info(workload.workloadName, "Error publishing tracking.", e);
-            Debug.stackTrace(workload.workloadName, e);
+            Debug.info(workload.label, "Error publishing tracking.", e);
+            Debug.stackTrace(workload.label, e);
             throw new RuntimeException(e);
         }
     }
