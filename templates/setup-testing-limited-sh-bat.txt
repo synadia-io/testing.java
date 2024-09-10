@@ -1,1 +1,1 @@
-java -cp "build/libs/*" io.synadia.Runner --workload setupTesting --params gen-params<PathSep>config.json --params gen-params<PathSep>stream-limited.json
+java -cp "build/libs/*" io.synadia.Runner --workload setupTesting --params params<PathSep>config.json --params params<PathSep>stream-limited.json
