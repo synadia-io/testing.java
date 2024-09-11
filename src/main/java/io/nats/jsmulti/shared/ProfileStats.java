@@ -17,10 +17,7 @@ import io.nats.client.support.JsonValue;
 import io.nats.client.support.JsonValueUtils;
 
 import java.io.PrintStream;
-import java.lang.management.ManagementFactory;
-import java.lang.management.MemoryMXBean;
-import java.lang.management.MemoryUsage;
-import java.lang.management.ThreadMXBean;
+import java.lang.management.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -84,12 +81,15 @@ public class ProfileStats {
             deadThreadIds = new long[0];
         }
         for (long id : threadBean.getAllThreadIds()) {
-            String text = "<" + id + "> " + threadBean.getThreadInfo(id).getThreadName();
-            if (isAlive(id, deadThreadIds)) {
-                liveThreads.add(text);
-            }
-            else {
-                deadThreads.add(text);
+            ThreadInfo ti = threadBean.getThreadInfo(id);
+            if (ti != null) {
+                String text = "<" + id + "> " + ti.getThreadName();
+                if (isAlive(id, deadThreadIds)) {
+                    liveThreads.add(text);
+                }
+                else {
+                    deadThreads.add(text);
+                }
             }
         }
     }
