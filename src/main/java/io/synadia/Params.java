@@ -30,6 +30,7 @@ public class Params {
     public final String server2;
     public final String testingStreamName;
     public final String testingStreamSubject;
+    public final String multiBucket;
     public final String statsBucket;
     public final String profileBucket;
     public final String profileStreamName;
@@ -40,7 +41,39 @@ public class Params {
     public final String saveStreamSubject;
 
     public Params(List<String> paramsFiles) {
-        jv = mapBuilder().jv;
+        this(readParamsFiles(paramsFiles));
+    }
+
+    public Params(JsonValue jv) {
+        this.jv = jv;
+        String temp = readString(jv, "os");
+        os = OS_WIN.equals(temp) ? OS_WIN : OS_UNIX;
+        streamConfig = loadStreamConfig("stream_config");
+        createStream = streamConfig != null && readBoolean(jv, "create_stream", false);
+        jvMultiConfig = readObject(jv, "multi_config");
+        adminServer = readString(jv, "admin_server", Options.DEFAULT_URL);
+        server0 = readString(jv, "server0");
+        server1 = readString(jv, "server1");
+        server2 = readString(jv, "server2");
+        testingStreamName = readString(jv, "testing_stream_name");
+        testingStreamSubject = readString(jv, "testing_stream_subject");
+        multiBucket = readString(jv, "multi_bucket");
+        statsBucket = readString(jv, "stats_bucket");
+        profileBucket = readString(jv, "profile_bucket");
+        profileStreamName = readString(jv, "profile_stream_name");
+        profileStreamSubject = readString(jv, "profile_stream_subject");
+        watchWaitTime = readLong(jv, "watch_wait_time", 5000);
+        saveServer = readString(jv, "save_server");
+        saveStreamName = readString(jv, "save_stream_name");
+        saveStreamSubject = readString(jv, "save_stream_subject");
+    }
+
+    public String toJson() {
+        return jv.toJson();
+    }
+
+    private static JsonValue readParamsFiles(List<String> paramsFiles) {
+        JsonValue jv = mapBuilder().jv;
         for (String paramsFile : paramsFiles) {
             try {
                 byte[] bytes = Files.readAllBytes(Paths.get(paramsFile));
@@ -51,26 +84,7 @@ public class Params {
                 throw new RuntimeException(e);
             }
         }
-        String temp = readString(jv, "os");
-        os = OS_WIN.equals(temp) ? OS_WIN : OS_UNIX;
-        streamConfig = loadStreamConfig("stream_config");
-        createStream = streamConfig != null && readBoolean(jv, "create_stream", false);
-        jvMultiConfig = readObject(jv, "multi_config");
-        adminServer = readString(jv, "admin_server", Options.DEFAULT_URL);
-        server0 = readString(jv, "server0");
-        server1 = readString(jv, "server1");
-        server2 = readString(jv, "server2");
-
-        testingStreamName = readString(jv, "testing_stream_name");
-        testingStreamSubject = readString(jv, "testing_stream_subject");
-        statsBucket = readString(jv, "stats_bucket");
-        profileBucket = readString(jv, "profile_bucket");
-        profileStreamName = readString(jv, "profile_stream_name");
-        profileStreamSubject = readString(jv, "profile_stream_subject");
-        watchWaitTime = readLong(jv, "watch_wait_time", 5000);
-        saveServer = readString(jv, "save_server");
-        saveStreamName = readString(jv, "save_stream_name");
-        saveStreamSubject = readString(jv, "save_stream_subject");
+        return jv;
     }
 
     public void debug() {
@@ -85,14 +99,15 @@ public class Params {
 
         _debug("testingStreamName", testingStreamName);
         _debug("testingStreamSubject", testingStreamSubject);
+        _debug("multiBucket", multiBucket);
         _debug("statsBucket", statsBucket);
         _debug("profileBucket", profileBucket);
         _debug("profileStreamName", profileStreamName);
         _debug("profileStreamSubject", profileStreamSubject);
-        _debug("watchWaitTime", watchWaitTime);
         _debug("saveServer", saveServer);
         _debug("saveStreamName", saveStreamName);
         _debug("saveStreamSubject", saveStreamSubject);
+        _debug("watchWaitTime", watchWaitTime);
     }
 
     private void _debug(String name, Object value) {

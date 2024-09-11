@@ -39,6 +39,12 @@ public class TestingApplication implements Application, AutoCloseable {
                 .build();
             kvStats = nc.keyValue(workload.params.statsBucket, kvo);
             kvRunStats = nc.keyValue(workload.params.profileBucket, kvo);
+
+            KeyValue kvMulti = nc.keyValue(workload.params.multiBucket, kvo);
+            //noinspection DataFlowIssue // action will never be null here
+            String key = ctx.action.getLabel() + "."  + ctx.id;
+            byte[] value = workload.params.toJson().getBytes(StandardCharsets.US_ASCII);
+            kvMulti.put(key, value);
         }
         catch (Exception e) {
             throw new RuntimeException(e);

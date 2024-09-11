@@ -18,6 +18,7 @@ public class SetupTracking extends Workload {
     public void runWorkload() throws Exception {
         try (Connection nc = Nats.connect(getAdminOptions())) {
             KeyValueManagement kvm = nc.keyValueManagement();
+            createBucket(params.multiBucket, kvm);
             createBucket(params.statsBucket, kvm);
             createBucket(params.profileBucket, kvm);
             createStream(params.streamConfig, nc.jetStreamManagement());

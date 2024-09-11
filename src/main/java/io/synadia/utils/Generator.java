@@ -41,6 +41,7 @@ public class Generator {
 
     public static final String TESTING_STREAM_NAME = "<TestingStreamName>";
     public static final String TESTING_STREAM_SUBJECT = "<TestingStreamSubject>";
+    public static final String MULTI_BUCKET = "<MultiBucket>";
     public static final String STATS_BUCKET = "<StatsBucket>";
     public static final String STATS_WATCH_WAIT_TIME = "<StatsWatchWaitTime>";
     public static final String PROFILE_BUCKET = "<ProfileBucket>";
@@ -301,6 +302,7 @@ public class Generator {
         public final String natsPort;
         public final String testingStreamName;
         public final String testingStreamSubject;
+        public final String multiBucket;
         public final String statsBucket;
         public final String profileBucket;
         public final String profileStreamName;
@@ -328,6 +330,7 @@ public class Generator {
 
             testingStreamName = readString(jv, "testing_stream_name");
             testingStreamSubject = readString(jv, "testing_stream_subject");
+            multiBucket = readString(jv, "multi_bucket");
             statsBucket = readString(jv, "stats_bucket");
 
             profileBucket = readString(jv, "profile_bucket");
@@ -343,6 +346,7 @@ public class Generator {
         public String populate(String template) {
             return template.replace(TESTING_STREAM_NAME, testingStreamName)
                 .replace(TESTING_STREAM_SUBJECT, testingStreamSubject)
+                .replace(MULTI_BUCKET, multiBucket)
                 .replace(STATS_BUCKET, statsBucket)
                 .replace(STATS_WATCH_WAIT_TIME, statsWatchWaitTime)
                 .replace(PROFILE_BUCKET, profileBucket)
@@ -367,14 +371,15 @@ public class Generator {
             System.out.println("natsPort: " + natsPort);
             System.out.println("testingStreamName: " + testingStreamName);
             System.out.println("testingStreamSubject: " + testingStreamSubject);
+            System.out.println("multiBucket: " + multiBucket);
             System.out.println("statsBucket: " + statsBucket);
-            System.out.println("statsWatchWaitTime: " + statsWatchWaitTime);
             System.out.println("profileBucket: " + profileBucket);
             System.out.println("profileStreamName: " + profileStreamName);
             System.out.println("profileStreamSubject: " + profileStreamSubject);
-            System.out.println("profileWatchWaitTime: " + profileWatchWaitTime);
             System.out.println("saveStreamName: " + saveStreamName);
             System.out.println("saveStreamSubject: " + saveStreamSubject);
+            System.out.println("statsWatchWaitTime: " + statsWatchWaitTime);
+            System.out.println("profileWatchWaitTime: " + profileWatchWaitTime);
         }
 
         private JsonValue loadConfig() throws IOException {
@@ -392,6 +397,7 @@ public class Generator {
                 .put("nats_port", "4222")
                 .put("testing_stream_name", "testingStream")
                 .put("testing_stream_subject", "t")
+                .put("multi_bucket", "multiBucket")
                 .put("stats_bucket", "statsBucket")
                 .put("stats_watch_wait_time", 5000)
                 .put("profile_bucket", "profileBucket")

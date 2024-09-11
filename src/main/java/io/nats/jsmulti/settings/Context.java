@@ -435,7 +435,7 @@ public class Context {
         }
 
         // all errors exit
-        if (_action == null) {
+        if (action == null) {
             error("Valid action required!");
         }
         else if (_messageCount < 1) {
