@@ -134,7 +134,6 @@ public class WatchTracking extends Workload {
                 }
             }
             catch (Exception e) {
-                Debug.info(label, e);
                 Debug.stackTrace(label, e);
                 System.exit(-1);
             }

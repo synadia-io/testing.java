@@ -13,7 +13,6 @@
 
 package io.synadia;
 
-import io.nats.client.Options;
 import io.synadia.utils.Debug;
 
 import java.util.ArrayList;
@@ -67,8 +66,6 @@ public class CommandLine {
     // Construction
     // ----------------------------------------------------------------------------------------------------
     public CommandLine(String[] args) {
-        String _server = Options.DEFAULT_URL;
-        String _id = null;
         String _label = null;
         String _workload = null;
         List<String> _paramsFiles = new ArrayList<>();

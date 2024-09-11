@@ -30,6 +30,9 @@ public class Runner {
             case "watchProfile":
                 workload = new WatchTracking(WatchTracking.Which.Profile, commandLine);
                 break;
+            case "readTracking":
+                workload = new ReadTracking(commandLine);
+                break;
             case "saveTracking":
                 workload = new SaveTracking(commandLine);
                 break;
@@ -45,7 +48,6 @@ public class Runner {
         }
         catch (Exception e) {
             String wn = workload == null ? "Runner" : workload.label;
-            Debug.info(wn, e);
             Debug.stackTrace(wn, e);
             System.exit(-1);
         }

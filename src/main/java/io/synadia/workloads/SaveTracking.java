@@ -14,7 +14,6 @@ import io.synadia.Workload;
 import io.synadia.utils.Debug;
 import io.synadia.utils.Reporting;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -28,89 +27,76 @@ public class SaveTracking extends Workload {
     @SuppressWarnings("ResultOfMethodCallIgnored")
     @Override
     public void runWorkload() throws Exception {
-        SaveWatcher sw = new SaveWatcher();
-        SaveWatcher pw = new SaveWatcher();
-        List<Message> profileMessages = new ArrayList<>();
-        Options options = getAdminOptions();
-        try (Connection nc = Nats.connect(options)) {
-            KeyValue kv = nc.keyValue(params.statsBucket);
-            kv.watchAll(sw);
-            sw.latch.await(10, TimeUnit.MINUTES);
-            kv = nc.keyValue(params.profileBucket);
-            kv.watchAll(pw);
-            pw.latch.await(10, TimeUnit.MINUTES);
 
-            JetStream js = nc.jetStream();
-            JetStreamSubscription sub = js.subscribe(
+        Options adminOpts = getAdminOptions();
+        Options saveOpts = getOptions(params.saveServer);
+        try (Connection sourceNc = Nats.connect(adminOpts);
+             Connection targetNc = Nats.connect(saveOpts))
+        {
+            JetStream jsSource = sourceNc.jetStream();
+            JetStream jsTarget = targetNc.jetStream();
+
+            KeyValue kvTargetStats = targetNc.keyValue(params.statsBucket);
+            KeyValue kvTargetProfile = targetNc.keyValue(params.profileBucket);
+
+            SaveWatcher sw = new SaveWatcher(kvTargetStats);
+            SaveWatcher pw = new SaveWatcher(kvTargetProfile);
+
+            KeyValue kvSourceStats = sourceNc.keyValue(params.statsBucket);
+            kvSourceStats.watchAll(sw);
+
+            KeyValue kvSourceProfile = sourceNc.keyValue(params.profileBucket);
+            kvSourceProfile.watchAll(pw);
+
+            JetStreamSubscription sub = jsSource.subscribe(
                 params.profileStreamSubject,
                 PushSubscribeOptions.builder().ordered(true).build());
             Thread.sleep(1000); // so I don't have to wait for messages
             Message m = sub.nextMessage(1000);
             while (m != null) {
-                profileMessages.add(m);
+                Debug.info(label, "profile", m.getSubject());
+                jsTarget.publish(m);
                 m = sub.nextMessage(1000);
             }
-        }
 
-        // 1. Label
-        sw.list.forEach(p -> p.targetAndLabel(new Stats(p.jv), false));
-        pw.list.forEach(p -> p.targetAndLabel(new ProfileStats(p.jv), false));
+            // 0. Wait
+            sw.latch.await(10, TimeUnit.MINUTES);
+            pw.latch.await(10, TimeUnit.MINUTES);
 
-        // 2. Sort
-        ParsedEntry.sort(sw.list);
-        ParsedEntry.sort(pw.list);
+            // 1. Label
+            sw.list.forEach(p -> p.targetAndLabel(new Stats(p.jv), false));
+            pw.list.forEach(p -> p.targetAndLabel(new ProfileStats(p.jv), false));
 
-        // 3. Print
-        sw.list.forEach(p -> Reporting.statsLineReport(p.label, (Stats)p.target));
-        pw.list.forEach(p -> Reporting.profileLineReport(p.label, (ProfileStats)p.target));
+            // 2. Sort
+            ParsedEntry.sort(sw.list);
+            ParsedEntry.sort(pw.list);
 
-        options = getAdminOptions(params.saveServer);
-        try (Connection nc = Nats.connect(options)) {
-            KeyValue skv = nc.keyValue(params.statsBucket);
-            sw.list.forEach(p -> {
-                try {
-                    skv.put(p.key, p.value);
-                }
-                catch (IOException | JetStreamApiException e) {
-                    throw new RuntimeException(e);
-                }
-            });
-
-            KeyValue pkv = nc.keyValue(params.profileBucket);
-            pw.list.forEach(p -> {
-                try {
-                    pkv.put(p.key, p.value);
-                }
-                catch (IOException | JetStreamApiException e) {
-                    throw new RuntimeException(e);
-                }
-            });
-
-            JetStream js = nc.jetStream();
-            profileMessages.forEach(m -> {
-                try {
-                    js.publish(m);
-                }
-                catch (IOException | JetStreamApiException e) {
-                    throw new RuntimeException(e);
-                }
-            });
-
+            // 3. Print
+            sw.list.forEach(p -> Reporting.statsLineReport(p.label, (Stats)p.target));
+            pw.list.forEach(p -> Reporting.profileLineReport(p.label, (ProfileStats)p.target));
         }
     }
 
     class SaveWatcher implements KeyValueWatcher {
-        CountDownLatch latch = new CountDownLatch(1);
-        List<ParsedEntry> list = new ArrayList<>();
+        final KeyValue kvTarget;
+        final CountDownLatch latch;
+        final List<ParsedEntry> list;
+
+        public SaveWatcher(KeyValue kvTarget) {
+            this.kvTarget = kvTarget;
+            this.latch = new CountDownLatch(1);
+            this.list = new ArrayList<>();
+        }
 
         @Override
         public void watch(KeyValueEntry kve) {
             try {
                 System.out.println(kve.getKey());
-                list.add(new ParsedEntry(kve));
+                ParsedEntry p = new ParsedEntry(kve);
+                list.add(p);
+                kvTarget.put(p.key, p.value);
             }
             catch (Exception e) {
-                Debug.info(label, e);
                 Debug.stackTrace(label, e);
                 System.exit(-1);
             }

@@ -28,10 +28,10 @@ public abstract class Workload {
     public abstract void runWorkload() throws Exception;
 
     protected Options getAdminOptions() {
-        return getAdminOptions(params.adminServer);
+        return getOptions(params.adminServer);
     }
 
-    protected Options getAdminOptions(String server) {
+    protected Options getOptions(String server) {
         return new Options.Builder()
             .server(server)
             .connectionListener((x, y) -> {})

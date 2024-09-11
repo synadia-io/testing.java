@@ -95,10 +95,9 @@ public class TestingApplication implements Application, AutoCloseable {
         try {
             kvStats.put(key, statsData);
             kvRunStats.put(key, profileData);
-            js.publish(workload.params.profileStreamSubject, profileData);
+            js.publish(workload.params.profileStreamSubject.replace(">", key), profileData);
         }
         catch (Exception e) {
-            Debug.info(workload.label, "Error publishing tracking.", e);
             Debug.stackTrace(workload.label, e);
             throw new RuntimeException(e);
         }

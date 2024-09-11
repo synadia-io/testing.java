@@ -12,4 +12,6 @@ chmod +x bin/* && chmod -x bin/*.bat && bin/make && bin/get-aws && bin/generate 
 EOF
 
 chmod +x bin/*
+
 echo "Todo: Export AWS security"
+. update-client

@@ -26,7 +26,7 @@ public class DeployTest extends Workload {
     }
 
     private void connect(String server) {
-        Options options = getAdminOptions(server);
+        Options options = getOptions(server);
         try (Connection nc = Nats.connect(options)) {
             System.out.println("server: " + getServerInfo(nc));
             String stream = NUID.nextGlobalSequence();

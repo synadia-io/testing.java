@@ -30,6 +30,7 @@ System.out.println("jnatsv: ${jnatsv} | " + jnatsv);
 
 dependencies {
     implementation "io.nats:jnats:${jnatsv}"
+    implementation 'org.jfree:jfreechart:1.5.5'
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.9.0'
 }
