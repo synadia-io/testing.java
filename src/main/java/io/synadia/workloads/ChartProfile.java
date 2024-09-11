@@ -71,22 +71,26 @@ public class ChartProfile extends Workload {
             JetStreamSubscription sub = js.subscribe(
                 params.profileStreamSubject,
                 PushSubscribeOptions.builder().ordered(true).build());
-            Thread.sleep(1000); // so I don't have to wait for messages
-            Message m = sub.nextMessage(1000);
+            Message m = sub.nextMessage(10_000);
             long lastTime = 0;
-            while (m != null) {
-                String s = m.getSubject();
-                if (s.contains(filter)) {
-                    jv = JsonParser.parse(m.getData());
-                    long timeMs = JsonValueUtils.readLong(jv, TIME_MS, -1);
-                    long elapsed = timeMs - lastTime;
-                    if (elapsed >= interval) {
-                        lastTime = timeMs;
-                        ProfileStats ps = new ProfileStats(jv);
-                        Millisecond fixed = new Millisecond(new Date(timeMs));
-                        al.addOrUpdate(fixed, mb(ps.allocatedMemory));
-                        fm.addOrUpdate(fixed, mb(ps.freeMemory));
-                        hu.addOrUpdate(fixed, mb(ps.heapUsed));
+            while (true) {
+                if (m != null) {
+                    String s = m.getSubject();
+                    if (s.contains(filter)) {
+                        jv = JsonParser.parse(m.getData());
+                        long timeMs = JsonValueUtils.readLong(jv, TIME_MS, -1);
+                        long elapsed = timeMs - lastTime;
+                        if (elapsed >= interval) {
+                            lastTime = timeMs;
+                            ProfileStats ps = new ProfileStats(jv);
+                            Millisecond fixed = new Millisecond(new Date(timeMs));
+                            al.addOrUpdate(fixed, mb(ps.allocatedMemory));
+                            fm.addOrUpdate(fixed, mb(ps.freeMemory));
+                            hu.addOrUpdate(fixed, mb(ps.heapUsed));
+                        }
+                    }
+                    if (m.metaData().streamSequence() == mlast.getSeq()) {
+                        break;
                     }
                 }
                 m = sub.nextMessage(100);
