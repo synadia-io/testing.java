@@ -402,10 +402,10 @@ public class Generator {
                 .put("stats_watch_wait_time", 5000)
                 .put("profile_bucket", "profileBucket")
                 .put("profile_stream_name", "profileStream")
-                .put("profile_stream_subject", "p.>")
+                .put("profile_stream_subject", "P.>")
                 .put("profile_watch_wait_time", 5000)
                 .put("save_stream_name", "saveStream")
-                .put("save_stream_subject", "save.>")
+                .put("save_stream_subject", "S.>")
                 .toJsonValue();
 
             // override with custom settings

@@ -66,7 +66,7 @@ public class ReadTracking extends Workload {
         @Override
         public void watch(KeyValueEntry kve) {
             try {
-                Debug.info(label, kve.getKey(), kve.getValueAsString());
+                Debug.info(label, kve.getKey());
             }
             catch (Exception e) {
                 Debug.stackTrace(label, e);

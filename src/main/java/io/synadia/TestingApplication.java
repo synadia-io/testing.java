@@ -27,7 +27,7 @@ public class TestingApplication implements Application, AutoCloseable {
     private Workload workload;
     private JetStream js;
     private KeyValue kvStats;
-    private KeyValue kvRunStats;
+    private KeyValue kvProfileStats;
 
     public void initTesting(Workload workload) {
         this.workload = workload;
@@ -38,7 +38,7 @@ public class TestingApplication implements Application, AutoCloseable {
                 .jetStreamOptions(ctx.getJetStreamOptions())
                 .build();
             kvStats = nc.keyValue(workload.params.statsBucket, kvo);
-            kvRunStats = nc.keyValue(workload.params.profileBucket, kvo);
+            kvProfileStats = nc.keyValue(workload.params.profileBucket, kvo);
 
             KeyValue kvMulti = nc.keyValue(workload.params.multiBucket, kvo);
             //noinspection DataFlowIssue // action will never be null here
@@ -94,7 +94,7 @@ public class TestingApplication implements Application, AutoCloseable {
     private void publish(String key, byte[] statsData, byte[] profileData) {
         try {
             kvStats.put(key, statsData);
-            kvRunStats.put(key, profileData);
+            kvProfileStats.put(key, profileData);
             js.publish(workload.params.profileStreamSubject.replace(">", key), profileData);
         }
         catch (Exception e) {
