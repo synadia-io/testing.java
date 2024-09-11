@@ -347,6 +347,9 @@ public class Generator {
                 .put("profile_stream_name", "profileStream")
                 .put("profile_stream_subject", "p.>")
                 .put("profile_watch_wait_time", 5000)
+                .put("save_server", "nats://localhost:4222")
+                .put("save_stream_subject", "saveStream")
+                .put("save_stream_subject", "save.>")
                 .toJsonValue();
 
             // override with custom settings
