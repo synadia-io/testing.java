@@ -14,13 +14,16 @@ import java.util.List;
 
 import static io.nats.client.support.JsonValueUtils.*;
 import static io.synadia.support.Constants.OS_UNIX;
+import static io.synadia.support.Constants.OS_WIN;
 
 public class Params {
+    private static final String PARAMS = "Params";
+
     public final JsonValue jv;
+    public final String os;
     public final StreamConfiguration streamConfig;
     public final JsonValue jvMultiConfig;
     public final boolean createStream;
-    public final String os;
     public final String adminServer;
     public final String server0;
     public final String server1;
@@ -32,6 +35,9 @@ public class Params {
     public final String profileStreamName;
     public final String profileStreamSubject;
     public final long watchWaitTime;
+    public final String saveServer;
+    public final String saveStreamName;
+    public final String saveStreamSubject;
 
     public Params(List<String> paramsFiles) {
         jv = mapBuilder().jv;
@@ -41,11 +47,12 @@ public class Params {
                 jv.map.putAll(JsonParser.parse(bytes).map);
             }
             catch (IOException e) {
-                Debug.info("Params", "Unable to load params file '" + paramsFile + "', " + e);
+                Debug.info(PARAMS, "Unable to load params file '" + paramsFile + "', " + e);
                 throw new RuntimeException(e);
             }
         }
-        os = readString(jv, "os", OS_UNIX);
+        String temp = readString(jv, "os");
+        os = OS_WIN.equals(temp) ? OS_WIN : OS_UNIX;
         streamConfig = loadStreamConfig("stream_config");
         createStream = streamConfig != null && readBoolean(jv, "create_stream", false);
         jvMultiConfig = readObject(jv, "multi_config");
@@ -53,6 +60,7 @@ public class Params {
         server0 = readString(jv, "server0");
         server1 = readString(jv, "server1");
         server2 = readString(jv, "server2");
+
         testingStreamName = readString(jv, "testing_stream_name");
         testingStreamSubject = readString(jv, "testing_stream_subject");
         statsBucket = readString(jv, "stats_bucket");
@@ -60,6 +68,37 @@ public class Params {
         profileStreamName = readString(jv, "profile_stream_name");
         profileStreamSubject = readString(jv, "profile_stream_subject");
         watchWaitTime = readLong(jv, "watch_wait_time", 5000);
+        saveServer = readString(jv, "save_server");
+        saveStreamName = readString(jv, "save_stream_subject");
+        saveStreamSubject = readString(jv, "save_stream_subject");
+    }
+
+    public void debug() {
+        _debug("os", os);
+        _debug("streamConfig", streamConfig);
+        _debug("createStream", createStream);
+        _debug("jvMultiConfig", createStream ? jvMultiConfig : null);
+        _debug("adminServer", adminServer);
+        _debug("server0", server0);
+        _debug("server1", server1);
+        _debug("server2", server2);
+
+        _debug("testingStreamName", testingStreamName);
+        _debug("testingStreamSubject", testingStreamSubject);
+        _debug("statsBucket", statsBucket);
+        _debug("profileBucket", profileBucket);
+        _debug("profileStreamName", profileStreamName);
+        _debug("profileStreamSubject", profileStreamSubject);
+        _debug("watchWaitTime", watchWaitTime);
+        _debug("saveServer", saveServer);
+        _debug("saveStreamName", saveStreamName);
+        _debug("saveStreamSubject", saveStreamSubject);
+    }
+
+    private void _debug(String name, Object value) {
+        if (value != null) {
+            Debug.info(PARAMS, name, value);
+        }
     }
 
     public StreamConfiguration loadStreamConfig(String fieldName) {
@@ -73,7 +112,7 @@ public class Params {
                 streamConfig = StreamConfiguration.instance(streamConfigJv.toJson());
             }
             catch (JsonParseException e) {
-                Debug.info("Params", "Unable to parse stream config, " + e);
+                Debug.info(PARAMS, "Unable to parse stream config, " + e);
                 throw new RuntimeException(e);
             }
         }

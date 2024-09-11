@@ -65,6 +65,7 @@ public class SaveTracking extends Workload {
         @Override
         public void watch(KeyValueEntry kve) {
             try {
+                System.out.println(kve);
                 list.add(new ParsedEntry(kve));
             }
             catch (Exception e) {

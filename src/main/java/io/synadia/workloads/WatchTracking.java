@@ -9,6 +9,7 @@ import io.nats.client.Nats;
 import io.nats.client.Options;
 import io.nats.client.api.KeyValueEntry;
 import io.nats.client.api.KeyValueWatcher;
+import io.nats.client.support.JsonValue;
 import io.nats.jsmulti.shared.ProfileStats;
 import io.nats.jsmulti.shared.Stats;
 import io.synadia.CommandLine;
@@ -16,8 +17,9 @@ import io.synadia.ParsedEntry;
 import io.synadia.Workload;
 import io.synadia.support.Debug;
 
-import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 
 import static io.synadia.support.Reporting.*;
@@ -69,115 +71,66 @@ public class WatchTracking extends Workload {
         }
     }
 
-    public static final SimpleDateFormat FORMATTER = new SimpleDateFormat("HH:mm:ss");
-
     class StatsWatcher extends WtWatcher {
-        Map<String, ParsedEntry> map;
-
         public StatsWatcher() {
-            map = new HashMap<>();
+            super(false);
         }
 
         @Override
-        void subWatch(ParsedEntry p) {
-            p.targetAndLabel(new Stats(p.jv), false);
-            map.put(p.label, p);
+        Object extractTarget(JsonValue pjv) {
+            return new Stats(pjv);
         }
 
         @Override
-        void subReport() {
-            startNewReport();
-
-            List<ParsedEntry> list = new ArrayList<>(map.values());
-            ParsedEntry.sort(list);
-            String date = FORMATTER.format(new Date());
-
-            String lastMark = null;
-            Stats totalStats = new Stats();
-            for (ParsedEntry p : list) {
-                boolean alreadyReported = p.reported;
-                p.reported = true;
-                Stats stats = (Stats)p.target;
-                String mark = p.statType + p.contextId;
-                if (!mark.equals(lastMark)){
-                    if (lastMark != null) {
-                        System.out.println(STATS_SEP_LINE);
-                        statsLineReport("Total", totalStats);
-                        System.out.println(STATS_FOOT_LINE);
-                        totalStats = new Stats();
-                    }
-                    lastMark = mark;
-                    System.out.println(STATS_TOP_LINE);
-                    System.out.printf(STATS_LINE_HEADER, date);
-                    System.out.println(STATS_SEP_LINE);
-                }
-                Stats.totalOne(stats, totalStats);
-                statsLineReport(p.label + (alreadyReported ? "" : "*"), stats);
-            }
-
-            System.out.println(STATS_SEP_LINE);
-            statsLineReport("Total", totalStats);
-            System.out.println(STATS_FOOT_LINE);
+        void report(Collection<ParsedEntry> peMapValues) {
+            printStats(peMapValues);
         }
     }
 
     class ProfileWatcher extends WtWatcher {
-        Map<String, ParsedEntry> map;
-
         public ProfileWatcher() {
-            map = new HashMap<>();
+            super(true);
         }
 
         @Override
-        void subWatch(ParsedEntry p) {
-            p.targetAndLabel(new ProfileStats(p.jv), true);
-            map.put(p.label, p);
+        Object extractTarget(JsonValue pjv) {
+            return new ProfileStats(pjv);
         }
 
         @Override
-        void subReport() {
-            startNewReport();
-            System.out.println(PROFILE_TOP_LINE);
-            System.out.printf(PROFILE_LINE_HEADER, FORMATTER.format(new Date()));
-            System.out.println(PROFILE_SEP_LINE);
-
-            List<ParsedEntry> list = new ArrayList<>(map.values());
-            ParsedEntry.sort(list);
-            String lastMark = null;
-            for (ParsedEntry p : list) {
-                ProfileStats ps = (ProfileStats) p.target;
-                boolean alreadyReported = p.reported;
-                p.reported = true;
-                String mark = p.statType;
-                if (lastMark == null) {
-                    lastMark = mark;
-                }
-                else if (!lastMark.equals(mark)) {
-                    lastMark = mark;
-                    System.out.println(PROFILE_SEP_LINE);
-                }
-                profileLineReport(p.label + (alreadyReported ? "" : "*"), ps);
-            }
-            System.out.println(PROFILE_FOOT_LINE);
+        void report(Collection<ParsedEntry> peMapValues) {
+            printProfileStats(peMapValues);
         }
     }
 
     abstract class WtWatcher implements KeyValueWatcher {
-        private final ReentrantLock lock = new ReentrantLock();
+        protected Map<String, ParsedEntry> peMap;
+        private final boolean targetContextOnly;
+        private final ReentrantLock rwLock;
         private boolean changed = false;
         private boolean waiting = false;
-        abstract void subWatch(ParsedEntry parsedEntry);
+
+        public WtWatcher(boolean targetContextOnly) {
+            this.targetContextOnly = targetContextOnly;
+            peMap = new HashMap<>();
+            rwLock = new ReentrantLock();
+        }
+
+        abstract Object extractTarget(JsonValue pjv);
+        abstract void report(Collection<ParsedEntry> collection);
 
         @Override
         public void watch(KeyValueEntry kve) {
             try {
-                lock.lock();
+                rwLock.lock();
                 try {
                     changed = true;
-                    subWatch(new ParsedEntry(kve));
+                    ParsedEntry p = new ParsedEntry(kve);
+                    p.targetAndLabel(extractTarget(p.jv), targetContextOnly);
+                    peMap.put(p.label, p);
                 }
                 finally {
-                    lock.unlock();
+                    rwLock.unlock();
                 }
             }
             catch (Exception e) {
@@ -190,17 +143,15 @@ public class WatchTracking extends Workload {
         @Override
         public void endOfData() {}
 
-        abstract void subReport();
-
         void report() {
-            lock.lock();
+            rwLock.lock();
             try {
                 if (changed) {
                     changed = false;
                     if (waiting) {
                         endWait();
                     }
-                    subReport();
+                    report(peMap.values());
                 }
                 else {
                     waiting = true;
@@ -208,20 +159,8 @@ public class WatchTracking extends Workload {
                 }
             }
             finally {
-                lock.unlock();
+                rwLock.unlock();
             }
-        }
-
-        void startNewReport() {
-            System.out.println("\n\n");
-        }
-
-        void showWait() {
-            System.out.print(".");
-        }
-
-        void endWait() {
-            System.out.println();
         }
     }
 }

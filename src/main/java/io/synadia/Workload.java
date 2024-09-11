@@ -18,14 +18,6 @@ public abstract class Workload {
         this.params = new Params(commandLine.paramsFiles);
 
         commandLine.debug();
-        String dl = "Config [" + label + "]";
-        debug(dl,  "testingStreamName", params.testingStreamName);
-        debug(dl,  "testingStreamSubject", params.testingStreamSubject);
-        debug(dl,  "statsBucket", params.statsBucket);
-        debug(dl,  "profileBucket", params.profileBucket);
-        debug(dl,  "profileStreamName", params.profileStreamName);
-        debug(dl,  "profileStreamSubject", params.profileStreamSubject);
-        debug(dl,  "watchWaitTime", "" + params.watchWaitTime);
     }
 
     public void debug(String label, String k, String v) {

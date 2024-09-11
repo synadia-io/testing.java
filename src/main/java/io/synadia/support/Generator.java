@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import static io.nats.client.support.JsonValueUtils.readString;
 import static io.synadia.support.Constants.*;
 
 public class Generator {
@@ -56,9 +57,8 @@ public class Generator {
         boolean generate = args == null || args.length == 0;
 
         GeneratorConfig gc = new GeneratorConfig();
-        gc.show();
-
         if (generate) {
+            gc.show();
             prepareOutputDirs();
         }
 
@@ -253,10 +253,13 @@ public class Generator {
         public final String testingStreamSubject;
         public final String statsBucket;
         public final String profileBucket;
-        public final String statsWatchWaitTime;
-        public final String profileWatchWaitTime;
         public final String profileStreamName;
         public final String profileStreamSubject;
+        public final String saveServer;
+        public final String saveStreamName;
+        public final String saveStreamSubject;
+        public final String statsWatchWaitTime;
+        public final String profileWatchWaitTime;
 
         public GeneratorConfig() throws IOException {
             JsonValue jv = loadConfig();
@@ -271,14 +274,20 @@ public class Generator {
             clientFilter = jv.map.get("client_filter").string;
             natsProto = jv.map.get("nats_proto").string;
             natsPort = jv.map.get("nats_port").string;
-            testingStreamName = jv.map.get("testing_stream_name").string;
-            testingStreamSubject = jv.map.get("testing_stream_subject").string;
-            statsBucket = jv.map.get("stats_bucket").string;
-            profileBucket = jv.map.get("profile_bucket").string;
+
+            testingStreamName = readString(jv, "testing_stream_name");
+            testingStreamSubject = readString(jv, "testing_stream_subject");
+            statsBucket = readString(jv, "stats_bucket");
+
+            profileBucket = readString(jv, "profile_bucket");
+            profileStreamName = readString(jv, "profile_stream_name");
+            profileStreamSubject = readString(jv, "profile_stream_subject");
+            saveServer = readString(jv, "save_server");
+            saveStreamName = readString(jv, "save_stream_subject");
+            saveStreamSubject = readString(jv, "save_stream_subject");
+
             statsWatchWaitTime = jv.map.get("stats_watch_wait_time").i.toString();
-            profileWatchWaitTime = jv.map.get("profile_watch_wait_time").i.toString();;
-            profileStreamName = jv.map.get("profile_stream_name").string;
-            profileStreamSubject = jv.map.get("profile_stream_subject").string;
+            profileWatchWaitTime = jv.map.get("profile_watch_wait_time").i.toString();
         }
 
         public String populate(String template) {
@@ -288,9 +297,11 @@ public class Generator {
                 .replace(STATS_WATCH_WAIT_TIME, statsWatchWaitTime)
                 .replace(PROFILE_BUCKET, profileBucket)
                 .replace(PROFILE_STREAM_NAME, profileStreamName)
-                .replace(PROFILE_STREAM_NAME, profileStreamName)
                 .replace(PROFILE_STREAM_SUBJECT, profileStreamSubject)
                 .replace(PROFILE_WATCH_WAIT_TIME, profileWatchWaitTime)
+                .replace(SAVE_SERVER, saveServer)
+                .replace(SAVE_STREAM_NAME, saveStreamName)
+                .replace(SAVE_STREAM_SUBJECT, saveStreamSubject)
                 ;
         }
 

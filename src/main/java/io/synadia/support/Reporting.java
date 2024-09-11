@@ -5,8 +5,18 @@ package io.synadia.support;
 
 import io.nats.jsmulti.shared.ProfileStats;
 import io.nats.jsmulti.shared.Stats;
+import io.synadia.ParsedEntry;
+
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Date;
+import java.util.List;
 
 public abstract class Reporting {
+
+    public static final SimpleDateFormat FORMATTER = new SimpleDateFormat("HH:mm:ss");
+
     public static final String STATS_TOP_LINE    = "┌─────────────────────┬───────────────────┬─────────────────┬──────────────────────────┬──────────────────┐";
     public static final String STATS_SEP_LINE    = "├─────────────────────┼───────────────────┼─────────────────┼──────────────────────────┼──────────────────┤";
     public static final String STATS_FOOT_LINE   = "└─────────────────────┴───────────────────┴─────────────────┴──────────────────────────┴──────────────────┘";
@@ -43,5 +53,78 @@ public abstract class Reporting {
             Stats.humanBytes(p.nonHeapCommitted),
             p.liveThreads.size() + "/" + p.threadCount,
             p.deadThreads.size() + "/" + p.threadCount);
+    }
+
+    public static void startNewReport() {
+        System.out.println("\n\n");
+    }
+
+    public static void showWait() {
+        System.out.print(".");
+    }
+
+    public static void endWait() {
+        System.out.println();
+    }
+
+    public static void printStats(Collection<ParsedEntry> collection) {
+        List<ParsedEntry> list = new ArrayList<>(collection);
+        ParsedEntry.sort(list);
+
+        String date = FORMATTER.format(new Date());
+        startNewReport();
+
+        String lastMark = null;
+        Stats totalStats = new Stats();
+        for (ParsedEntry p : list) {
+            boolean alreadyReported = p.reported;
+            p.reported = true;
+            Stats stats = (Stats)p.target;
+            String mark = p.statType + p.contextId;
+            if (!mark.equals(lastMark)){
+                if (lastMark != null) {
+                    System.out.println(STATS_SEP_LINE);
+                    statsLineReport("Total", totalStats);
+                    System.out.println(STATS_FOOT_LINE);
+                    totalStats = new Stats();
+                }
+                lastMark = mark;
+                System.out.println(STATS_TOP_LINE);
+                System.out.printf(STATS_LINE_HEADER, date);
+                System.out.println(STATS_SEP_LINE);
+            }
+            Stats.totalOne(stats, totalStats);
+            statsLineReport(p.label + (alreadyReported ? "" : "*"), stats);
+        }
+
+        System.out.println(STATS_SEP_LINE);
+        statsLineReport("Total", totalStats);
+        System.out.println(STATS_FOOT_LINE);
+    }
+
+    public static void printProfileStats(Collection<ParsedEntry> collection) {
+        List<ParsedEntry> list = new ArrayList<>(collection);
+        ParsedEntry.sort(list);
+
+        startNewReport();
+        System.out.println(PROFILE_TOP_LINE);
+        System.out.printf(PROFILE_LINE_HEADER, FORMATTER.format(new Date()));
+        System.out.println(PROFILE_SEP_LINE);
+        String lastMark = null;
+        for (ParsedEntry p : list) {
+            ProfileStats ps = (ProfileStats) p.target;
+            boolean alreadyReported = p.reported;
+            p.reported = true;
+            String mark = p.statType;
+            if (lastMark == null) {
+                lastMark = mark;
+            }
+            else if (!lastMark.equals(mark)) {
+                lastMark = mark;
+                System.out.println(PROFILE_SEP_LINE);
+            }
+            profileLineReport(p.label + (alreadyReported ? "" : "*"), ps);
+        }
+        System.out.println(PROFILE_FOOT_LINE);
     }
 }

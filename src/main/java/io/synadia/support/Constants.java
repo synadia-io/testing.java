@@ -27,6 +27,9 @@ public interface Constants {
     String PROFILE_STREAM_NAME = "<ProfileStreamName>";
     String PROFILE_STREAM_SUBJECT = "<ProfileStreamSubject>";
     String PROFILE_WATCH_WAIT_TIME = "<ProfileWatchWaitTime>";
+    String SAVE_SERVER = "<SaveServer>";
+    String SAVE_STREAM_NAME = "<SaveStreamName>";
+    String SAVE_STREAM_SUBJECT = "<SaveStreamSubject>";
 
     String OS_WIN = "win";
     String OS_UNIX = "unix";

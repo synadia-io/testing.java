@@ -23,6 +23,8 @@ import static java.lang.Integer.parseInt;
 
 public class CommandLine {
 
+    private static final String COMMAND_LINE = "Command Line";
+
     // ----------------------------------------------------------------------------------------------------
     // DRIVER COMMAND LINE
     // ----------------------------------------------------------------------------------------------------
@@ -64,15 +66,15 @@ public class CommandLine {
     }
 
     public void debug() {
-        Debug.info("Command Line", "server", server);
+        Debug.info(COMMAND_LINE, "server", server);
         if (id != null) {
-            Debug.info("Command Line", "id", id);
+            Debug.info(COMMAND_LINE, "id", id);
         }
         if (label != null) {
-            Debug.info("Command Line", "label", label);
+            Debug.info(COMMAND_LINE, "label", label);
         }
-        Debug.info("Command Line", "workload", workload);
-        Debug.info("Command Line", "paramsFile", paramsFiles);
+        Debug.info(COMMAND_LINE, "workload", workload);
+        Debug.info(COMMAND_LINE, "paramsFile", paramsFiles);
     }
 
     // ----------------------------------------------------------------------------------------------------
@@ -108,13 +110,13 @@ public class CommandLine {
                         case "":
                             break;
                         default:
-                            Debug.info("CommandLine", "Unknown argument: " + arg);
+                            Debug.info(COMMAND_LINE, "Unknown argument: " + arg);
                             break;
                     }
                 }
             }
             catch (Exception e) {
-                Debug.info("CommandLine", "Exception while parsing, most likely missing an argument value.", e);
+                Debug.info(COMMAND_LINE, "Exception while parsing, most likely missing an argument value.", e);
             }
         }
 
@@ -136,7 +138,7 @@ public class CommandLine {
         }
         if (upper > 0) {
             if (v > upper) {
-                Debug.info("CommandLine", "Value for " + name + " cannot exceed " + upper);
+                Debug.info(COMMAND_LINE, "Value for " + name + " cannot exceed " + upper);
             }
         }
         return v;
@@ -145,10 +147,10 @@ public class CommandLine {
     private int asNumber(String name, String val, int lower, int upper) {
         int v = parseInt(val);
         if (v < lower) {
-            Debug.info("CommandLine", "Value for " + name + " cannot be less than " + lower);
+            Debug.info(COMMAND_LINE, "Value for " + name + " cannot be less than " + lower);
         }
         if (v > upper) {
-            Debug.info("CommandLine", "Value for " + name + " cannot exceed " + upper);
+            Debug.info(COMMAND_LINE, "Value for " + name + " cannot exceed " + upper);
         }
         return v;
     }
