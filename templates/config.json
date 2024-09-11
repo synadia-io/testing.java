@@ -13,7 +13,6 @@
   "profile_stream_name": "<ProfileStreamName>",
   "profile_stream_subject": "<ProfileStreamSubject>",
   "profile_watch_wait_time": <ProfileWatchWaitTime>,
-  "save_server": "<SaveServer>",
   "save_stream_name": "<SaveStreamName>",
   "save_stream_subject": "<SaveStreamSubject>"
 }

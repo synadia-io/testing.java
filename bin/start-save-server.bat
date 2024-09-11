@@ -1,0 +1,1 @@
+start nats-server -js -c js\save-server.conf

@@ -1,0 +1,3 @@
+{
+  "admin_server": "nats://localhost:4222"
+}

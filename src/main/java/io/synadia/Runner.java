@@ -1,6 +1,6 @@
 package io.synadia;
 
-import io.synadia.support.Debug;
+import io.synadia.utils.Debug;
 import io.synadia.workloads.*;
 
 public class Runner {
@@ -19,7 +19,10 @@ public class Runner {
                 workload = new SetupTesting(commandLine);
                 break;
             case "setupTracking":
-                workload = new SetupTracking(commandLine);
+                workload = new SetupTracking("Setup Tracking", commandLine);
+                break;
+            case "setupSave":
+                workload = new SetupTracking("Setup Save", commandLine);
                 break;
             case "watchStats":
                 workload = new WatchTracking(WatchTracking.Which.Stats, commandLine);

@@ -11,13 +11,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static io.synadia.support.Constants.FINAL;
+import static io.synadia.utils.Constants.FINAL;
 
 public class ParsedEntry {
-    public final KeyValueEntry kve;
+    public final String key;
+    public final byte[] value;
     public final JsonValue jv;
     public final boolean fin;
-    public final String key;
     public final String statType;
     public final String contextId;
     public final String statId;
@@ -26,8 +26,9 @@ public class ParsedEntry {
     public boolean reported;
 
     public ParsedEntry(KeyValueEntry kve) throws JsonParseException {
-        this.kve = kve;
-        jv = JsonParser.parse(kve.getValue());
+        key = kve.getKey();
+        value = kve.getValue();
+        jv = JsonParser.parse(value);
 
         JsonValue jvFinal = jv.map.get(FINAL);
         if (jvFinal == null) {
@@ -37,7 +38,6 @@ public class ParsedEntry {
             fin = jvFinal.bool != null && jvFinal.bool;
         }
 
-        key = kve.getKey();
         String[] parts = key.split("\\.");
         statType = parts[0];
         contextId = parts[1];

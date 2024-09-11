@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package io.synadia.support;
+package io.synadia.utils;
 
 import io.nats.client.*;
 import io.nats.client.support.Status;

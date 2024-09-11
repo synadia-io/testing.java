@@ -3,7 +3,7 @@ package io.synadia;
 import io.nats.client.*;
 import io.nats.client.api.KeyValueConfiguration;
 import io.nats.client.api.StreamConfiguration;
-import io.synadia.support.Debug;
+import io.synadia.utils.Debug;
 
 import java.util.List;
 
@@ -18,6 +18,7 @@ public abstract class Workload {
         this.params = new Params(commandLine.paramsFiles);
 
         commandLine.debug();
+        params.debug();
     }
 
     public void debug(String label, String k, String v) {

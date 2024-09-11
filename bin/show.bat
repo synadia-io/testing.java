@@ -1,1 +1,1 @@
-java -cp "build/libs/*" io.synadia.support.Generator show
+java -cp "build/libs/*" io.synadia.utils.Generator show

@@ -10,8 +10,8 @@ import io.synadia.CommandLine;
 import io.synadia.Workload;
 
 public class SetupTracking extends Workload {
-    public SetupTracking(CommandLine commandLine) {
-        super("Setup Tracking", commandLine);
+    public SetupTracking(String defaultLabel, CommandLine commandLine) {
+        super(defaultLabel, commandLine);
     }
 
     @Override

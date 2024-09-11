@@ -1,0 +1,1 @@
+java -cp "build/libs/*" io.synadia.Runner --workload multi --label Iterate --params params<PathSep>config.json --params params<PathSep>iterate.json

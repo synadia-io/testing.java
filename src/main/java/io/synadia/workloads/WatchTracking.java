@@ -15,14 +15,14 @@ import io.nats.jsmulti.shared.Stats;
 import io.synadia.CommandLine;
 import io.synadia.ParsedEntry;
 import io.synadia.Workload;
-import io.synadia.support.Debug;
+import io.synadia.utils.Debug;
 
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 
-import static io.synadia.support.Reporting.*;
+import static io.synadia.utils.Reporting.*;
 
 public class WatchTracking extends Workload {
     public enum Which {

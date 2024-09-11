@@ -1,4 +1,4 @@
-package io.synadia.support;
+package io.synadia.utils;
 
 import io.nats.client.support.JsonParser;
 import io.nats.client.support.JsonValue;
@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Map;
 
 import static io.nats.client.support.JsonValueUtils.readString;
-import static io.synadia.support.Constants.*;
+import static io.synadia.utils.Constants.*;
 
 public class Generator {
 
@@ -255,7 +255,6 @@ public class Generator {
         public final String profileBucket;
         public final String profileStreamName;
         public final String profileStreamSubject;
-        public final String saveServer;
         public final String saveStreamName;
         public final String saveStreamSubject;
         public final String statsWatchWaitTime;
@@ -282,8 +281,7 @@ public class Generator {
             profileBucket = readString(jv, "profile_bucket");
             profileStreamName = readString(jv, "profile_stream_name");
             profileStreamSubject = readString(jv, "profile_stream_subject");
-            saveServer = readString(jv, "save_server");
-            saveStreamName = readString(jv, "save_stream_subject");
+            saveStreamName = readString(jv, "save_stream_name");
             saveStreamSubject = readString(jv, "save_stream_subject");
 
             statsWatchWaitTime = jv.map.get("stats_watch_wait_time").i.toString();
@@ -299,7 +297,6 @@ public class Generator {
                 .replace(PROFILE_STREAM_NAME, profileStreamName)
                 .replace(PROFILE_STREAM_SUBJECT, profileStreamSubject)
                 .replace(PROFILE_WATCH_WAIT_TIME, profileWatchWaitTime)
-                .replace(SAVE_SERVER, saveServer)
                 .replace(SAVE_STREAM_NAME, saveStreamName)
                 .replace(SAVE_STREAM_SUBJECT, saveStreamSubject)
                 ;
@@ -324,6 +321,8 @@ public class Generator {
             System.out.println("profileStreamName: " + profileStreamName);
             System.out.println("profileStreamSubject: " + profileStreamSubject);
             System.out.println("profileWatchWaitTime: " + profileWatchWaitTime);
+            System.out.println("saveStreamName: " + saveStreamName);
+            System.out.println("saveStreamSubject: " + saveStreamSubject);
         }
 
         private JsonValue loadConfig() throws IOException {
@@ -347,8 +346,7 @@ public class Generator {
                 .put("profile_stream_name", "profileStream")
                 .put("profile_stream_subject", "p.>")
                 .put("profile_watch_wait_time", 5000)
-                .put("save_server", "nats://localhost:4222")
-                .put("save_stream_subject", "saveStream")
+                .put("save_stream_name", "saveStream")
                 .put("save_stream_subject", "save.>")
                 .toJsonValue();
 

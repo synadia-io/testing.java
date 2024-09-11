@@ -5,7 +5,7 @@ import io.nats.client.api.StreamConfiguration;
 import io.nats.client.support.JsonParseException;
 import io.nats.client.support.JsonParser;
 import io.nats.client.support.JsonValue;
-import io.synadia.support.Debug;
+import io.synadia.utils.Debug;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -13,8 +13,8 @@ import java.nio.file.Paths;
 import java.util.List;
 
 import static io.nats.client.support.JsonValueUtils.*;
-import static io.synadia.support.Constants.OS_UNIX;
-import static io.synadia.support.Constants.OS_WIN;
+import static io.synadia.utils.Constants.OS_UNIX;
+import static io.synadia.utils.Constants.OS_WIN;
 
 public class Params {
     private static final String PARAMS = "Params";
@@ -69,7 +69,7 @@ public class Params {
         profileStreamSubject = readString(jv, "profile_stream_subject");
         watchWaitTime = readLong(jv, "watch_wait_time", 5000);
         saveServer = readString(jv, "save_server");
-        saveStreamName = readString(jv, "save_stream_subject");
+        saveStreamName = readString(jv, "save_stream_name");
         saveStreamSubject = readString(jv, "save_stream_subject");
     }
 

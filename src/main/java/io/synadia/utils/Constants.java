@@ -1,4 +1,4 @@
-package io.synadia.support;
+package io.synadia.utils;
 
 public interface Constants {
     String FINAL = "final";
@@ -27,7 +27,6 @@ public interface Constants {
     String PROFILE_STREAM_NAME = "<ProfileStreamName>";
     String PROFILE_STREAM_SUBJECT = "<ProfileStreamSubject>";
     String PROFILE_WATCH_WAIT_TIME = "<ProfileWatchWaitTime>";
-    String SAVE_SERVER = "<SaveServer>";
     String SAVE_STREAM_NAME = "<SaveStreamName>";
     String SAVE_STREAM_SUBJECT = "<SaveStreamSubject>";
 

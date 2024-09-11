@@ -2,13 +2,12 @@
   "multi_config": {
     "server": "<Bootstrap>",
     "subject": "<TestingStreamSubject>",
-    "action": "PubAsync",
-    "message_count": 600000000,
-    "payload_size": 300,
-    "threads": 6,
+    "action": "SubFetch",
+    "message_count": 400000000,
+    "threads": 4,
+    "batch_size": 100,
     "connection_strategy": "individual",
     "report_frequency": 50000,
-    "round_size": 100,
     "options_factory_class_name": "io.synadia.utils.VirtualExecutorOptionsFactory"
   }
 }

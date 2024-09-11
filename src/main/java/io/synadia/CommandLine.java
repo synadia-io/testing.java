@@ -14,12 +14,10 @@
 package io.synadia;
 
 import io.nats.client.Options;
-import io.synadia.support.Debug;
+import io.synadia.utils.Debug;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import static java.lang.Integer.parseInt;
 
 public class CommandLine {
 
@@ -28,10 +26,6 @@ public class CommandLine {
     // ----------------------------------------------------------------------------------------------------
     // DRIVER COMMAND LINE
     // ----------------------------------------------------------------------------------------------------
-    // ### --server <NATS_SERVER_URL>
-    //     --server nats://localhost:4000,nats://localhost:4001,nats://localhost:4002
-    // ### --id <UNIQUE ID>
-    //     --id foo-bar-baz-12345
     // ### --workload <WORKLOAD_NAME>
     //     --workload stay-connected
     // ### --label <workload label>
@@ -39,8 +33,6 @@ public class CommandLine {
     // ### --params <PATH_TO_JSON_FILE>
     //     --params /tmp/workload-92493-9983831-3-0913.json
     // ----------------------------------------------------------------------------------------------------
-    public final String server;
-    public final String id;
     public final String workload;
     public final String label;
     public final List<String> paramsFiles;
@@ -57,8 +49,6 @@ public class CommandLine {
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder("Client Test Config: ");
-        append(sb, "server", server, true);
-        append(sb, "id", id, id != null);
         append(sb, "workload", workload, true);
         append(sb, "label", label, label != null);
         append(sb, "paramsFile", paramsFiles, true);
@@ -66,10 +56,6 @@ public class CommandLine {
     }
 
     public void debug() {
-        Debug.info(COMMAND_LINE, "server", server);
-        if (id != null) {
-            Debug.info(COMMAND_LINE, "id", id);
-        }
         if (label != null) {
             Debug.info(COMMAND_LINE, "label", label);
         }
@@ -92,12 +78,6 @@ public class CommandLine {
                 for (int x = 0; x < args.length; x++) {
                     String arg = args[x].trim();
                     switch (arg) {
-                        case "--server":
-                            _server = asString(args[++x]);
-                            break;
-                        case "--id":
-                            _id = asString(args[++x]);
-                            break;
                         case "--label":
                             _label = asString(args[++x]);
                             break;
@@ -120,8 +100,6 @@ public class CommandLine {
             }
         }
 
-        server = _server;
-        id = _id;
         workload = _workload;
         label = _label;
         paramsFiles = _paramsFiles;
@@ -129,29 +107,5 @@ public class CommandLine {
 
     private String asString(String val) {
         return val.trim();
-    }
-
-    private int asNumber(String name, String val, int upper) {
-        int v = parseInt(val);
-        if (upper == -2 && v < 1) {
-            return Integer.MAX_VALUE;
-        }
-        if (upper > 0) {
-            if (v > upper) {
-                Debug.info(COMMAND_LINE, "Value for " + name + " cannot exceed " + upper);
-            }
-        }
-        return v;
-    }
-
-    private int asNumber(String name, String val, int lower, int upper) {
-        int v = parseInt(val);
-        if (v < lower) {
-            Debug.info(COMMAND_LINE, "Value for " + name + " cannot be less than " + lower);
-        }
-        if (v > upper) {
-            Debug.info(COMMAND_LINE, "Value for " + name + " cannot exceed " + upper);
-        }
-        return v;
     }
 }

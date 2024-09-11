@@ -10,14 +10,14 @@ import io.nats.jsmulti.shared.Application;
 import io.nats.jsmulti.shared.OptionsFactory;
 import io.nats.jsmulti.shared.ProfileStats;
 import io.nats.jsmulti.shared.Stats;
-import io.synadia.support.Debug;
+import io.synadia.utils.Debug;
 
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Map;
 
-import static io.synadia.support.Constants.*;
+import static io.synadia.utils.Constants.*;
 
 public class TestingApplication implements Application, AutoCloseable {
     public static final SimpleDateFormat FORMATTER = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
