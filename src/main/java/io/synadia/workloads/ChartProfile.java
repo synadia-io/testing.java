@@ -4,6 +4,9 @@
 package io.synadia.workloads;
 
 import io.nats.client.*;
+import io.nats.client.api.MessageInfo;
+import io.nats.client.api.StreamInfo;
+import io.nats.client.api.StreamInfoOptions;
 import io.nats.client.support.JsonParser;
 import io.nats.client.support.JsonValue;
 import io.nats.client.support.JsonValueUtils;
@@ -20,13 +23,13 @@ import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
 import org.jfree.chart.ui.ApplicationFrame;
 import org.jfree.chart.ui.RectangleInsets;
 import org.jfree.chart.ui.UIUtils;
-import org.jfree.data.time.FixedMillisecond;
+import org.jfree.data.time.Millisecond;
 import org.jfree.data.time.TimeSeries;
 import org.jfree.data.time.TimeSeriesCollection;
 
 import javax.swing.*;
 import java.awt.*;
-import java.text.SimpleDateFormat;
+import java.util.Date;
 
 import static io.synadia.utils.Constants.TIME_MS;
 
@@ -43,47 +46,63 @@ public class ChartProfile extends Workload {
 
     @Override
     public void runWorkload() throws Exception {
-        long firstTime = -1;
         TimeSeries al = new TimeSeries("Allocated");
         TimeSeries fm = new TimeSeries("Free Memory");
         TimeSeries hu = new TimeSeries("Heap Used");
+
         Options adminOpts = getAdminOptions();
-        try (Connection sourceNc = Nats.connect(adminOpts))
+        try (Connection nc = Nats.connect(adminOpts))
         {
-            JetStream js = sourceNc.jetStream();
+            JetStreamManagement jsm = nc.jetStreamManagement();
+            StreamInfo si = jsm.getStreamInfo(params.profileStreamName,
+                StreamInfoOptions.builder().filterSubjects(params.profileStreamSubject).build());
+
+            MessageInfo mFirst = jsm.getFirstMessage(params.profileStreamName, params.profileStreamSubject);
+            JsonValue jv = JsonParser.parse(mFirst.getData());
+            long firstMs = JsonValueUtils.readLong(jv, TIME_MS, -1);
+
+            MessageInfo mlast = jsm.getLastMessage(params.profileStreamName, params.profileStreamSubject);
+            jv = JsonParser.parse(mlast.getData());
+            long lastMs = JsonValueUtils.readLong(jv, TIME_MS, -1);
+
+            long interval = (lastMs - firstMs) / 100;
+
+            JetStream js = nc.jetStream();
             JetStreamSubscription sub = js.subscribe(
                 params.profileStreamSubject,
                 PushSubscribeOptions.builder().ordered(true).build());
             Thread.sleep(1000); // so I don't have to wait for messages
             Message m = sub.nextMessage(1000);
+            long lastTime = 0;
             while (m != null) {
                 String s = m.getSubject();
                 if (s.contains(filter)) {
-                    JsonValue jv = JsonParser.parse(m.getData());
+                    jv = JsonParser.parse(m.getData());
                     long timeMs = JsonValueUtils.readLong(jv, TIME_MS, -1);
-                    if (firstTime == -1) {
-                        firstTime = timeMs;
+                    long elapsed = timeMs - lastTime;
+                    if (elapsed >= interval) {
+                        lastTime = timeMs;
+                        ProfileStats ps = new ProfileStats(jv);
+                        Millisecond fixed = new Millisecond(new Date(timeMs));
+                        al.addOrUpdate(fixed, mb(ps.allocatedMemory));
+                        fm.addOrUpdate(fixed, mb(ps.freeMemory));
+                        hu.addOrUpdate(fixed, mb(ps.heapUsed));
                     }
-                    ProfileStats ps = new ProfileStats(jv);
-                    FixedMillisecond fixed = new FixedMillisecond(timeMs);
-                    al.add(fixed, mb(ps.allocatedMemory));
-                    fm.add(fixed, mb(ps.freeMemory));
-                    hu.add(fixed, mb(ps.heapUsed));
                 }
                 m = sub.nextMessage(100);
             }
         }
 
-        TimeSeriesCollection dataset = new TimeSeriesCollection();
-        dataset.addSeries(al);
-        dataset.addSeries(fm);
-        dataset.addSeries(hu);
+        TimeSeriesCollection tscDataset = new TimeSeriesCollection();
+        tscDataset.addSeries(al);
+        tscDataset.addSeries(fm);
+        tscDataset.addSeries(hu);
 
         JFreeChart chart = ChartFactory.createTimeSeriesChart(
             "Memory Allocation", // title
             "Time",              // x-axis label
             "Memory (mb)",       // y-axis label
-            dataset);
+            tscDataset);
         chart.setBackgroundPaint(Color.WHITE);
 
         XYPlot plot = (XYPlot) chart.getPlot();
@@ -93,6 +112,7 @@ public class ChartProfile extends Workload {
         plot.setAxisOffset(new RectangleInsets(5.0, 5.0, 5.0, 5.0));
         plot.setDomainCrosshairVisible(true);
         plot.setRangeCrosshairVisible(true);
+        plot.getRenderer().setSeriesPaint(2, Color.BLACK);
 
         XYItemRenderer r = plot.getRenderer();
         if (r instanceof XYLineAndShapeRenderer renderer) {
@@ -102,7 +122,8 @@ public class ChartProfile extends Workload {
         }
 
         DateAxis axis = (DateAxis) plot.getDomainAxis();
-        axis.setDateFormatOverride(new SimpleDateFormat("MMM-yyyy"));
+        axis.setVerticalTickLabels(true);
+        // axis.setDateFormatOverride(new SimpleDateFormat("hh:mm:ss"));
 
         ChartPanel panel = new ChartPanel(chart, false);
         panel.setFillZoomRectangle(true);

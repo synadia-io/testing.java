@@ -60,6 +60,7 @@ public abstract class Debug {
 
     public static void stackTrace(String label, Throwable t) {
         if (PAUSE) { return; }
+        info(label, t.getMessage());
         StackTraceElement[] elements = t.getStackTrace();
         for (int i = 0; i < elements.length; i++) {
             String ts = elements[i].toString();

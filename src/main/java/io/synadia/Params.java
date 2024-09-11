@@ -35,10 +35,10 @@ public class Params {
     public final String profileBucket;
     public final String profileStreamName;
     public final String profileStreamSubject;
-    public final long watchWaitTime;
     public final String saveServer;
     public final String saveStreamName;
     public final String saveStreamSubject;
+    public final long watchWaitTime;
 
     public Params(List<String> paramsFiles) {
         this(readParamsFiles(paramsFiles));
@@ -62,10 +62,10 @@ public class Params {
         profileBucket = readString(jv, "profile_bucket");
         profileStreamName = readString(jv, "profile_stream_name");
         profileStreamSubject = readString(jv, "profile_stream_subject");
-        watchWaitTime = readLong(jv, "watch_wait_time", 5000);
         saveServer = readString(jv, "save_server");
         saveStreamName = readString(jv, "save_stream_name");
         saveStreamSubject = readString(jv, "save_stream_subject");
+        watchWaitTime = readLong(jv, "watch_wait_time", 5000);
     }
 
     public String toJson() {
@@ -107,6 +107,7 @@ public class Params {
         _debug("saveServer", saveServer);
         _debug("saveStreamName", saveStreamName);
         _debug("saveStreamSubject", saveStreamSubject);
+
         _debug("watchWaitTime", watchWaitTime);
     }
 
