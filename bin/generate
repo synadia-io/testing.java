@@ -1,2 +1,1 @@
-aws ec2 describe-instances --output json > aws.json
-java -cp "build/libs/*" io.synadia.utils.Generator
+java -cp "build/libs/*" io.synadia.utils.Generator full

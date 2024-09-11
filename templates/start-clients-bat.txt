@@ -1,0 +1,3 @@
+wt --window 0 <Ssh1>
+wt --window 0 <Ssh2>
+wt --window 0 <Ssh3>

@@ -16,11 +16,41 @@ import java.util.List;
 import java.util.Map;
 
 import static io.nats.client.support.JsonValueUtils.readString;
-import static io.synadia.utils.Constants.*;
+import static io.synadia.utils.Constants.OS_UNIX;
+import static io.synadia.utils.Constants.OS_WIN;
 
 public class Generator {
+    public static final String INPUT_DIR = "templates";
+    public static final String SCRIPT_OUTPUT_DIR = "gen";
+    public static final String PARAMS_OUTPUT_DIR = "params";
+    public static final String SERVER_SETUP_OUTPUT_DIR = "bin-server";
+    public static final String DOT_JSON = ".json";
+    public static final String SH_BAT_DOT_TXT = "-sh-bat.txt";
 
-    // aws ec2 describe-instances --output json > aws.json
+    public static final String CONFIG_JSON = "config.json";
+    public static final String START_CLIENTS_BAT = "start-clients.bat";
+    public static final String START_CLIENTS_BAT_TXT = "start-clients-bat.txt";
+
+    public static final String BOOTSTRAP = "<Bootstrap>";
+    public static final String ADMIN = "<Admin>";
+    public static final String OS = "<OS>";
+    public static final String PATH_SEP = "<PathSep>";
+    public static final String SERVER_PREFIX = "<Server";
+    public static final String SSH_PREFIX = "<Ssh";
+    public static final String TAG_END = ">";
+
+    public static final String TESTING_STREAM_NAME = "<TestingStreamName>";
+    public static final String TESTING_STREAM_SUBJECT = "<TestingStreamSubject>";
+    public static final String STATS_BUCKET = "<StatsBucket>";
+    public static final String STATS_WATCH_WAIT_TIME = "<StatsWatchWaitTime>";
+    public static final String PROFILE_BUCKET = "<ProfileBucket>";
+    public static final String PROFILE_STREAM_NAME = "<ProfileStreamName>";
+    public static final String PROFILE_STREAM_SUBJECT = "<ProfileStreamSubject>";
+    public static final String PROFILE_WATCH_WAIT_TIME = "<ProfileWatchWaitTime>";
+    public static final String SAVE_STREAM_NAME = "<SaveStreamName>";
+    public static final String SAVE_STREAM_SUBJECT = "<SaveStreamSubject>";
+
+    public static final String NA = "na";
 
     static class Instance {
         final String name;
@@ -53,8 +83,12 @@ public class Generator {
     }
 
     public static void main(String[] args) throws Exception {
-        // any arg on the command line meant to just do "show"
-        boolean generate = args == null || args.length == 0;
+        if (args == null || args.length == 0) {
+            System.out.println("USAGE: full | show");
+            return;
+        }
+
+        boolean generate = "full".equals(args[0]);
 
         GeneratorConfig gc = new GeneratorConfig();
         if (generate) {
@@ -63,6 +97,9 @@ public class Generator {
         }
 
         List<Instance> runningServers = new ArrayList<>();
+
+        String startSshTemplate = readTemplate(START_CLIENTS_BAT_TXT, gc);
+        int client = 0;
 
         // parse the aws json
         JsonValue jv = JsonParser.parse(Files.readAllBytes(Paths.get("aws.json")));
@@ -79,12 +116,20 @@ public class Generator {
                     try {
                         heading("client " + instance.name + " [" + instance.stateName + "]");
                         if (instance.isRunning()) {
-                            printSsh(instance, gc);
+                            String ssh = printSsh(instance, gc);
+                            if (ssh != null) {
+                                String repl = SSH_PREFIX + (++client) + TAG_END;
+                                startSshTemplate = startSshTemplate.replace(repl, ssh);
+                            }
                         }
                     }
                     catch (Exception ignore) {}
                 }
             }
+        }
+
+        if (client > 0) {
+            generate(START_CLIENTS_BAT, startSshTemplate, SCRIPT_OUTPUT_DIR);
         }
 
         if (runningServers.size() != 3) {
@@ -176,7 +221,7 @@ public class Generator {
     private static void script(String filename, GeneratorConfig gc) throws IOException {
         String name = filename.replace(SH_BAT_DOT_TXT, "");
         String scriptTemplate = readTemplate(filename, gc);
-        String genName = gc.os.equals(OS_UNIX) ? name + gc.shellExt : name + ".bat";
+        String genName = gc.unix ? name + gc.shellExt : name + ".bat";
         generate(genName, scriptTemplate, SCRIPT_OUTPUT_DIR);
     }
 
@@ -189,18 +234,21 @@ public class Generator {
         System.out.println("nats s list -a -s " + instance.publicIpAddr);
     }
 
-    private static void printSsh(Instance current, GeneratorConfig gc) {
+    private static String printSsh(Instance current, GeneratorConfig gc) {
         if (!NA.equals(gc.keyFile)) {
-            System.out.println("ssh -oStrictHostKeyChecking=no -i " + gc.keyFile + " " + gc.clientUser + "@" + current.publicDnsName);
+            String cmd = "ssh -oStrictHostKeyChecking=no -i " + gc.keyFile + " " + gc.clientUser + "@" + current.publicDnsName;
+            System.out.println(cmd);
+            return cmd;
         }
+        return null;
     }
 
     private static String readTemplate(String tpl, GeneratorConfig gc) throws IOException {
         String template = Files.readString(Paths.get(INPUT_DIR, tpl));
-        if (OS_WIN.equals(gc.os)) {
-            return template.replace(PATH_SEP, "\\");
+        if (gc.unix) {
+            return template.replace(PATH_SEP, "/");
         }
-        return template.replace(PATH_SEP, "/");
+        return template.replace(PATH_SEP, "\\");
     }
 
     private static String finishJsonTemplatePopulate(String template, GeneratorConfig gc, StringBuilder bootstrap, String admin) {
@@ -241,6 +289,8 @@ public class Generator {
     static class GeneratorConfig {
         public final boolean doPublic;
         public final String os;
+        public final boolean windows;
+        public final boolean unix;
         public final String shellExt;
         public final String keyFile;
         public final String serverUser;
@@ -264,6 +314,8 @@ public class Generator {
             JsonValue jv = loadConfig();
             doPublic = jv.map.get("do_public") == null || jv.map.get("do_public").bool;
             os = jv.map.get("os").string.equals(OS_WIN) ? OS_WIN : OS_UNIX;
+            windows = os.equals(OS_WIN);
+            unix = !windows;
             String temp = jv.map.get("shell_ext").string;
             shellExt = temp == null ? "" : temp;
             keyFile = jv.map.get("key_file").string;
