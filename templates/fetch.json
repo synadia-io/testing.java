@@ -3,7 +3,7 @@
     "server": "<Bootstrap>",
     "subject": "<TestingStreamSubject>",
     "action": "SubFetch",
-    "message_count": 400000000,
+    "message_count": 800000000,
     "threads": 4,
     "batch_size": 100,
     "connection_strategy": "individual",
