@@ -31,15 +31,18 @@ public class CommandLine {
     //     --label what-is-being-done
     // ### --params <PATH_TO_JSON_FILE>
     //     --params /tmp/workload-92493-9983831-3-0913.json
+    // ### --arg <command line arg>
+    //     --arg foo
     // ----------------------------------------------------------------------------------------------------
     public final String workload;
     public final String label;
     public final List<String> paramsFiles;
+    public final List<String> args;
 
     // ----------------------------------------------------------------------------------------------------
     // ToString
     // ----------------------------------------------------------------------------------------------------
-    private void append(StringBuilder sb, String label, Object value, boolean test) {
+    private void appendToString(StringBuilder sb, String label, Object value, boolean test) {
         if (test) {
             sb.append("--").append(label).append(":").append(value).append(" ");
         }
@@ -48,9 +51,10 @@ public class CommandLine {
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder("Client Test Config: ");
-        append(sb, "workload", workload, true);
-        append(sb, "label", label, label != null);
-        append(sb, "paramsFile", paramsFiles, true);
+        appendToString(sb, "workload", workload, true);
+        appendToString(sb, "label", label, label != null);
+        appendToString(sb, "paramsFile", paramsFiles, !paramsFiles.isEmpty());
+        appendToString(sb, "args", args, !args.isEmpty());
         return sb.toString().trim();
     }
 
@@ -59,7 +63,12 @@ public class CommandLine {
             Debug.info(COMMAND_LINE, "label", label);
         }
         Debug.info(COMMAND_LINE, "workload", workload);
-        Debug.info(COMMAND_LINE, "paramsFile", paramsFiles);
+        if (!paramsFiles.isEmpty()) {
+            Debug.info(COMMAND_LINE, "paramsFile", paramsFiles);
+        }
+        if (!args.isEmpty()) {
+            Debug.info(COMMAND_LINE, "args", args);
+        }
     }
 
     // ----------------------------------------------------------------------------------------------------
@@ -69,6 +78,7 @@ public class CommandLine {
         String _label = null;
         String _workload = null;
         List<String> _paramsFiles = new ArrayList<>();
+        List<String> _args = new ArrayList<>();
 
         if (args != null && args.length > 0) {
             try {
@@ -84,6 +94,9 @@ public class CommandLine {
                         case "--params":
                             _paramsFiles.add(asString(args[++x]));
                             break;
+                        case "--arg":
+                            _args.add(asString(args[++x]));
+                            break;
                         case "":
                             break;
                         default:
@@ -97,9 +110,10 @@ public class CommandLine {
             }
         }
 
-        workload = _workload;
-        label = _label;
-        paramsFiles = _paramsFiles;
+        this.workload = _workload;
+        this.label = _label;
+        this.paramsFiles = _paramsFiles;
+        this.args = _args;
     }
 
     private String asString(String val) {

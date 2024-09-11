@@ -30,11 +30,14 @@ public class Runner {
             case "watchProfile":
                 workload = new WatchTracking(WatchTracking.Which.Profile, commandLine);
                 break;
-            case "readTracking":
-                workload = new ReadTracking(commandLine);
+            case "listTracking":
+                workload = new ListTracking(commandLine);
                 break;
             case "saveTracking":
                 workload = new SaveTracking(commandLine);
+                break;
+            case "chartProfile":
+                workload = new ChartProfile(commandLine);
                 break;
             default:
                 Debug.info("Runner", "Workload not implemented: " + commandLine.workload);

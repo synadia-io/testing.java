@@ -1,4 +1,5 @@
 {
+  "save_server": "nats://localhost:4222",
   "stream_config":{
     "name": "<ProfileStreamName>",
     "subjects": ["<ProfileStreamSubject>"],

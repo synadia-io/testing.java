@@ -35,6 +35,7 @@ public class Generator {
     public static final String ADMIN = "<Admin>";
     public static final String OS = "<OS>";
     public static final String PATH_SEP = "<PathSep>";
+    public static final String ARG = "<Arg>";
     public static final String SERVER_PREFIX = "<Server";
     public static final String SSH_PREFIX = "<Ssh";
     public static final String TAG_END = ">";
@@ -247,9 +248,9 @@ public class Generator {
     private static String readTemplate(String tpl, GeneratorConfig gc) throws IOException {
         String template = Files.readString(Paths.get(INPUT_DIR, tpl));
         if (gc.unix) {
-            return template.replace(PATH_SEP, "/");
+            return template.replace(PATH_SEP, "/").replace(ARG, "$");
         }
-        return template.replace(PATH_SEP, "\\");
+        return template.replace(PATH_SEP, "\\").replace(ARG, "%");
     }
 
     private static String finishJsonTemplatePopulate(String template, GeneratorConfig gc, StringBuilder bootstrap, String admin) {
