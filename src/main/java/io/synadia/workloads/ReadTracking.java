@@ -35,6 +35,10 @@ public class ReadTracking extends Workload {
             KeyValue kvSourceProfile = sourceNc.keyValue(params.profileBucket);
             kvSourceProfile.watchAll(pw);
 
+            // 0. Wait
+            sw.latch.await(10, TimeUnit.MINUTES);
+            pw.latch.await(10, TimeUnit.MINUTES);
+
             JetStreamSubscription sub = jsSource.subscribe(
                 params.profileStreamSubject,
                 PushSubscribeOptions.builder().ordered(true).build());
@@ -44,15 +48,8 @@ public class ReadTracking extends Workload {
                 Debug.info("Profile Stream", m.getSubject());
                 m = sub.nextMessage(1000);
             }
-
-            // 0. Wait
-            sw.latch.await(10, TimeUnit.MINUTES);
-            pw.latch.await(10, TimeUnit.MINUTES);
-            doneWatching();
         }
     }
-
-    protected void doneWatching() {}
 
     static class ReadWatcher implements KeyValueWatcher {
         final CountDownLatch latch;

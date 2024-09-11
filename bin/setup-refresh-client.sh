@@ -1,7 +1,7 @@
 cd ~
 mkdir -p bin
-rm bin/update-client
-cat > bin/update-client <<EOF
+rm bin/refresh
+cat > bin/refresh <<EOF
 
 cd ~
 rm -rf testing.java
@@ -14,4 +14,4 @@ EOF
 chmod +x bin/*
 
 echo "Todo: Export AWS security"
-. update-client
+. refresh
