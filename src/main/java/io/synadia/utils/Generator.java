@@ -3,6 +3,7 @@ package io.synadia.utils;
 import io.nats.client.support.JsonParser;
 import io.nats.client.support.JsonValue;
 import io.nats.client.support.JsonValueUtils;
+import io.synadia.workloads.Which;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -15,9 +16,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import static io.nats.client.support.JsonValueUtils.readInteger;
 import static io.nats.client.support.JsonValueUtils.readString;
-import static io.synadia.utils.Constants.OS_UNIX;
-import static io.synadia.utils.Constants.OS_WIN;
+import static io.synadia.utils.Constants.*;
 
 public class Generator {
     public static final String INPUT_DIR = "templates";
@@ -32,7 +33,7 @@ public class Generator {
     public static final String START_CLIENTS_BAT_TXT = "start-clients-bat.txt";
 
     public static final String BOOTSTRAP = "<Bootstrap>";
-    public static final String ADMIN = "<Admin>";
+    public static final String ADMIN_SERVER = "<AdminServer>";
     public static final String OS = "<OS>";
     public static final String PATH_SEP = "<PathSep>";
     public static final String ARG = "<Arg>";
@@ -54,176 +55,115 @@ public class Generator {
 
     public static final String NA = "na";
 
-    static class Instance {
-        final String name;
-        final String publicDnsName;
-        final String privateIpAddr;
-        final String publicIpAddr;
-        final Integer stateCode;
-        final String stateName;
-
-        public Instance(JsonValue jv) {
-            this.name = jv.map.get("Tags").array.getFirst().map.get("Value").string;
-            this.publicDnsName = JsonValueUtils.readString(jv, "PublicDnsName", "Undefined");
-            this.privateIpAddr = JsonValueUtils.readString(jv, "PrivateIpAddress", "Undefined");
-            this.publicIpAddr = JsonValueUtils.readString(jv, "PublicIpAddress", "Undefined");
-
-            Map<String, JsonValue> map = jv.map.get("State").map;
-            if (map == null) {
-                stateCode = null;
-                stateName = "unknown";
-            }
-            else {
-                stateCode = map.get("Code").i;
-                stateName = map.get("Name").string;
-            }
-        }
-
-        boolean isRunning() {
-            return stateCode != null && stateCode == 16;
-        }
-    }
-
     public static void main(String[] args) throws Exception {
         if (args == null || args.length == 0) {
-            System.out.println("USAGE: full | show");
-            return;
+            args = new String[]{"full"};
         }
+        Which which = Which.instance(GENERATOR, args[0]);
 
-        boolean generate = "full".equals(args[0]);
-
-        GeneratorConfig gc = new GeneratorConfig();
-        if (generate) {
-            gc.show();
+        Config cfg = new Config();
+        if (which != Which.Show) {
+            cfg.print();
             prepareOutputDirs();
         }
+        Calculations calc = new Calculations(cfg);
 
-        List<Instance> runningServers = new ArrayList<>();
-
-        String startSshTemplate = readTemplate(START_CLIENTS_BAT_TXT, gc);
-        int client = 0;
-
-        // parse the aws json
-        JsonValue jv = JsonParser.parse(Files.readAllBytes(Paths.get("aws.json")));
-        for (JsonValue jvRes : jv.map.get("Reservations").array) {
-            for (JsonValue jvInstance : jvRes.map.get("Instances").array) {
-                Instance instance = new Instance(jvInstance);
-                if (instance.name.contains(gc.serverFilter)) {
-                    heading("server " + instance.name + " [" + instance.stateName + "]");
-                    if (instance.isRunning()) {
-                        runningServers.add(instance);
-                    }
-                }
-                else if (instance.name.contains(gc.clientFilter)) {
-                    try {
-                        heading("client " + instance.name + " [" + instance.stateName + "]");
-                        if (instance.isRunning()) {
-                            String ssh = printSsh(instance, gc);
-                            if (ssh != null) {
-                                String repl = SSH_PREFIX + (++client) + TAG_END;
-                                startSshTemplate = startSshTemplate.replace(repl, ssh);
-                            }
-                        }
-                    }
-                    catch (Exception ignore) {}
-                }
-            }
+        if (which == Which.Local) {
+            calculateLocal(cfg, calc);
+        }
+        else {
+            calculateAws(cfg, calc);
         }
 
-        if (client > 0) {
-            generate(START_CLIENTS_BAT, startSshTemplate, SCRIPT_OUTPUT_DIR);
+        if (calc.clients > 0) {
+            generate(START_CLIENTS_BAT, calc.startSshTemplate, SCRIPT_OUTPUT_DIR);
         }
 
-        if (runningServers.size() != 3) {
+        if (calc.runningServers.size() != cfg.serverCount) {
             return;
         }
 
-        String privateAdmin = null;
-        String publicAdmin = null;
-        StringBuilder privateBootstrap = new StringBuilder();
-        StringBuilder publicBootstrap = new StringBuilder();
-        String configTemplatePrivate = readTemplate(CONFIG_JSON, gc);
-        String configTemplatePublic = configTemplatePrivate;
-        for (int x = 0; x < 3; x++) {
+        for (int x = 0; x < cfg.serverCount; x++) {
             String scriptName = "server" + x;
 
-            Instance current = runningServers.getFirst();
-            String privateServer = gc.natsProto + current.privateIpAddr + ":" + gc.natsPort;
-            String publicServer = gc.natsProto + current.publicIpAddr + ":" + gc.natsPort;
+            Instance current = calc.runningServers.getFirst();
+            String privateServer = cfg.natsProto + current.privateIpAddr + ":" + current.port;
+            String publicServer = cfg.natsProto + current.publicIpAddr + ":" + current.port;
 
             if (x == 0) {
-                privateAdmin = privateServer;
-                publicAdmin = publicServer;
+                calc.privateAdmin = privateServer;
+                calc.publicAdmin = publicServer;
             }
             else {
-                privateBootstrap.append(",");
-                publicBootstrap.append(",");
+                calc.privateBootstrap.append(",");
+                calc.publicBootstrap.append(",");
             }
-            privateBootstrap.append(privateServer);
-            publicBootstrap.append(publicServer);
+            calc.privateBootstrap.append(privateServer);
+            calc.publicBootstrap.append(publicServer);
 
-            configTemplatePrivate = configTemplatePrivate.replace(SERVER_PREFIX + x + TAG_END, privateServer);
-            configTemplatePublic = configTemplatePublic.replace(SERVER_PREFIX + x + TAG_END, publicServer);
+            calc.configTemplatePrivate = calc.configTemplatePrivate.replace(SERVER_PREFIX + x + TAG_END, privateServer);
+            calc.configTemplatePublic = calc.configTemplatePublic.replace(SERVER_PREFIX + x + TAG_END, publicServer);
 
-            if (gc.doPublic) {
+            if (which != Which.Local && cfg.doPublic) {
                 heading(scriptName + " " + current.stateName);
-                printSsh(current, gc);
+                printSsh(current, cfg);
                 printNatsCli(current);
 
                 // SERVER SCRIPT
-                if (generate) {
-                    String template = readTemplate("server.sh", gc)
+                if (which == Which.Full) {
+                    String template = readTemplate("server.sh", cfg)
                         .replace("<InstanceId>", "" + x)
-                        .replace("<PrivateIpRoute1>", runningServers.get(1).privateIpAddr)
-                        .replace("<PrivateIpRoute2>", runningServers.get(2).privateIpAddr);
+                        .replace("<PrivateIpRoute1>", calc.runningServers.get(1).privateIpAddr)
+                        .replace("<PrivateIpRoute2>", calc.runningServers.get(2).privateIpAddr);
                     generate("server" + x, template, SERVER_SETUP_OUTPUT_DIR);
                 }
             }
 
-            runningServers.add(runningServers.removeFirst());
+            calc.runningServers.add(calc.runningServers.removeFirst());
         }
-        configTemplatePrivate = finishJsonTemplatePopulate(configTemplatePrivate, gc, privateBootstrap, privateAdmin);
-        configTemplatePublic = finishJsonTemplatePopulate(configTemplatePublic, gc, publicBootstrap, publicAdmin);
 
-        if (generate) {
+        calc.configTemplatePrivate = finishJsonTemplatePopulate(calc.configTemplatePrivate, cfg, calc.privateBootstrap, calc.privateAdmin);
+        calc.configTemplatePublic = finishJsonTemplatePopulate(calc.configTemplatePublic, cfg, calc.publicBootstrap, calc.publicAdmin);
+
+        if (which != Which.Show) {
             File[] files = new File(INPUT_DIR).listFiles();
             if (files != null) {
                 for (File f : files) {
                     String filename = f.getName();
                     if (filename.equals(CONFIG_JSON)) {
-                        if (gc.doPublic) {
-                            generate(CONFIG_JSON, configTemplatePublic, PARAMS_OUTPUT_DIR);
+                        if (cfg.doPublic) {
+                            generate(CONFIG_JSON, calc.configTemplatePublic, PARAMS_OUTPUT_DIR);
                         }
                         else {
-                            generate(CONFIG_JSON, configTemplatePrivate, PARAMS_OUTPUT_DIR);
+                            generate(CONFIG_JSON, calc.configTemplatePrivate, PARAMS_OUTPUT_DIR);
                         }
                     }
                     else if (filename.endsWith(DOT_JSON)) {
-                        writeJson(filename, gc, publicBootstrap, publicAdmin, privateBootstrap, privateAdmin);
+                        writeJson(filename, cfg, calc.publicBootstrap, calc.publicAdmin, calc.privateBootstrap, calc.privateAdmin);
                     }
                     else if (filename.endsWith(SH_BAT_DOT_TXT)) {
-                        script(filename, gc);
+                        script(filename, cfg);
                     }
                 }
             }
         }
     }
 
-    private static void writeJson(String filename, GeneratorConfig gc, StringBuilder publicBootstrap, String publicAdmin, StringBuilder privateBootstrap, String privateAdmin) throws IOException {
-        String jsonTemplate = readTemplate(filename, gc);
-        if (gc.doPublic) {
-            jsonTemplate = finishJsonTemplatePopulate(jsonTemplate, gc, publicBootstrap, publicAdmin);
+    private static void writeJson(String filename, Config cfg, StringBuilder publicBootstrap, String publicAdmin, StringBuilder privateBootstrap, String privateAdmin) throws IOException {
+        String jsonTemplate = readTemplate(filename, cfg);
+        if (cfg.doPublic) {
+            jsonTemplate = finishJsonTemplatePopulate(jsonTemplate, cfg, publicBootstrap, publicAdmin);
         }
         else {
-            jsonTemplate = finishJsonTemplatePopulate(jsonTemplate, gc, privateBootstrap, privateAdmin);
+            jsonTemplate = finishJsonTemplatePopulate(jsonTemplate, cfg, privateBootstrap, privateAdmin);
         }
         generate(filename, jsonTemplate, PARAMS_OUTPUT_DIR);
     }
 
-    private static void script(String filename, GeneratorConfig gc) throws IOException {
+    private static void script(String filename, Config cfg) throws IOException {
         String name = filename.replace(SH_BAT_DOT_TXT, "");
-        String scriptTemplate = readTemplate(filename, gc);
-        String genName = gc.unix ? name + gc.shellExt : name + ".bat";
+        String scriptTemplate = readTemplate(filename, cfg);
+        String genName = cfg.unix ? name + cfg.shellExt : name + ".bat";
         generate(genName, scriptTemplate, SCRIPT_OUTPUT_DIR);
     }
 
@@ -236,25 +176,25 @@ public class Generator {
         System.out.println("nats s list -a -s " + instance.publicIpAddr);
     }
 
-    private static String printSsh(Instance current, GeneratorConfig gc) {
-        if (!NA.equals(gc.keyFile)) {
-            String cmd = "ssh -oStrictHostKeyChecking=no -i " + gc.keyFile + " " + gc.clientUser + "@" + current.publicDnsName;
+    private static String printSsh(Instance current, Config cfg) {
+        if (!NA.equals(cfg.keyFile)) {
+            String cmd = "ssh -oStrictHostKeyChecking=no -i " + cfg.keyFile + " " + cfg.clientUser + "@" + current.publicDnsName;
             System.out.println(cmd);
             return cmd;
         }
         return null;
     }
 
-    private static String readTemplate(String tpl, GeneratorConfig gc) throws IOException {
+    private static String readTemplate(String tpl, Config cfg) throws IOException {
         String template = Files.readString(Paths.get(INPUT_DIR, tpl));
-        if (gc.unix) {
+        if (cfg.unix) {
             return template.replace(PATH_SEP, "/").replace(ARG, "$");
         }
         return template.replace(PATH_SEP, "\\").replace(ARG, "%");
     }
 
-    private static String finishJsonTemplatePopulate(String template, GeneratorConfig gc, StringBuilder bootstrap, String admin) {
-        return gc.populate(template.replace(BOOTSTRAP, bootstrap).replace(ADMIN, admin).replace(OS, gc.os));
+    private static String finishJsonTemplatePopulate(String template, Config cfg, StringBuilder bootstrap, String admin) {
+        return cfg.populate(template.replace(BOOTSTRAP, bootstrap).replace(ADMIN_SERVER, admin).replace(OS, cfg.os));
     }
 
     private static void generate(String fn, String data, String dir) throws IOException {
@@ -288,8 +228,108 @@ public class Generator {
         }
     }
 
-    static class GeneratorConfig {
+    private static void calculateAws(Config cfg, Calculations calc) throws IOException {
+        // parse the aws json
+        JsonValue jv = JsonParser.parse(Files.readAllBytes(Paths.get("aws.json")));
+        for (JsonValue jvRes : jv.map.get("Reservations").array) {
+            for (JsonValue jvInstance : jvRes.map.get("Instances").array) {
+                Instance instance = new Instance(jvInstance, cfg.natsPort);
+                if (instance.name.contains(cfg.serverFilter)) {
+                    heading("server " + instance.name + " [" + instance.stateName + "]");
+                    if (instance.isRunning()) {
+                        calc.runningServers.add(instance);
+                    }
+                }
+                else if (instance.name.contains(cfg.clientFilter)) {
+                    try {
+                        heading("client " + instance.name + " [" + instance.stateName + "]");
+                        if (instance.isRunning()) {
+                            String ssh = printSsh(instance, cfg);
+                            if (ssh != null) {
+                                String repl = SSH_PREFIX + (++calc.clients) + TAG_END;
+                                calc.startSshTemplate = calc.startSshTemplate.replace(repl, ssh);
+                            }
+                        }
+                    }
+                    catch (Exception ignore) {
+                    }
+                }
+            }
+        }
+    }
+
+    static class Instance {
+        final String name;
+        final String publicDnsName;
+        final String privateIpAddr;
+        final String publicIpAddr;
+        final Integer stateCode;
+        final String stateName;
+        final String port;
+
+        // aws
+        public Instance(JsonValue jv, String port) {
+            this.name = jv.map.get("Tags").array.getFirst().map.get("Value").string;
+            this.publicDnsName = JsonValueUtils.readString(jv, "PublicDnsName", "Undefined");
+            this.privateIpAddr = JsonValueUtils.readString(jv, "PrivateIpAddress", "Undefined");
+            this.publicIpAddr = JsonValueUtils.readString(jv, "PublicIpAddress", "Undefined");
+            this.port = port;
+
+            Map<String, JsonValue> map = jv.map.get("State").map;
+            if (map == null) {
+                stateCode = null;
+                stateName = "unknown";
+            }
+            else {
+                stateCode = map.get("Code").i;
+                stateName = map.get("Name").string;
+            }
+        }
+
+        // local
+        public Instance(String port) {
+            this.name = "local-" + port;
+            this.publicDnsName = this.privateIpAddr = this.publicIpAddr = "localhost";
+            this.port = port;
+            stateCode = 0;
+            stateName = "running";
+        }
+
+        boolean isRunning() {
+            return stateCode != null && stateCode == 16;
+        }
+    }
+
+    private static void calculateLocal(Config cfg, Calculations calc) {
+        for (String lp : cfg.localPorts) {
+            calc.runningServers.add(new Instance(lp));
+        }
+    }
+
+    static class Calculations {
+        public List<Instance> runningServers;
+        public String startSshTemplate;
+        public String privateAdmin;
+        public String publicAdmin;
+        public StringBuilder privateBootstrap;
+        public StringBuilder publicBootstrap;
+        public String configTemplatePrivate;
+        public String configTemplatePublic;
+        public int clients;
+
+        public Calculations(Config cfg) throws IOException {
+            runningServers = new ArrayList<>();
+            startSshTemplate = readTemplate(START_CLIENTS_BAT_TXT, cfg);
+            privateBootstrap = new StringBuilder();
+            publicBootstrap = new StringBuilder();
+            configTemplatePrivate = readTemplate(CONFIG_JSON, cfg);
+            configTemplatePublic = configTemplatePrivate;
+        }
+    }
+
+    static class Config {
         public final boolean doPublic;
+        public final int serverCount;
         public final String os;
         public final boolean windows;
         public final boolean unix;
@@ -301,6 +341,7 @@ public class Generator {
         public final String clientFilter;
         public final String natsProto;
         public final String natsPort;
+        public final List<String> localPorts;
         public final String testingStreamName;
         public final String testingStreamSubject;
         public final String multiBucket;
@@ -313,21 +354,23 @@ public class Generator {
         public final String statsWatchWaitTime;
         public final String profileWatchWaitTime;
 
-        public GeneratorConfig() throws IOException {
+        public Config() throws IOException {
             JsonValue jv = loadConfig();
             doPublic = jv.map.get("do_public") == null || jv.map.get("do_public").bool;
-            os = jv.map.get("os").string.equals(OS_WIN) ? OS_WIN : OS_UNIX;
+            os = readString(jv, "os", OS_UNIX).equals(OS_WIN) ? OS_WIN : OS_UNIX;
+            serverCount = readInteger(jv, "server_count", 3);
             windows = os.equals(OS_WIN);
             unix = !windows;
-            String temp = jv.map.get("shell_ext").string;
+            String temp = readString(jv, ("shell_ext"));
             shellExt = temp == null ? "" : temp;
-            keyFile = jv.map.get("key_file").string;
-            serverUser = jv.map.get("server_user").string;
-            clientUser = jv.map.get("client_user").string;
-            serverFilter = jv.map.get("server_filter").string;
-            clientFilter = jv.map.get("client_filter").string;
-            natsProto = jv.map.get("nats_proto").string;
-            natsPort = jv.map.get("nats_port").string;
+            keyFile = readString(jv, ("key_file"));
+            serverUser = readString(jv, ("server_user"));
+            clientUser = readString(jv, ("client_user"));
+            serverFilter = readString(jv, ("server_filter"));
+            clientFilter = readString(jv, ("client_filter"));
+            natsProto = readString(jv, ("nats_proto"));
+            natsPort = readString(jv, ("nats_port"));
+            localPorts = JsonValueUtils.readStringList(jv, "local_ports");
 
             testingStreamName = readString(jv, "testing_stream_name");
             testingStreamSubject = readString(jv, "testing_stream_subject");
@@ -359,7 +402,7 @@ public class Generator {
                 ;
         }
 
-        public void show() {
+        public void print() {
             System.out.println("doPublic: " + doPublic);
             System.out.println("os: " + os);
             System.out.println("shellExt: " + shellExt);
@@ -370,6 +413,7 @@ public class Generator {
             System.out.println("clientFilter: " + clientFilter);
             System.out.println("natsProto: " + natsProto);
             System.out.println("natsPort: " + natsPort);
+            System.out.println("localPorts: " + localPorts);
             System.out.println("testingStreamName: " + testingStreamName);
             System.out.println("testingStreamSubject: " + testingStreamSubject);
             System.out.println("multiBucket: " + multiBucket);
@@ -396,6 +440,7 @@ public class Generator {
                 .put("client_filter", NA)
                 .put("nats_proto", "nats://")
                 .put("nats_port", "4222")
+                .put("local_ports", JsonValueUtils.arrayBuilder().add("4222").add("5222").add("6222"))
                 .put("testing_stream_name", "testingStream")
                 .put("testing_stream_subject", "t")
                 .put("multi_bucket", "multiBucket")

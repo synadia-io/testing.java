@@ -4,9 +4,9 @@ import io.nats.jsmulti.JsMulti;
 import io.nats.jsmulti.settings.Arguments;
 import io.nats.jsmulti.settings.Context;
 
-public class MultiWorkload extends Workload {
-    public MultiWorkload(String defaultLabel, CommandLine commandLine) {
-        super(defaultLabel, commandLine);
+public class Multi extends Workload {
+    public Multi(CommandLine commandLine) {
+        super("Multi", commandLine);
     }
 
     public void runWorkload() throws Exception {

@@ -1,1 +1,1 @@
-java -cp "build/libs/*" io.synadia.Runner --workload setupTracking --params params<PathSep>config.json --params params<PathSep>tracking.json
+java -cp "build/libs/*" io.synadia.Runner --workload setup --action tracking --params params<PathSep>config.json --params params<PathSep>tracking.json

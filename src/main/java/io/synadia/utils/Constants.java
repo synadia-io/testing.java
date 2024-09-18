@@ -7,4 +7,8 @@ public interface Constants {
     String FINAL = "final";
     String OS_WIN = "win";
     String OS_UNIX = "unix";
+
+    String WATCH = "Watch";
+    String SETUP = "Setup";
+    String GENERATOR = "Generator";
 }

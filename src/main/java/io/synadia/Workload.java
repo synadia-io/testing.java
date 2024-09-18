@@ -13,10 +13,11 @@ public abstract class Workload {
     public final Params params;
 
     public Workload(String defaultLabel, CommandLine commandLine) {
-        this.label = commandLine.label == null ? defaultLabel : commandLine.label;
+        this.label = commandLine.action == null ? defaultLabel : commandLine.action;
         this.commandLine = commandLine;
         this.params = new Params(commandLine.paramsFiles);
 
+        Debug.info("Environment", "JNats %s", Nats.CLIENT_VERSION);
         commandLine.debug();
         params.debug();
     }

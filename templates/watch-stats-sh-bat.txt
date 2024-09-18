@@ -1,1 +1,1 @@
-java -cp "build/libs/*" io.synadia.Runner --workload watchStats --params params<PathSep>config.json --params params<PathSep>watch-stats.json
+java -cp "build/libs/*" io.synadia.Runner --workload watch --action stats --params params<PathSep>config.json --params params<PathSep>watch-stats.json

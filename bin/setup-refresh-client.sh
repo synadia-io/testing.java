@@ -8,7 +8,7 @@ rm -rf testing.java
 git clone https://github.com/synadia-io/testing.java
 cd testing.java
 
-chmod +x bin/* && chmod -x bin/*.bat && bin/make && bin/get-aws && bin/generate && chmod +x gen/*
+chmod +x bin/* && chmod -x bin/*.bat && bin/make && bin/get-aws && bin/gen && chmod +x gen/*
 EOF
 
 chmod +x bin/*

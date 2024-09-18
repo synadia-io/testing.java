@@ -19,7 +19,7 @@ import java.util.concurrent.TimeUnit;
 
 public class ListTracking extends Workload {
     public ListTracking(CommandLine commandLine) {
-        super("Read Tracking", commandLine);
+        super("List Tracking", commandLine);
     }
 
     @SuppressWarnings("ResultOfMethodCallIgnored")

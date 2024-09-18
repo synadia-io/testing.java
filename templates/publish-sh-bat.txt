@@ -1,1 +1,1 @@
-java -cp "build/libs/*" io.synadia.Runner --workload multi --label Publish --params params<PathSep>config.json --params params<PathSep>publish.json
+java -cp "build/libs/*" io.synadia.Runner --workload multi --action publish --params params<PathSep>config.json --params params<PathSep>publish.json

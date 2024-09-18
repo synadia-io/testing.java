@@ -17,7 +17,7 @@ import java.util.List;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-// MODIFIED 09/04/2024 1
+// MODIFIED 09/16/2024 1
 
 @SuppressWarnings("SameParameterValue")
 public abstract class Debug {
@@ -227,7 +227,7 @@ public abstract class Debug {
             sb.append(xtra);
         }
 
-        return sb.length() == 0 ? null : sb.toString();
+        return sb.isEmpty() ? null : sb.toString();
     }
 
     public static String getString(Object o) {

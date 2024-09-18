@@ -10,25 +10,16 @@ public class Runner {
         Workload workload = null;
         switch (commandLine.workload) {
             case "multi":
-                workload = new MultiWorkload("Multi", commandLine);
+                workload = new Multi(commandLine);
                 break;
             case "deployTest":
                 workload = new DeployTest(commandLine);
                 break;
-            case "setupTesting":
-                workload = new SetupTesting(commandLine);
+            case "setup":
+                workload = new Setup(commandLine);
                 break;
-            case "setupTracking":
-                workload = new SetupTracking("Setup Tracking", commandLine);
-                break;
-            case "setupSave":
-                workload = new SetupTracking("Setup Save", commandLine);
-                break;
-            case "watchStats":
-                workload = new WatchTracking(WatchTracking.Which.Stats, commandLine);
-                break;
-            case "watchProfile":
-                workload = new WatchTracking(WatchTracking.Which.Profile, commandLine);
+            case "watch":
+                workload = new Watch(commandLine);
                 break;
             case "listTracking":
                 workload = new ListTracking(commandLine);

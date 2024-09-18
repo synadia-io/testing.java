@@ -26,7 +26,7 @@ if (jnatsv == null || jnatsv.equals("")) {
         jnatsv = "2.20.2"
     }
 }
-System.out.println("jnatsv: ${jnatsv} | " + jnatsv);
+System.out.println("JNats ${jnatsv}");
 
 dependencies {
     implementation "io.nats:jnats:${jnatsv}"

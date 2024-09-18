@@ -22,29 +22,27 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 
+import static io.synadia.utils.Constants.WATCH;
 import static io.synadia.utils.Reporting.*;
 
-public class WatchTracking extends Workload {
-    public enum Which {
-        Stats("Stats"),
-        Profile("Profile");
-        final String workloadName;
-        Which(String workloadName) {
-            this.workloadName = workloadName;
-        }
-    }
+public class Watch extends Workload {
+
+    enum Watches { Stats, Profile }
 
     private final Which which;
     private final String bucket;
 
-    public WatchTracking(Which which, CommandLine commandLine) {
-        super(which.workloadName, commandLine);
-        this.which = which;
+    public Watch(CommandLine commandLine) {
+        super(commandLine.action, commandLine);
+        this.which = Which.instance(WATCH, commandLine.action);
         if (which == Which.Stats) {
             bucket = params.statsBucket;
         }
-        else {
+        else if (which == Which.Profile) {
             bucket = params.profileBucket;
+        }
+        else {
+            throw new RuntimeException("Watch not implemented: " + commandLine.workload);
         }
     }
 

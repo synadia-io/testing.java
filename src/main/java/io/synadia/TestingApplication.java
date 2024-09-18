@@ -1,10 +1,8 @@
 package io.synadia;
 
-import io.nats.client.Connection;
-import io.nats.client.JetStream;
-import io.nats.client.KeyValue;
-import io.nats.client.KeyValueOptions;
+import io.nats.client.*;
 import io.nats.client.support.JsonValue;
+import io.nats.client.support.JsonValueUtils;
 import io.nats.jsmulti.settings.Context;
 import io.nats.jsmulti.shared.Application;
 import io.nats.jsmulti.shared.OptionsFactory;
@@ -43,7 +41,12 @@ public class TestingApplication implements Application, AutoCloseable {
             KeyValue kvMulti = nc.keyValue(workload.params.multiBucket, kvo);
             //noinspection DataFlowIssue // action will never be null here
             String key = ctx.action.getLabel() + "."  + ctx.id;
-            byte[] value = workload.params.toJson().getBytes(StandardCharsets.US_ASCII);
+
+            JsonValue jv = JsonValueUtils.mapBuilder()
+                .put("jnats_version", new JsonValue(Nats.CLIENT_VERSION))
+                .put("multi_config", workload.params.jvMultiConfig)
+                .jv;
+            byte[] value = jv.toJson().getBytes(StandardCharsets.US_ASCII);
             kvMulti.put(key, value);
         }
         catch (Exception e) {

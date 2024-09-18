@@ -13,6 +13,8 @@
 
 package io.synadia;
 
+import io.nats.client.support.JsonValue;
+import io.nats.client.support.JsonValueUtils;
 import io.synadia.utils.Debug;
 
 import java.util.ArrayList;
@@ -27,24 +29,24 @@ public class CommandLine {
     // ----------------------------------------------------------------------------------------------------
     // ### --workload <WORKLOAD_NAME>
     //     --workload stay-connected
-    // ### --label <workload label>
-    //     --label what-is-being-done
+    // ### --action <workload action>
+    //     --action blah
     // ### --params <PATH_TO_JSON_FILE>
     //     --params /tmp/workload-92493-9983831-3-0913.json
     // ### --arg <command line arg>
     //     --arg foo
     // ----------------------------------------------------------------------------------------------------
     public final String workload;
-    public final String label;
+    public final String action;
     public final List<String> paramsFiles;
     public final List<String> args;
 
     // ----------------------------------------------------------------------------------------------------
     // ToString
     // ----------------------------------------------------------------------------------------------------
-    private void appendToString(StringBuilder sb, String label, Object value, boolean test) {
+    private void appendToString(StringBuilder sb, String name, Object value, boolean test) {
         if (test) {
-            sb.append("--").append(label).append(":").append(value).append(" ");
+            sb.append("--").append(name).append(":").append(value).append(" ");
         }
     }
 
@@ -52,20 +54,37 @@ public class CommandLine {
     public String toString() {
         StringBuilder sb = new StringBuilder("Client Test Config: ");
         appendToString(sb, "workload", workload, true);
-        appendToString(sb, "label", label, label != null);
-        appendToString(sb, "paramsFile", paramsFiles, !paramsFiles.isEmpty());
+        appendToString(sb, "action", action, action != null);
+        appendToString(sb, "paramsFile", paramsFiles, true);
         appendToString(sb, "args", args, !args.isEmpty());
         return sb.toString().trim();
     }
 
+    private void appendToJv(JsonValueUtils.MapBuilder builder, String name, Object value, boolean test) {
+        if (test) {
+            builder.put(name, JsonValueUtils.toJsonValue(value));
+        }
+    }
+
+    public JsonValue toJsonValue() {
+        JsonValueUtils.ArrayBuilder ab = JsonValueUtils.arrayBuilder();
+        for (String pf : paramsFiles) {
+            ab.add(pf);
+        }
+        JsonValueUtils.MapBuilder b = JsonValueUtils.mapBuilder();
+        appendToJv(b, "workload", workload, true);
+        appendToJv(b, "action", action, action != null);
+        appendToJv(b, "paramsFile", ab, true);
+        appendToJv(b, "args", args, !args.isEmpty());
+        return b.toJsonValue();
+    }
+
     public void debug() {
-        if (label != null) {
-            Debug.info(COMMAND_LINE, "label", label);
-        }
         Debug.info(COMMAND_LINE, "workload", workload);
-        if (!paramsFiles.isEmpty()) {
-            Debug.info(COMMAND_LINE, "paramsFile", paramsFiles);
+        if (action != null) {
+            Debug.info(COMMAND_LINE, "action", action);
         }
+        Debug.info(COMMAND_LINE, "paramsFile", paramsFiles);
         if (!args.isEmpty()) {
             Debug.info(COMMAND_LINE, "args", args);
         }
@@ -75,8 +94,8 @@ public class CommandLine {
     // Construction
     // ----------------------------------------------------------------------------------------------------
     public CommandLine(String[] args) {
-        String _label = null;
         String _workload = null;
+        String _action = null;
         List<String> _paramsFiles = new ArrayList<>();
         List<String> _args = new ArrayList<>();
 
@@ -85,8 +104,8 @@ public class CommandLine {
                 for (int x = 0; x < args.length; x++) {
                     String arg = args[x].trim();
                     switch (arg) {
-                        case "--label":
-                            _label = asString(args[++x]);
+                        case "--action":
+                            _action = asString(args[++x]);
                             break;
                         case "--workload":
                             _workload = asString(args[++x]);
@@ -111,7 +130,7 @@ public class CommandLine {
         }
 
         this.workload = _workload;
-        this.label = _label;
+        this.action = _action;
         this.paramsFiles = _paramsFiles;
         this.args = _args;
     }
