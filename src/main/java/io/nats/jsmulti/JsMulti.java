@@ -443,6 +443,7 @@ public class JsMulti {
         _jsSyncConsume(ctx, stats, durable, () -> sub.nextMessage(ctx.readTimeoutDuration));
     }
 
+    private static boolean HOLDING = false;
     private static void _jsSyncConsume(Context ctx, Stats stats, String durable, SyncConsumer syncConsumer) throws Exception {
         long rcvd = 0;
         Message lastUnAcked = null;
@@ -457,6 +458,7 @@ public class JsMulti {
             long hold = stats.elapsed();
             long received = System.currentTimeMillis();
             if (m == null) {
+                HOLDING = true;
                 noMessageTotalElapsed += hold;
                 if (noMessageTotalElapsed > ctx.readMaxWaitDuration.toMillis()) {
                     report(ctx, rcvd, "Stopped At Max Wait, Finished Reading Messages");
@@ -465,6 +467,7 @@ public class JsMulti {
                 acceptHoldOnceStarted(stats, rcvd, hold, ctx);
             }
             else {
+                HOLDING = false;
                 noMessageTotalElapsed = 0;
                 stats.manualElapsed(hold);
                 stats.count(m, received);
