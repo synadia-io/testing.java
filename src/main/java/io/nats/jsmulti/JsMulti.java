@@ -524,7 +524,7 @@ public class JsMulti {
                 Message m = fcRef.get().nextMessage();
                 if (m == null) {
                     if (HOLDING > lastHolding.get()) {
-                        lastHolding.set(Integer.MAX_VALUE);
+                        lastHolding.set(HOLDING);
                         FetchConsumer fcx = fcRef.get();
                         ConsumerInfo ci = fcx.getConsumerInfo();
                         Debug.info("FETCH", fcx.isStopped(), fcx.isFinished(), "Pending %s", ci.getNumPending(),
