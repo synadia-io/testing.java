@@ -522,12 +522,14 @@ public class JsMulti {
                 }
                 Message m = fcRef.get().nextMessage();
                 if (m == null) {
-                    FetchConsumer fcx = fcRef.get();
-                    ConsumerInfo ci = fcx.getConsumerInfo();
-                    Debug.info("FETCH", fcx.isStopped(), fcx.isFinished(), "Pending %s", ci.getNumPending(),
-                        "Ack Pending %s", ci.getNumAckPending(),
-                        "Waiting %s", ci.getNumWaiting()
-                    );
+                    if (HOLDING) {
+                        FetchConsumer fcx = fcRef.get();
+                        ConsumerInfo ci = fcx.getConsumerInfo();
+                        Debug.info("FETCH", fcx.isStopped(), fcx.isFinished(), "Pending %s", ci.getNumPending(),
+                            "Ack Pending %s", ci.getNumAckPending(),
+                            "Waiting %s", ci.getNumWaiting()
+                        );
+                    }
                     fcRef.set(null);
                 }
                 return m;
