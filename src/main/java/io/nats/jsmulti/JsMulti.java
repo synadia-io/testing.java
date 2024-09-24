@@ -21,6 +21,7 @@ import io.nats.jsmulti.settings.Action;
 import io.nats.jsmulti.settings.Arguments;
 import io.nats.jsmulti.settings.Context;
 import io.nats.jsmulti.shared.*;
+import io.synadia.utils.Debug;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -518,6 +519,12 @@ public class JsMulti {
                 }
                 Message m = fcRef.get().nextMessage();
                 if (m == null) {
+                    FetchConsumer fcx = fcRef.get();
+                    ConsumerInfo ci = fcx.getConsumerInfo();
+                    Debug.info("FETCH", fcx.isStopped(), fcx.isFinished(), "Pending %s", ci.getNumPending(),
+                        "Ack Pending %s", ci.getNumAckPending(),
+                        "Waiting %s", ci.getNumWaiting()
+                    );
                     fcRef.set(null);
                 }
                 return m;

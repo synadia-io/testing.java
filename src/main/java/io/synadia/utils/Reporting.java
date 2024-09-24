@@ -67,7 +67,8 @@ public abstract class Reporting {
         System.out.println();
     }
 
-    public static void printStats(Collection<ParsedEntry> collection) {
+    public static boolean printStats(Collection<ParsedEntry> collection) {
+        boolean anyNewData = false;
         List<ParsedEntry> list = new ArrayList<>(collection);
         ParsedEntry.sort(list);
 
@@ -78,6 +79,7 @@ public abstract class Reporting {
         Stats totalStats = new Stats();
         for (ParsedEntry p : list) {
             boolean alreadyReported = p.reported;
+            anyNewData = anyNewData || !alreadyReported;
             p.reported = true;
             Stats stats = (Stats)p.target;
             String mark = p.statType + p.contextId;
@@ -100,9 +102,12 @@ public abstract class Reporting {
         System.out.println(STATS_SEP_LINE);
         statsLineReport("Total", totalStats);
         System.out.println(STATS_FOOT_LINE);
+
+        return anyNewData;
     }
 
-    public static void printProfileStats(Collection<ParsedEntry> collection) {
+    public static boolean printProfileStats(Collection<ParsedEntry> collection) {
+        boolean anyNewData = false;
         List<ParsedEntry> list = new ArrayList<>(collection);
         ParsedEntry.sort(list);
 
@@ -114,6 +119,7 @@ public abstract class Reporting {
         for (ParsedEntry p : list) {
             ProfileStats ps = (ProfileStats) p.target;
             boolean alreadyReported = p.reported;
+            anyNewData = anyNewData || !alreadyReported;
             p.reported = true;
             String mark = p.statType;
             if (lastMark == null) {
@@ -126,5 +132,6 @@ public abstract class Reporting {
             profileLineReport(p.label + (alreadyReported ? "" : "*"), ps);
         }
         System.out.println(PROFILE_FOOT_LINE);
+        return anyNewData;
     }
 }

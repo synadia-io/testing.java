@@ -80,8 +80,8 @@ public class Watch extends Workload {
         }
 
         @Override
-        void report(Collection<ParsedEntry> peMapValues) {
-            printStats(peMapValues);
+        boolean report(Collection<ParsedEntry> peMapValues) {
+            return printStats(peMapValues);
         }
     }
 
@@ -96,8 +96,8 @@ public class Watch extends Workload {
         }
 
         @Override
-        void report(Collection<ParsedEntry> peMapValues) {
-            printProfileStats(peMapValues);
+        boolean report(Collection<ParsedEntry> peMapValues) {
+            return printProfileStats(peMapValues);
         }
     }
 
@@ -105,7 +105,7 @@ public class Watch extends Workload {
         protected Map<String, ParsedEntry> peMap;
         private final boolean targetContextOnly;
         private final ReentrantLock rwLock;
-        private boolean changed = false;
+        private boolean reportNextTime = false;
         private boolean waiting = false;
 
         public WtWatcher(boolean targetContextOnly) {
@@ -115,14 +115,14 @@ public class Watch extends Workload {
         }
 
         abstract Object extractTarget(JsonValue pjv);
-        abstract void report(Collection<ParsedEntry> collection);
+        abstract boolean report(Collection<ParsedEntry> collection);
 
         @Override
         public void watch(KeyValueEntry kve) {
             try {
                 rwLock.lock();
                 try {
-                    changed = true;
+                    reportNextTime = true;
                     ParsedEntry p = new ParsedEntry(kve);
                     p.targetAndLabel(extractTarget(p.jv), targetContextOnly);
                     peMap.put(p.label, p);
@@ -143,12 +143,11 @@ public class Watch extends Workload {
         void report() {
             rwLock.lock();
             try {
-                if (changed) {
-                    changed = false;
+                if (reportNextTime) {
                     if (waiting) {
                         endWait();
                     }
-                    report(peMap.values());
+                    reportNextTime = report(peMap.values());
                 }
                 else {
                     waiting = true;
