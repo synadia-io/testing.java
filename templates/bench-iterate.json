@@ -1,0 +1,13 @@
+{
+  "multi_config": {
+    "server": "<Bootstrap>",
+    "subject": "<TestingStreamSubject>",
+    "action": "SubIterate",
+    "message_count": 1000000,
+    "threads": 1,
+    "batch_size": 100,
+    "connection_strategy": "individual",
+    "report_frequency": 50000,
+    "options_factory_class_name": "io.synadia.utils.VirtualExecutorOptionsFactory"
+  }
+}

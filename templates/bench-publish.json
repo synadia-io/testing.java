@@ -1,0 +1,14 @@
+{
+  "multi_config": {
+    "server": "<Bootstrap>",
+    "subject": "<TestingStreamSubject>",
+    "action": "PubAsync",
+    "message_count": 1000000,
+    "payload_size": 1000,
+    "threads": 1,
+    "connection_strategy": "individual",
+    "report_frequency": 50000,
+    "round_size": 100,
+    "options_factory_class_name": "io.synadia.utils.VirtualExecutorOptionsFactory"
+  }
+}
