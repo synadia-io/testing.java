@@ -1,8 +1,11 @@
-package io.synadia;
+package io.synadia.workloads;
 
 import io.nats.jsmulti.JsMulti;
 import io.nats.jsmulti.settings.Arguments;
 import io.nats.jsmulti.settings.Context;
+import io.synadia.CommandLine;
+import io.synadia.TestingApplication;
+import io.synadia.Workload;
 
 public class Multi extends Workload {
     public Multi(CommandLine commandLine) {
