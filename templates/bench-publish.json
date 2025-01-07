@@ -3,7 +3,7 @@
     "server": "<Bootstrap>",
     "subject": "<TestingStreamSubject>",
     "action": "PubAsync",
-    "message_count": 1000000,
+    "message_count": 5000000,
     "payload_size": 1000,
     "threads": 1,
     "connection_strategy": "individual",
