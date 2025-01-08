@@ -8,10 +8,7 @@ import io.nats.jsmulti.shared.Stats;
 import io.synadia.ParsedEntry;
 
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 
 public abstract class Reporting {
 
@@ -68,12 +65,21 @@ public abstract class Reporting {
     }
 
     public static boolean printStats(Collection<ParsedEntry> collection) {
-        boolean anyNewData = false;
+        return printStats(collection, false);
+    }
+
+    public static boolean printStats(Collection<ParsedEntry> collection, boolean summary) {
         List<ParsedEntry> list = new ArrayList<>(collection);
         ParsedEntry.sort(list);
 
+        boolean anyNewData = false;
         String date = FORMATTER.format(new Date());
         startNewReport();
+
+        if (summary) {
+            System.out.println(STATS_TOP_LINE);
+            System.out.printf(STATS_LINE_HEADER, "");
+        }
 
         String lastMark = null;
         Stats totalStats = new Stats();
@@ -83,27 +89,53 @@ public abstract class Reporting {
             p.reported = true;
             Stats stats = (Stats)p.target;
             String mark = p.statType + p.contextId;
-            if (!mark.equals(lastMark)){
-                if (lastMark != null) {
-                    System.out.println(STATS_SEP_LINE);
-                    statsLineReport("Total", totalStats);
-                    System.out.println(STATS_FOOT_LINE);
-                    totalStats = new Stats();
-                }
-                lastMark = mark;
-                System.out.println(STATS_TOP_LINE);
-                System.out.printf(STATS_LINE_HEADER, date);
+            if (summary) {
                 System.out.println(STATS_SEP_LINE);
+                statsLineReport(p.label, stats);
             }
-            Stats.totalOne(stats, totalStats);
-            statsLineReport(p.label + (alreadyReported ? "" : "*"), stats);
+            else {
+                if (!mark.equals(lastMark)) {
+                    if (lastMark != null) {
+                        System.out.println(STATS_SEP_LINE);
+                        statsLineReport("Total", totalStats);
+                        System.out.println(STATS_FOOT_LINE);
+                        totalStats = new Stats();
+                    }
+                    lastMark = mark;
+                    System.out.println(STATS_TOP_LINE);
+                    System.out.printf(STATS_LINE_HEADER, date);
+                    System.out.println(STATS_SEP_LINE);
+                }
+                Stats.totalOne(stats, totalStats);
+                statsLineReport(p.label + (alreadyReported ? "" : "*"), stats);
+            }
         }
 
-        System.out.println(STATS_SEP_LINE);
-        statsLineReport("Total", totalStats);
-        System.out.println(STATS_FOOT_LINE);
+        if (summary) {
+            System.out.println(STATS_FOOT_LINE);
+        }
+        else {
+            System.out.println(STATS_SEP_LINE);
+            statsLineReport("Total", totalStats);
+            System.out.println(STATS_FOOT_LINE);
+        }
 
         return anyNewData;
+    }
+
+    public static boolean summarizeStats(Collection<ParsedEntry> collection) {
+        Map<String, List<Stats>> map = new HashMap<>();
+        for (ParsedEntry p : collection) {
+            String key = p.statType;
+            List<Stats> list = map.computeIfAbsent(key, k -> new ArrayList<>());
+            list.add(new Stats(p.jv));
+        }
+        List<ParsedEntry> newCollection = new ArrayList<>();
+        for (Map.Entry<String, List<Stats>> entry : map.entrySet()) {
+            Stats merged = Stats.merge(entry.getValue());
+            newCollection.add(new ParsedEntry(merged, entry.getKey()));
+        }
+        return printStats(newCollection, true);
     }
 
     public static boolean printProfileStats(Collection<ParsedEntry> collection) {

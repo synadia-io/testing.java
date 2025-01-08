@@ -4,6 +4,7 @@ import io.nats.client.api.KeyValueEntry;
 import io.nats.client.support.JsonParseException;
 import io.nats.client.support.JsonParser;
 import io.nats.client.support.JsonValue;
+import io.nats.jsmulti.shared.Stats;
 
 import java.util.Comparator;
 import java.util.HashMap;
@@ -44,6 +45,29 @@ public class ParsedEntry {
         statId = parts.length == 3 ? parts[2] : "";
     }
 
+    public ParsedEntry(Stats stats, String statType) {
+        key = null;
+        value = null;
+        target = stats;
+        label = statType;
+        reported = true;
+
+        Map<String, JsonValue> map = stats.toJsonValueMap();
+        jv = new JsonValue(map);
+
+        JsonValue jvFinal = jv.map.get(FINAL);
+        if (jvFinal == null) {
+            fin = false;
+        }
+        else {
+            fin = jvFinal.bool != null && jvFinal.bool;
+        }
+
+        this.statType = statType;
+        contextId = "";
+        statId = null;
+    }
+
     static final AtomicInteger CONTEXT_ID = new AtomicInteger(0);
     static final Map<String, Integer> idByContext = new HashMap<>();
     static final Map<Integer, Map<String, Integer>> statIdsForContext = new HashMap<>();
@@ -79,5 +103,21 @@ public class ParsedEntry {
 
     public static void sort(List<ParsedEntry> list) {
         list.sort(Comparator.comparing(p -> p.label));
+    }
+
+    @Override
+    public String toString() {
+        return "ParsedEntry{" +
+            "key='" + key + '\'' +
+            ", value=" + (value == null ? "null" : new String(value)) +
+            ", jv=" + jv +
+            ", fin=" + fin +
+            ", statType='" + statType + '\'' +
+            ", contextId='" + contextId + '\'' +
+            ", statId='" + statId + '\'' +
+            ", label='" + label + '\'' +
+            ", target=" + target +
+            ", reported=" + reported +
+            '}';
     }
 }

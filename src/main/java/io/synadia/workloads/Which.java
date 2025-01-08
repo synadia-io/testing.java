@@ -6,6 +6,7 @@ public enum Which {
 
     Stats(WATCH),
     Profile(WATCH),
+    ReportStats(WATCH),
     Tracking(SETUP),
     Testing(SETUP),
     Save(SETUP),

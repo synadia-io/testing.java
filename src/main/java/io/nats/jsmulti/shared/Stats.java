@@ -384,6 +384,36 @@ public class Stats {
         total.minMessageFullElapsed = Math.min(total.minMessageFullElapsed, stats.minMessageFullElapsed);
     }
 
+    public static Stats merge(List<Stats> statList) {
+        Stats merge = new Stats();
+        for (Stats stats : statList) {
+            merge(stats, merge);
+        }
+        return merge;
+    }
+
+    public static void merge(Stats stats, Stats merge) {
+        merge.elapsed += stats.elapsed;
+        merge.messageCount += stats.messageCount;
+        merge.bytes += stats.bytes;
+
+        merge.messagePubToServerTimeElapsed += stats.messagePubToServerTimeElapsed;
+        merge.messageServerToReceiverElapsed += stats.messageServerToReceiverElapsed;
+        merge.messageFullElapsed += stats.messageFullElapsed;
+
+        merge.messagePubToServerTimeElapsedForAverage += stats.messagePubToServerTimeElapsed;
+        merge.messageServerToReceiverElapsedForAverage += stats.messageServerToReceiverElapsed;
+        merge.messageFullElapsedForAverage += stats.messageFullElapsed;
+
+        merge.maxMessagePubToServerTimeElapsed += stats.maxMessagePubToServerTimeElapsed;
+        merge.maxMessageServerToReceiverElapsed += stats.maxMessageServerToReceiverElapsed;
+        merge.maxMessageFullElapsed += stats.maxMessageFullElapsed;
+
+        merge.minMessagePubToServerTimeElapsed += stats.minMessagePubToServerTimeElapsed;
+        merge.minMessageServerToReceiverElapsed += stats.minMessageServerToReceiverElapsed;
+        merge.minMessageFullElapsed += stats.minMessageFullElapsed;
+    }
+
     public static void report(List<Stats> statList) {
         report(statList, System.out);
     }

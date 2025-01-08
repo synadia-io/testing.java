@@ -27,22 +27,22 @@ import static io.synadia.utils.Reporting.*;
 
 public class Watch extends Workload {
 
-    enum Watches { Stats, Profile }
-
     private final Which which;
     private final String bucket;
 
     public Watch(CommandLine commandLine) {
         super(commandLine.action, commandLine);
         this.which = Which.instance(WATCH, commandLine.action);
-        if (which == Which.Stats) {
-            bucket = params.statsBucket;
-        }
-        else if (which == Which.Profile) {
-            bucket = params.profileBucket;
-        }
-        else {
-            throw new RuntimeException("Watch not implemented: " + commandLine.workload);
+        switch (which){
+            case Stats:
+            case ReportStats:
+                bucket = params.statsBucket;
+                break;
+            case Profile:
+                bucket = params.profileBucket;
+                break;
+            default:
+                throw new RuntimeException("Watch not implemented: " + commandLine.workload);
         }
     }
 
@@ -51,14 +51,18 @@ public class Watch extends Workload {
         Options options = getAdminOptions();
         try (Connection nc = Nats.connect(options)) {
             KeyValue kv = nc.keyValue(bucket);
-            WtWatcher watcher;
-            if (which == Which.Stats) {
-                watcher = new StatsWatcher();
-            }
-            else {
-                watcher = new ProfileWatcher();
-            }
+            WtWatcher watcher = switch (which) {
+                case Stats -> new StatsWatcher();
+                case ReportStats -> new ReportWatcher();
+                case Profile -> new ProfileWatcher();
+                default -> throw new RuntimeException("Watch not implemented: " + commandLine.workload);
+            };
             kv.watchAll(watcher);
+
+            if (which == Which.ReportStats) {
+                watcher.report();
+                return;
+            }
 
             //noinspection InfiniteLoopStatement
             while (true) {
@@ -82,6 +86,22 @@ public class Watch extends Workload {
         @Override
         boolean report(Collection<ParsedEntry> peMapValues) {
             return printStats(peMapValues);
+        }
+    }
+
+    class ReportWatcher extends WtWatcher {
+        public ReportWatcher() {
+            super(false);
+        }
+
+        @Override
+        Object extractTarget(JsonValue pjv) {
+            return new Stats(pjv);
+        }
+
+        @Override
+        boolean report(Collection<ParsedEntry> peMapValues) {
+            return summarizeStats(peMapValues);
         }
     }
 
