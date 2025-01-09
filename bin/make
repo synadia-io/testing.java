@@ -1,1 +1,2 @@
 gradle make
+ls -la build/libs/jnats* | egrep -o "build.*"

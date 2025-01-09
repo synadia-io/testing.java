@@ -39,6 +39,7 @@ public class Params {
     public final String saveStreamName;
     public final String saveStreamSubject;
     public final long watchWaitTime;
+    public final boolean trackProfile;
 
     public Params(List<String> paramsFiles) {
         this(readParamsFiles(paramsFiles));
@@ -66,6 +67,7 @@ public class Params {
         saveStreamName = readString(jv, "save_stream_name");
         saveStreamSubject = readString(jv, "save_stream_subject");
         watchWaitTime = readLong(jv, "watch_wait_time", 5000);
+        trackProfile = readBoolean(jv, "track_profile", false);
     }
 
     public String toJson() {

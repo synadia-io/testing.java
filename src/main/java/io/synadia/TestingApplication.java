@@ -77,20 +77,25 @@ public class TestingApplication implements Application, AutoCloseable {
         JsonValue jv = new JsonValue(map);
         byte[] statsData = jv.toJson().getBytes(StandardCharsets.US_ASCII);
 
-        ProfileStats ps = new ProfileStats(ctx.id, stats.action);
-        map = ps.toJsonValueMap();
-        map.put(TIME, sTime);
-        map.put(TIME_MS, jvTime);
-        jv = new JsonValue(map);
-        byte[] profileData = jv.toJson().getBytes(StandardCharsets.US_ASCII);
+        byte[] profileData;
+        if (workload.params.trackProfile) {
+            ProfileStats ps = new ProfileStats(ctx.id, stats.action);
+            map = ps.toJsonValueMap();
+            map.put(TIME, sTime);
+            map.put(TIME_MS, jvTime);
+            jv = new JsonValue(map);
+            profileData = jv.toJson().getBytes(StandardCharsets.US_ASCII);
+        }
+        else {
+            profileData = null;
+        }
 
         if (statsAreFinal) {
             publish(key, statsData, profileData);
         }
         else {
-            nc.getOptions().getExecutor().submit(() -> {
-                publish(key, statsData, profileData);
-            });
+            nc.getOptions().getExecutor().submit(
+                () -> publish(key, statsData, profileData));
         }
     }
 
