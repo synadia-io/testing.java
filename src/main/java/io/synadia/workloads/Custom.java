@@ -45,7 +45,7 @@ public class Custom extends Workload {
 
     static String SUBJECT;
 
-    static class CustomPublish implements ActionRunner {
+    public static class CustomPublish implements ActionRunner {
         @Override
         public void run(Context ctx, Connection nc, Stats stats, int id) throws Exception {
             final JetStream js = nc.jetStream(ctx.getJetStreamOptions());
