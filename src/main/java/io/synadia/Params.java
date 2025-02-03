@@ -10,7 +10,9 @@ import io.synadia.utils.Debug;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static io.nats.client.support.JsonValueUtils.*;
 import static io.synadia.utils.Constants.OS_UNIX;
@@ -40,6 +42,8 @@ public class Params {
     public final String saveStreamSubject;
     public final long watchWaitTime;
     public final boolean trackProfile;
+    public final String custom;
+    public final Map<String, String> customMap;
 
     public Params(List<String> paramsFiles) {
         this(readParamsFiles(paramsFiles));
@@ -68,6 +72,44 @@ public class Params {
         saveStreamSubject = readString(jv, "save_stream_subject");
         watchWaitTime = readLong(jv, "watch_wait_time", 5000);
         trackProfile = readBoolean(jv, "track_profile", false);
+        custom = readString(jv, "custom");
+        customMap = new HashMap<>();
+        String[] split = custom.split(",");
+        for (String s : split) {
+            String[] split2 = s.split("=");
+            customMap.put(split2[0], split2[1]);
+        }
+    }
+
+    public String customString(String key) {
+        return customMap.get(key);
+    }
+
+    public String customString(String key, String dflt) {
+        String s = customMap.get(key);
+        return s == null ? dflt : s;
+    }
+
+    public int customInt(String key) {
+        return customInt(key, -1);
+    }
+
+    public int customInt(String key, int dflt) {
+        String value = customString(key);
+        return value == null ? dflt : Integer.parseInt(value);
+    }
+
+    public long customLong(String key) {
+        return customLong(key, -1);
+    }
+
+    public long customLong(String key, long dflt) {
+        String value = customString(key);
+        return value == null ? dflt : Long.parseLong(value);
+    }
+
+    public boolean customBoolean(String key) {
+        return "true".equalsIgnoreCase(customString(key));
     }
 
     public String toJson() {
@@ -111,6 +153,8 @@ public class Params {
         _debug("saveStreamSubject", saveStreamSubject);
 
         _debug("watchWaitTime", watchWaitTime);
+        _debug("trackProfile", trackProfile);
+        _debug("custom", custom);
     }
 
     private void _debug(String name, Object value) {

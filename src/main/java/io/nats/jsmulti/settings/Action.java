@@ -18,6 +18,7 @@ public enum Action {
     PUB_ASYNC(           "PubAsync",            true,  false, false, false, false),
     PUB_CORE(            "PubCore",             true,  true,  false, false, false),
     PUB(                 "Pub",                 true,  true,  true,  false, false),
+    PUB_CUSTOM(          "PubCustom",           true,  false, false, false, false),
 
     REQUEST(             "Request",             true,  true,  true,  false, false),
     // REQUEST_ASYNC(       "RequestAsync",        true,  false, true,  false),
@@ -42,7 +43,7 @@ public enum Action {
     // SUB_CONSUME_QUEUE(   "SubConsumeQueue",     false, false, false, false, true),
 
     RTT(                 "RTT",                 true,  true,  true,  false, false),
-    CUSTOM(              "CUSTOM",              false, false, false, false, false);
+    CUSTOM(              "Custom",              false, false, false, false, false);
 
     private final String label;
     private final boolean pubAction;

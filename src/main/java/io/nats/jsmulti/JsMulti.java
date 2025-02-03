@@ -21,7 +21,6 @@ import io.nats.jsmulti.settings.Action;
 import io.nats.jsmulti.settings.Arguments;
 import io.nats.jsmulti.settings.Context;
 import io.nats.jsmulti.shared.*;
-import io.synadia.utils.Debug;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -444,7 +443,6 @@ public class JsMulti {
         _jsSyncConsume(ctx, stats, durable, () -> sub.nextMessage(ctx.readTimeoutDuration));
     }
 
-    private static int HOLDING = 0;
     private static void _jsSyncConsume(Context ctx, Stats stats, String durable, SyncConsumer syncConsumer) throws Exception {
         long rcvd = 0;
         Message lastUnAcked = null;
@@ -459,7 +457,6 @@ public class JsMulti {
             long hold = stats.elapsed();
             long received = System.currentTimeMillis();
             if (m == null) {
-                HOLDING++;
                 noMessageTotalElapsed += hold;
                 if (noMessageTotalElapsed > ctx.readMaxWaitDuration.toMillis()) {
                     report(ctx, rcvd, "Stopped At Max Wait, Finished Reading Messages");
@@ -468,7 +465,6 @@ public class JsMulti {
                 acceptHoldOnceStarted(stats, rcvd, hold, ctx);
             }
             else {
-                HOLDING = 0;
                 noMessageTotalElapsed = 0;
                 stats.manualElapsed(hold);
                 stats.count(m, received);
@@ -516,7 +512,6 @@ public class JsMulti {
         if (ctx.action == Action.SUB_FETCH || ctx.action == Action.SUB_FETCH_QUEUE) {
             FetchConsumeOptions opts = FetchConsumeOptions.builder().maxMessages(ctx.batchSize).build();
             AtomicReference<FetchConsumer> fcRef = new AtomicReference<>();
-            AtomicLong lastHolding = new AtomicLong();
             _jsSyncConsume(ctx, stats, durable, () -> {
                 if (fcRef.get() == null) {
                     FetchConsumer fc = cc.fetch(opts);
@@ -524,19 +519,7 @@ public class JsMulti {
                 }
                 Message m = fcRef.get().nextMessage();
                 if (m == null) {
-                    if (HOLDING > lastHolding.get()) {
-                        lastHolding.set(HOLDING);
-                        FetchConsumer fcx = fcRef.get();
-                        ConsumerInfo ci = fcx.getConsumerInfo();
-                        Debug.info("FETCH", fcx.isStopped(), fcx.isFinished(), "Pending %s", ci.getNumPending(),
-                            "Ack Pending %s", ci.getNumAckPending(),
-                            "Waiting %s", ci.getNumWaiting()
-                        );
-                    }
                     fcRef.set(null);
-                }
-                else {
-                    lastHolding.set(0);
                 }
                 return m;
             });

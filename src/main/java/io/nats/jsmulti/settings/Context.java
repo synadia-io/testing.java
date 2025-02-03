@@ -121,7 +121,7 @@ public class Context {
         return connect(OptionsFactory.OptionsType.DEFAULT);
     }
 
-    public Connection connect( OptionsFactory.OptionsType ot) throws Exception {
+    public Connection connect(OptionsFactory.OptionsType ot) throws Exception {
         Options options = getOptions(ot);
         Connection nc = Nats.connect(options);
         for (long x = 0; x < 100; x++) { // waits up to 10 seconds (100 * 100 = 10000) millis to be connected

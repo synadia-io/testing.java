@@ -163,6 +163,10 @@ public class Arguments {
         return add("of", optionsFactoryClassName);
     }
 
+    public Arguments customPublishFactory(String customPublishFactoryClassName) {
+        return add("cpf", customPublishFactoryClassName);
+    }
+
     public Arguments reportFrequency(int reportFrequency) {
         return add("rf", reportFrequency);
     }

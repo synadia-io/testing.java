@@ -1,0 +1,14 @@
+{
+  "multi_config": {
+    "server": "<Bootstrap>",
+    "subject": "<TestingStreamSubject>",
+    "action": "Custom",
+    "message_count": 10000000,
+    "payload_size": 5000000,
+    "threads": 1,
+    "connection_strategy": "individual",
+    "report_frequency": 50000,
+    "options_factory_class_name": "io.synadia.utils.VirtualExecutorOptionsFactory"
+  },
+  "custom": "compression=false,gzip=true,cleanup=100"
+}
