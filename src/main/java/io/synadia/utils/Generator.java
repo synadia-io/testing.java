@@ -232,7 +232,9 @@ public class Generator {
         // parse the aws json
         JsonValue jv = JsonParser.parse(Files.readAllBytes(Paths.get("aws.json")));
         for (JsonValue jvRes : jv.map.get("Reservations").array) {
+            System.out.println("Reservations: " + jvRes.map.size());
             for (JsonValue jvInstance : jvRes.map.get("Instances").array) {
+                System.out.println("Instances: " + jvInstance.map.size());
                 Instance instance = new Instance(jvInstance, cfg.natsPort);
                 if (instance.name.contains(cfg.serverFilter)) {
                     heading("server " + instance.name + " [" + instance.stateName + "]");
