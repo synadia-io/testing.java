@@ -119,7 +119,7 @@ public class Arguments {
 
     @SuppressWarnings("rawtypes")
     public Arguments customAction(Class clazz) {
-        return add("ca", clazz.getCanonicalName());
+        return add("ca", clazz.getTypeName());
     }
 
     public Arguments appClass(String customAppClass) {
