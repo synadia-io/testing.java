@@ -30,6 +30,9 @@ public class Runner {
             case "chartProfile":
                 workload = new ChartProfile(commandLine);
                 break;
+            case "custom":
+                workload = new Custom(commandLine);
+                break;
             default:
                 Debug.info("Runner", "Workload not implemented: " + commandLine.workload);
                 break;
