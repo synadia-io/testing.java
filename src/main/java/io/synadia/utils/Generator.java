@@ -232,29 +232,32 @@ public class Generator {
         // parse the aws json
         JsonValue jv = JsonParser.parse(Files.readAllBytes(Paths.get("aws.json")));
         for (JsonValue jvRes : jv.map.get("Reservations").array) {
-            System.out.println("Reservations: " + jvRes.map.size());
             for (JsonValue jvInstance : jvRes.map.get("Instances").array) {
-                System.out.println("Instances: " + jvInstance.map.size());
                 Instance instance = new Instance(jvInstance, cfg.natsPort);
-                if (instance.name.contains(cfg.serverFilter)) {
-                    heading("server " + instance.name + " [" + instance.stateName + "]");
-                    if (instance.isRunning()) {
-                        calc.runningServers.add(instance);
-                    }
-                }
-                else if (instance.name.contains(cfg.clientFilter)) {
-                    try {
-                        heading("client " + instance.name + " [" + instance.stateName + "]");
+                try {
+                    if (instance.name.contains(cfg.serverFilter)) {
+                        heading("server " + instance.name + " [" + instance.stateName + "]");
                         if (instance.isRunning()) {
-                            String ssh = printSsh(instance, cfg);
-                            if (ssh != null) {
-                                String repl = SSH_PREFIX + (++calc.clients) + TAG_END;
-                                calc.startSshTemplate = calc.startSshTemplate.replace(repl, ssh);
-                            }
+                            calc.runningServers.add(instance);
                         }
                     }
-                    catch (Exception ignore) {
+                    else if (instance.name.contains(cfg.clientFilter)) {
+                        try {
+                            heading("client " + instance.name + " [" + instance.stateName + "]");
+                            if (instance.isRunning()) {
+                                String ssh = printSsh(instance, cfg);
+                                if (ssh != null) {
+                                    String repl = SSH_PREFIX + (++calc.clients) + TAG_END;
+                                    calc.startSshTemplate = calc.startSshTemplate.replace(repl, ssh);
+                                }
+                            }
+                        }
+                        catch (Exception ignore) {
+                        }
                     }
+                }
+                catch (Exception e) {
+                    System.out.println("Instance Ignored, InstanceId: " + jvInstance.map.get("InstanceId"));
                 }
             }
         }
