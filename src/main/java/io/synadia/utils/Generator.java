@@ -233,8 +233,8 @@ public class Generator {
         JsonValue jv = JsonParser.parse(Files.readAllBytes(Paths.get("aws.json")));
         for (JsonValue jvRes : jv.map.get("Reservations").array) {
             for (JsonValue jvInstance : jvRes.map.get("Instances").array) {
-                Instance instance = new Instance(jvInstance, cfg.natsPort);
                 try {
+                    Instance instance = new Instance(jvInstance, cfg.natsPort);
                     if (instance.name.contains(cfg.serverFilter)) {
                         heading("server " + instance.name + " [" + instance.stateName + "]");
                         if (instance.isRunning()) {
