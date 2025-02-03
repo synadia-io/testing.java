@@ -28,7 +28,10 @@ public class Custom extends Workload {
 
         SUBJECT = params.testingStreamSubject;
 
-        a.customAction(CustomPublish.class);
+        if ("publish".equals(params.customString("which"))) {
+            a.customAction(CustomPublish.class);
+        }
+
         for (int i = 0; i < a.args.size(); i++) {
             String k = a.args.get(i);
             String v = a.args.get(++i);
