@@ -3,6 +3,7 @@ package io.synadia.utils;
 import io.nats.client.support.JsonParser;
 import io.nats.client.support.JsonValue;
 import io.nats.client.support.JsonValueUtils;
+import io.nats.jsmulti.shared.WarningException;
 import io.synadia.workloads.Which;
 
 import java.io.File;
@@ -256,8 +257,9 @@ public class Generator {
                         }
                     }
                 }
+                catch (WarningException ignore) {}
                 catch (Exception e) {
-                    System.out.println("Instance Ignored, InstanceId: " + jvInstance.map.get("InstanceId"));
+                    System.out.println(e.getMessage());
                 }
             }
         }
@@ -274,7 +276,21 @@ public class Generator {
 
         // aws
         public Instance(JsonValue jv, String port) {
-            this.name = jv.map.get("Tags").array.getFirst().map.get("Value").string;
+            JsonValue jvTags = jv.map.get("Tags");
+            if (jvTags == null) {
+                throw new WarningException("Invalid Instance, Ignore");
+            }
+            String temp = null;
+            for (JsonValue jvTag : jvTags.array) {
+                String key = JsonValueUtils.readString(jvTag, "Key");
+                if ("Name".equals(key)) {
+                    temp = JsonValueUtils.readString(jvTag, "Value");
+                }
+            }
+            if (temp == null) {
+                throw new WarningException("Invalid Instance, Ignore");
+            }
+            this.name = temp;
             this.publicDnsName = JsonValueUtils.readString(jv, "PublicDnsName", "Undefined");
             this.privateIpAddr = JsonValueUtils.readString(jv, "PrivateIpAddress", "Undefined");
             this.publicIpAddr = JsonValueUtils.readString(jv, "PublicIpAddress", "Undefined");
