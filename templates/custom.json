@@ -3,12 +3,13 @@
     "server": "<Bootstrap>",
     "subject": "<TestingStreamSubject>",
     "action": "Custom",
-    "message_count": 1000,
-    "payload_size": 5000000,
+    "message_count": 10000,
+    "payload_size": 1000,
     "threads": 1,
     "connection_strategy": "individual",
-    "report_frequency": 50000,
-    "options_factory_class_name": "io.synadia.utils.VirtualExecutorOptionsFactory"
+    "report_frequency": 100,
+    "options_factory_class_name": "io.synadia.utils.VirtualExecutorOptionsFactory",
+    "jitter": 1500
   },
-  "custom": "which=publish"
+  "custom": "which=consumers,prefix=spike-consumer"
 }

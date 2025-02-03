@@ -1,7 +1,8 @@
 package io.synadia.workloads;
 
 import io.nats.client.Connection;
-import io.nats.client.JetStream;
+import io.nats.client.JetStreamManagement;
+import io.nats.client.api.ConsumerConfiguration;
 import io.nats.jsmulti.JsMulti;
 import io.nats.jsmulti.settings.Arguments;
 import io.nats.jsmulti.settings.Context;
@@ -26,10 +27,12 @@ public class Custom extends Workload {
         Arguments a = Arguments.instance().addJsonConfig(params.jvMultiConfig.toJson());
         a.appClass(TestingApplication.class);
 
+        STREAM = params.testingStreamName;
         SUBJECT = params.testingStreamSubject;
 
-        if ("publish".equals(params.customString("which"))) {
-            a.customAction(CustomPublish.class);
+        if ("consumers".equals(params.customString("which"))) {
+            a.customAction(CustomConsumers.class);
+            PREFIX = params.customString("prefix");
         }
 
         for (int i = 0; i < a.args.size(); i++) {
@@ -43,24 +46,30 @@ public class Custom extends Workload {
         JsMulti.run(ctx);
     }
 
+    static String STREAM;
     static String SUBJECT;
+    static String PREFIX;
 
-    public static class CustomPublish implements ActionRunner {
+    public static class CustomConsumers implements ActionRunner {
         @Override
         public void run(Context ctx, Connection nc, Stats stats, int id) throws Exception {
-            final JetStream js = nc.jetStream(ctx.getJetStreamOptions());
-            long pubTarget = ctx.getPubCount(id);
-            long published = 0;
+            final JetStreamManagement jsm = nc.jetStreamManagement(ctx.getJetStreamOptions());
+            long consumerCount = ctx.getPubCount(id);
+            long consumers = 0;
             long unReported = 0;
-            report(ctx, published, "Begin Custom Publish Run");
-            while (published < pubTarget) {
+            report(ctx, consumers, "Begin Custom Consumers Run");
+            while (consumers < consumerCount) {
                 jitter(ctx);
-                byte[] payload = ctx.getPayload();
-                js.publish(SUBJECT, payload);
+                stats.start();
+                ConsumerConfiguration config = ConsumerConfiguration.builder()
+                    .durable(PREFIX + (consumers + 1))
+                    .filterSubject(SUBJECT)
+                    .build();
+                jsm.createConsumer(STREAM, config);
                 stats.stopAndCount(ctx.payloadSize);
-                unReported = reportAndTrackMaybe(ctx, ++published, ++unReported, "Custom", stats);
+                unReported = reportAndTrackMaybe(ctx, ++consumers, ++unReported, "Custom Consumers", stats);
             }
-            report(ctx, published, "Completed Custom Publish Run");
+            report(ctx, consumers, "Completed Custom Consumers Run");
         }
     }
 }
