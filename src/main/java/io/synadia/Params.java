@@ -74,10 +74,18 @@ public class Params {
         trackProfile = readBoolean(jv, "track_profile", false);
         custom = readString(jv, "custom");
         customMap = new HashMap<>();
-        String[] split = custom.split(",");
-        for (String s : split) {
-            String[] split2 = s.split("=");
-            customMap.put(split2[0], split2[1]);
+        if (custom != null) {
+            try {
+                String[] split = custom.split(",");
+                for (String s : split) {
+                    try {
+                        String[] split2 = s.split("=");
+                        customMap.put(split2[0], split2[1]);
+                    }
+                    catch (Exception ignore) {}
+                }
+            }
+            catch (Exception ignore) {}
         }
     }
 
