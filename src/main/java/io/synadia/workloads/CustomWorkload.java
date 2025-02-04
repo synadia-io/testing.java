@@ -34,7 +34,7 @@ public class CustomWorkload extends Workload {
         try (Connection nc = Nats.connect(getAdminOptions())) {
             String arg = commandLine.args.getFirst();
             switch (arg) {
-                default -> System.out.println("Custom Workload unknown [" + arg + "]. Choose 'stream', 'messages', 'consumers', 'info'");
+                default -> System.out.println("Custom Workload unknown [" + arg + "]. Choose 'stream', 'messages', 'create', 'list', 'clear', 'info'");
                 case "stream" -> {
                     System.out.println("Custom Workload - Stream");
                     JetStreamManagement jsm = nc.jetStreamManagement();
@@ -66,7 +66,7 @@ public class CustomWorkload extends Workload {
                         System.out.println(count);
                     }
                 }
-                case "consumers" -> {
+                case "create" -> {
                     System.out.println("Custom Workload - Create Consumers");
                     JetStreamManagement jsm = nc.jetStreamManagement();
                     for (int i = 0; i < CONSUMER_COUNT; i++) {
@@ -86,6 +86,14 @@ public class CustomWorkload extends Workload {
                     List<String> list = jsm.getConsumerNames(STREAM_NAME);
                     list.forEach(System.out::println);
                     System.out.println(list.size());
+                }
+                case "clear" -> {
+                    System.out.println("Custom Workload - Clear Consumers");
+                    JetStreamManagement jsm = nc.jetStreamManagement();
+                    List<String> list = jsm.getConsumerNames(STREAM_NAME);
+                    for (String cn : list) {
+                        jsm.deleteConsumer(STREAM_NAME, cn);
+                    }
                 }
                 case "info" -> {
                     System.out.println("Custom Workload - Consumer Info");
