@@ -135,7 +135,7 @@ public class CustomWorkload extends Workload {
         return new Thread(() -> {
             try (Connection nc = Nats.connect(adminOptions)) {
                 JetStream js = nc.jetStream();
-                printInfoResult("Connect", id, -1, nc.getServerInfo().getHost());
+                printInfoResult("Connect", id, -1, nc.getServerInfo().getServerId());
                 int jsapi = 0;
                 List<Integer> consumers = new ArrayList<>();
                 for (int cx = 0; cx < CONSUMER_COUNT; cx++) {
@@ -221,7 +221,7 @@ public class CustomWorkload extends Workload {
             try (Connection nc = Nats.connect(adminOptions)) {
                 JetStreamManagement jsm = nc.jetStreamManagement();
                 JetStream js = nc.jetStream();
-                submitInfoResult(js, "Connect", id, -1, nc.getServerInfo().getHost());
+                submitInfoResult(js, "Connect", id, -1, nc.getServerInfo().getServerId());
                 List<String> list = consumerNameLists.get(id);
                 while (true) {
                     for (String consumerName : list) {
