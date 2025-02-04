@@ -114,7 +114,9 @@ public class CommandLine {
                             _paramsFiles.add(asString(args[++x]));
                             break;
                         case "--arg":
-                            _args.add(asString(args[++x]));
+                            if (++x < args.length) {
+                                _args.add(asString(args[x]));
+                            }
                             break;
                         case "":
                             break;
