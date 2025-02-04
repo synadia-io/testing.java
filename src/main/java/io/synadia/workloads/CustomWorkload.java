@@ -188,7 +188,7 @@ public class CustomWorkload extends Workload {
 
     private void doInfo() throws InterruptedException {
         boolean background = commandLine.args.contains("background");
-        System.out.println("Custom Workload - Consumer Info !!! " + background);
+        System.out.println("Custom Workload - Consumer Info !!! " + background + " " + commandLine.args);
         List<Options> options = roundRobinOptions(INFO_THREAD_COUNT);
         List<Thread> threads = new ArrayList<>(INFO_THREAD_COUNT);
         List<List<String>> consumerNameLists = new ArrayList<>();

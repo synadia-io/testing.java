@@ -99,7 +99,12 @@ public class CommandLine {
         List<String> _paramsFiles = new ArrayList<>();
         List<String> _args = new ArrayList<>();
 
+        System.out.println("COMMANDLINE ARGS");
+
         if (args != null && args.length > 0) {
+            for (int x = 0; x < args.length; x++) {
+                System.out.print(args[x]);
+            }
             try {
                 for (int x = 0; x < args.length; x++) {
                     String arg = args[x].trim();
@@ -116,6 +121,10 @@ public class CommandLine {
                         case "--arg":
                             if (++x < args.length) {
                                 _args.add(asString(args[x]));
+                                System.out.print("--arg " + args[x]);
+                            }
+                            else {
+                                System.out.print("--arg <EMPTY>");
                             }
                             break;
                         case "":
