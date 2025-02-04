@@ -103,7 +103,7 @@ public class CommandLine {
 
         if (args != null && args.length > 0) {
             for (int x = 0; x < args.length; x++) {
-                System.out.print(args[x]);
+                System.out.println(x + " " + args[x]);
             }
             try {
                 for (int x = 0; x < args.length; x++) {
