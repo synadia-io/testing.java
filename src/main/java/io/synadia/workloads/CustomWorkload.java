@@ -119,10 +119,11 @@ public class CustomWorkload extends Workload {
 
     private void doPublish() throws InterruptedException {
         System.out.println("Custom Workload - Publish");
+        List<Options> options = roundRobinOptions(PUBLISH_THREAD_COUNT);
         List<Thread> threads = new ArrayList<>(PUBLISH_THREAD_COUNT);
         AtomicLong count = new AtomicLong();
         for (int x = 0; x < PUBLISH_THREAD_COUNT; x++) {
-            Thread t = publishThread(x, count, getAdminOptions());
+            Thread t = publishThread(x, count, options.get(x));
             t.start();
             threads.add(t);
         }
@@ -131,9 +132,9 @@ public class CustomWorkload extends Workload {
         }
     }
 
-    private static Thread publishThread(final Integer id, AtomicLong count, Options adminOptions) {
+    private static Thread publishThread(final Integer id, AtomicLong count, Options options) {
         return new Thread(() -> {
-            try (Connection nc = Nats.connect(adminOptions)) {
+            try (Connection nc = Nats.connect(options)) {
                 JetStream js = nc.jetStream();
                 printInfoResult("Connect", id, -1, nc.getServerInfo().getServerId());
                 int jsapi = 0;
@@ -187,6 +188,7 @@ public class CustomWorkload extends Workload {
 
     private void doInfo() throws InterruptedException {
         System.out.println("Custom Workload - Consumer Info");
+        List<Options> options = roundRobinOptions(INFO_THREAD_COUNT);
         List<Thread> threads = new ArrayList<>(INFO_THREAD_COUNT);
         List<List<String>> consumerNameLists = new ArrayList<>();
         for (int t = 0; t < INFO_THREAD_COUNT; t++) {
@@ -203,7 +205,7 @@ public class CustomWorkload extends Workload {
         }
 
         for (int x = 0; x < INFO_THREAD_COUNT; x++) {
-            Thread t = infoThread(x, consumerNameLists, getAdminOptions());
+            Thread t = infoThread(x, consumerNameLists, options.get(x));
             t.start();
             threads.add(t);
         }
@@ -213,12 +215,12 @@ public class CustomWorkload extends Workload {
         }
     }
 
-    private static Thread infoThread(final Integer id, List<List<String>> consumerNameLists, Options adminOptions) {
+    private static Thread infoThread(final Integer id, List<List<String>> consumerNameLists, Options options) {
         return new Thread(() -> {
             long got = 0;
             long io = 0;
             long jsapi = 0;
-            try (Connection nc = Nats.connect(adminOptions)) {
+            try (Connection nc = Nats.connect(options)) {
                 JetStreamManagement jsm = nc.jetStreamManagement();
                 JetStream js = nc.jetStream();
                 submitInfoResult(js, "Connect", id, -1, nc.getServerInfo().getServerId());

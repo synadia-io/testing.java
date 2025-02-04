@@ -5,6 +5,7 @@ import io.nats.client.api.KeyValueConfiguration;
 import io.nats.client.api.StreamConfiguration;
 import io.synadia.utils.Debug;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -107,5 +108,21 @@ public abstract class Workload {
             }
         }
 
+    }
+
+    public List<Options> roundRobinOptions(int numConnections) {
+        List<Options> options = new ArrayList<>(numConnections);
+        int cx = 2;
+        for (int i = 0; i < numConnections; i++) {
+            if (++cx == 3) {
+                cx = 0;
+            }
+            switch (cx) {
+                case 0 -> options.add(getOptions(params.server0));
+                case 1 -> options.add(getOptions(params.server1));
+                case 2 -> options.add(getOptions(params.server2));
+            }
+        }
+        return options;
     }
 }
