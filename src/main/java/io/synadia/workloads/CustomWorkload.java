@@ -33,7 +33,7 @@ public class CustomWorkload extends Workload {
     public static final int PUBLISH_THREAD_COUNT = 4;
     public static final int INFO_THREAD_COUNT = 8;
     public static final int PROGRESS_FREQUENCY = 100;
-    public static final int INFO_REPORT_FREQUENCY = 500;
+    public static final int INFO_REPORT_FREQUENCY = 1000;
 
     public static final int MAX_MESSAGES = 1_000_000;
     public static final int SEED_MESSAGES = 300_000;
@@ -233,17 +233,26 @@ public class CustomWorkload extends Workload {
                 List<String> list = consumerNameLists.get(id);
                 while (true) {
                     for (String consumerName : list) {
+                        boolean report = false;
+                        Exception e = null;
                         try {
                             jsm.getConsumerInfo(DATA_STREAM_NAME, consumerName);
                             if (++got % INFO_REPORT_FREQUENCY == 0) {
-                                infoResult(background, js, "Consumer Info", id, got, null);
+                                report = true;
                             }
                         }
-                        catch (IOException e) {
-                            infoResult(background, js, "INFO IO EX", id, ++io, e);
+                        catch (IOException ie) {
+                            e = ie;
+                            ++io;
                         }
-                        catch (JetStreamApiException e) {
-                            infoResult(background, js, "INFO JSAPI EX", id, ++jsapi, e);
+                        catch (JetStreamApiException je) {
+                            e = je;
+                            ++jsapi;
+                        }
+                        if (report || e != null) {
+                            infoResult(background, js, "Consumer Info Success", id, got, null);
+                            infoResult(background, js, "Consumer Info IOException", id, ++io, e);
+                            infoResult(background, js, "Consumer Info JetStreamApiException", id, ++jsapi, e);
                         }
                     }
                 }
