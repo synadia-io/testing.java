@@ -43,7 +43,7 @@ public class CustomWorkload extends Workload {
     }
 
     private static String commands() {
-        return "Commands: 'setup', 'list', 'clear', 'publish', 'info', 'results'";
+        return "Commands: 'setup', 'list', 'clear', 'publish', 'info', 'local', 'results'";
     }
 
     @Override
@@ -187,6 +187,7 @@ public class CustomWorkload extends Workload {
     }
 
     private void doInfo() throws InterruptedException {
+        boolean background = commandLine.args.contains("background");
         System.out.println("Custom Workload - Consumer Info");
         List<Options> options = roundRobinOptions(INFO_THREAD_COUNT);
         List<Thread> threads = new ArrayList<>(INFO_THREAD_COUNT);
@@ -205,7 +206,7 @@ public class CustomWorkload extends Workload {
         }
 
         for (int x = 0; x < INFO_THREAD_COUNT; x++) {
-            Thread t = infoThread(x, consumerNameLists, options.get(x));
+            Thread t = infoThread(x, background, consumerNameLists, options.get(x));
             t.start();
             threads.add(t);
         }
@@ -215,7 +216,7 @@ public class CustomWorkload extends Workload {
         }
     }
 
-    private static Thread infoThread(final Integer id, List<List<String>> consumerNameLists, Options options) {
+    private static Thread infoThread(final Integer id, boolean background, List<List<String>> consumerNameLists, Options options) {
         return new Thread(() -> {
             long got = 0;
             long io = 0;
@@ -223,21 +224,21 @@ public class CustomWorkload extends Workload {
             try (Connection nc = Nats.connect(options)) {
                 JetStreamManagement jsm = nc.jetStreamManagement();
                 JetStream js = nc.jetStream();
-                submitInfoResult(js, "Connect", id, -1, nc.getServerInfo().getServerId());
+                infoResult(background, js, "Connect", id, -1, nc.getServerInfo().getServerId());
                 List<String> list = consumerNameLists.get(id);
                 while (true) {
                     for (String consumerName : list) {
                         try {
                             jsm.getConsumerInfo(DATA_STREAM_NAME, consumerName);
                             if (++got % INFO_REPORT_FREQUENCY == 0) {
-                                submitInfoResult(js, "Consumer Info", id, got, null);
+                                infoResult(background, js, "Consumer Info", id, got, null);
                             }
                         }
                         catch (IOException e) {
-                            submitInfoResult(js, "INFO IO EX", id, ++io, e);
+                            infoResult(background, js, "INFO IO EX", id, ++io, e);
                         }
                         catch (JetStreamApiException e) {
-                            submitInfoResult(js, "INFO JSAPI EX", id, ++jsapi, e);
+                            infoResult(background, js, "INFO JSAPI EX", id, ++jsapi, e);
                         }
                     }
                 }
@@ -246,6 +247,16 @@ public class CustomWorkload extends Workload {
                 throw new RuntimeException(e);
             }
         });
+    }
+
+
+    private static void infoResult(boolean background, JetStream js, String label, Integer id, long count, Object extra) {
+        if (background) {
+            submitInfoResult(js, label, id, count, null);
+        }
+        else {
+            printInfoResult(label, id, count, null);
+        }
     }
 
     private static void printInfoResult(String label, Integer id, long count, Object extra) {
