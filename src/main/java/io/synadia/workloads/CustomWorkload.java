@@ -3,14 +3,15 @@
  */
 package io.synadia.workloads;
 
-import io.nats.client.Connection;
-import io.nats.client.JetStream;
-import io.nats.client.JetStreamManagement;
-import io.nats.client.Nats;
+import io.nats.client.*;
 import io.nats.client.api.ConsumerConfiguration;
 import io.nats.client.api.StreamConfiguration;
 import io.synadia.CommandLine;
 import io.synadia.Workload;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class CustomWorkload extends Workload {
     static final String STREAM_NAME = "custom";
@@ -19,6 +20,7 @@ public class CustomWorkload extends Workload {
     static final int SUBJECT_COUNT = 100;
     static final int MESSAGE_COUNT_PER = 1000;
     static final int CONSUMER_COUNT = 100;
+    static final int THREAD_COUNT = 5;
 
     public void init(CommandLine commandLine) {
         init("Custom Workload " + commandLine.action, commandLine);
@@ -30,7 +32,9 @@ public class CustomWorkload extends Workload {
     @Override
     public void runWorkload() throws Exception {
         try (Connection nc = Nats.connect(getAdminOptions())) {
-            switch (commandLine.args.getFirst()) {
+            String arg = commandLine.args.getFirst();
+            switch (arg) {
+                default -> System.out.println("Custom Workload unknown [" + arg + "]. Choose 'stream', 'messages', 'consumers', 'info'");
                 case "stream" -> {
                     System.out.println("Custom Workload - Stream");
                     JetStreamManagement jsm = nc.jetStreamManagement();
@@ -48,9 +52,9 @@ public class CustomWorkload extends Workload {
                     System.out.println("Custom Workload - Messages");
                     JetStream js = nc.jetStream();
                     long count = 0;
-                    for (int i = 0; i < SUBJECT_COUNT; i++) {
-                        String subject = SUBJECT.replace(">", Integer.toHexString(i).toUpperCase());
-                        for (int j = 0; j < MESSAGE_COUNT_PER; j++) {
+                    for (int s = 0; s < SUBJECT_COUNT; s++) {
+                        for (int m = 0; m < MESSAGE_COUNT_PER; m++) {
+                            String subject = toSubject(s);
                             js.publish(subject, null);
                             System.out.print(".");
                             if (++count % 100 == 0) {
@@ -63,12 +67,12 @@ public class CustomWorkload extends Workload {
                     }
                 }
                 case "consumers" -> {
-                    System.out.println("Custom Workload - Consumers");
+                    System.out.println("Custom Workload - Create Consumers");
                     JetStreamManagement jsm = nc.jetStreamManagement();
                     for (int i = 0; i < CONSUMER_COUNT; i++) {
                         for (int s = 0; s < SUBJECT_COUNT; s++) {
-                            String subject = SUBJECT.replace(">", Integer.toHexString(s).toUpperCase());
-                            String consumerName = CONSUMER + Integer.toHexString(i) + "-" + Integer.toHexString(s);
+                            String consumerName = toConsumerName(i, s);
+                            String subject = toSubject(s);
                             jsm.createConsumer(STREAM_NAME, ConsumerConfiguration.builder()
                                 .durable(consumerName)
                                 .filterSubject(subject)
@@ -76,8 +80,61 @@ public class CustomWorkload extends Workload {
                         }
                     }
                 }
-                default -> System.out.println("Custom Workload - UNKNOWN");
+                case "list" -> {
+                    System.out.println("Custom Workload - List Consumers");
+                    JetStreamManagement jsm = nc.jetStreamManagement();
+                    List<String> list = jsm.getConsumerNames(STREAM_NAME);
+                    list.forEach(System.out::println);
+                    System.out.println(list.size());
+                }
+                case "info" -> {
+                    System.out.println("Custom Workload - Consumer Info");
+                    JetStreamManagement jsm = nc.jetStreamManagement();
+                    Thread waiter = null;
+                    List<List<String>> consumerNameLists = new ArrayList<>();
+                    for (int i = 0; i < CONSUMER_COUNT; i++) {
+                        List<String> list = new ArrayList<>();
+                        consumerNameLists.add(list);
+                        for (int s = 0; s < SUBJECT_COUNT; s++) {
+                            list.add(toConsumerName(i, s));
+                        }
+                    }
+
+                    for (int x = 0; x < THREAD_COUNT; x++) {
+                        waiter = info(x, consumerNameLists, jsm);
+                        waiter.start();
+                    }
+                    waiter.join();
+                }
             }
         }
+    }
+
+    private static String toSubject(int s) {
+        return SUBJECT.replace(">", "" + s);
+    }
+
+    private static Thread info(final Integer id, List<List<String>> consumerNameLists, JetStreamManagement jsm) {
+        return new Thread(() -> {
+            List<String> list = consumerNameLists.get(id);
+            while (true) {
+                for (String consumerName : list) {
+                    System.out.println("GET CI, THREAD: " + id + " CN: " + consumerName);
+                    try {
+                        jsm.getConsumerInfo(STREAM_NAME, consumerName);
+                    }
+                    catch (IOException e) {
+                        System.out.println("IO " + e);
+                    }
+                    catch (JetStreamApiException e) {
+                        System.out.println("JSAPI " + e);
+                    }
+                }
+            }
+        });
+    }
+
+    private static String toConsumerName(int i, int s) {
+        return CONSUMER + Integer.toHexString(i) + "-" + Integer.toHexString(s);
     }
 }
