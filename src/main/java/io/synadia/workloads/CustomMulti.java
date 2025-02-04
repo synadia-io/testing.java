@@ -16,6 +16,7 @@ import static io.nats.jsmulti.shared.Utils.report;
 import static io.nats.jsmulti.shared.Utils.reportAndTrackMaybe;
 
 public class CustomMulti extends Workload {
+
     public void init(CommandLine commandLine) {
         init("custom multi", commandLine);
     }

@@ -10,9 +10,7 @@ import io.synadia.utils.Debug;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import static io.nats.client.support.JsonValueUtils.*;
 import static io.synadia.utils.Constants.OS_UNIX;
@@ -42,8 +40,6 @@ public class Params {
     public final String saveStreamSubject;
     public final long watchWaitTime;
     public final boolean trackProfile;
-    public final String custom;
-    public final Map<String, String> customMap;
 
     public Params(List<String> paramsFiles) {
         this(readParamsFiles(paramsFiles));
@@ -72,52 +68,34 @@ public class Params {
         saveStreamSubject = readString(jv, "save_stream_subject");
         watchWaitTime = readLong(jv, "watch_wait_time", 5000);
         trackProfile = readBoolean(jv, "track_profile", false);
-        custom = readString(jv, "custom");
-        customMap = new HashMap<>();
-        if (custom != null) {
-            try {
-                String[] split = custom.split(",");
-                for (String s : split) {
-                    try {
-                        String[] split2 = s.split("=");
-                        customMap.put(split2[0], split2[1]);
-                    }
-                    catch (Exception ignore) {}
-                }
-            }
-            catch (Exception ignore) {}
-        }
     }
 
     public String customString(String key) {
-        return customMap.get(key);
+        return readString(jv, key);
     }
 
     public String customString(String key, String dflt) {
-        String s = customMap.get(key);
-        return s == null ? dflt : s;
+        return readString(jv, key, dflt);
     }
 
     public int customInt(String key) {
-        return customInt(key, -1);
+        return readInteger(jv, key, -1);
     }
 
     public int customInt(String key, int dflt) {
-        String value = customString(key);
-        return value == null ? dflt : Integer.parseInt(value);
+        return readInteger(jv, key, dflt);
     }
 
     public long customLong(String key) {
-        return customLong(key, -1);
+        return readLong(jv, key, -1);
     }
 
     public long customLong(String key, long dflt) {
-        String value = customString(key);
-        return value == null ? dflt : Long.parseLong(value);
+        return readLong(jv, key, dflt);
     }
 
     public boolean customBoolean(String key) {
-        return "true".equalsIgnoreCase(customString(key));
+        return readBoolean(jv, key, false);
     }
 
     public String toJson() {
@@ -162,7 +140,8 @@ public class Params {
 
         _debug("watchWaitTime", watchWaitTime);
         _debug("trackProfile", trackProfile);
-        _debug("custom", custom);
+
+        //  TODO show "custom" _debug("custom", custom);
     }
 
     private void _debug(String name, Object value) {
