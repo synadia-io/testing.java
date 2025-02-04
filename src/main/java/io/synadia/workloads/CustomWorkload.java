@@ -30,7 +30,7 @@ public class CustomWorkload extends Workload {
     }
 
     private static String commands() {
-        return "Comamnds: 'stream', 'messages', 'create', 'list', 'clear', 'info'";
+        return "Commands: 'stream', 'messages', 'create', 'list', 'clear', 'info'";
     }
 
     @Override
