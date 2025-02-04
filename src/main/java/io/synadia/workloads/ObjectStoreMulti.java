@@ -14,7 +14,8 @@ import io.synadia.utils.GZipper;
 
 import java.io.IOException;
 
-import static io.nats.jsmulti.shared.Utils.*;
+import static io.nats.jsmulti.shared.Utils.report;
+import static io.nats.jsmulti.shared.Utils.reportAndTrackMaybe;
 
 public class ObjectStoreMulti extends Workload {
     public void init(CommandLine commandLine) {
@@ -71,7 +72,7 @@ public class ObjectStoreMulti extends Workload {
                 long unReported = 0;
                 report(ctx, published, "Begin Object Store Run");
                 while (published < pubTarget) {
-                    jitter(ctx);
+                    jitter(ctx.jitter);
                     byte[] payload = ctx.getPayload();
                     String name = "key" + published;
                     stats.start();

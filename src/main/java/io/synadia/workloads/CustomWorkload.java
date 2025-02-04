@@ -5,22 +5,29 @@ package io.synadia.workloads;
 
 import io.nats.client.*;
 import io.nats.client.api.ConsumerConfiguration;
+import io.nats.client.api.RetentionPolicy;
 import io.nats.client.api.StreamConfiguration;
 import io.synadia.CommandLine;
 import io.synadia.Workload;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
 public class CustomWorkload extends Workload {
-    static final String STREAM_NAME = "custom";
-    static final String SUBJECT = "subject.>";
+    static final String DATA_STREAM_NAME = "cw";
+    static final String RESULT_STREAM_NAME = "cw-results";
+    static final String DATA_SUBJECT = "d.>";
+    static final String RESULT_SUBJECT = "r";
     static final String CONSUMER = "con-";
     static final int SUBJECT_COUNT = 100;
     static final int MESSAGE_COUNT_PER = 1000;
     static final int CONSUMER_COUNT = 100;
-    static final int THREAD_COUNT = 5;
+    static final int THREAD_COUNT = 8;
+    static final long PUBLISH_JITTER = 250;
+    static final int PROGRESS_FREQUENCY = 100;
+    static final int INFO_REPORT_FREQUENCY = 500;
 
     public void init(CommandLine commandLine) {
         init("Custom Workload " + commandLine.action, commandLine);
@@ -30,7 +37,7 @@ public class CustomWorkload extends Workload {
     }
 
     private static String commands() {
-        return "Commands: 'stream', 'messages', 'create', 'list', 'clear', 'info'";
+        return "Commands: 'stream', 'create', 'list', 'clear', 'publish', 'info', 'results'";
     }
 
     @Override
@@ -38,132 +45,198 @@ public class CustomWorkload extends Workload {
         try (Connection nc = Nats.connect(getAdminOptions())) {
             String arg = commandLine.args.getFirst();
             switch (arg) {
-                default -> System.out.println("Custom Workload unknown [" + arg + "] " + commands());
-
-                case "stream" -> {
-                    System.out.println("Custom Workload - Stream");
-                    JetStreamManagement jsm = nc.jetStreamManagement();
-                    try {
-                        jsm.deleteStream(STREAM_NAME);
-                    }
-                    catch (Exception ignore) {
-                    }
-                    jsm.addStream(StreamConfiguration.builder()
-                        .name(STREAM_NAME)
-                        .subjects(SUBJECT)
-                        .build());
-                }
-
-                case "messages" -> {
-                    System.out.println("Custom Workload - Messages");
-                    JetStream js = nc.jetStream();
-                    long count = 0;
-                    for (int s = 0; s < SUBJECT_COUNT; s++) {
-                        for (int m = 0; m < MESSAGE_COUNT_PER; m++) {
-                            String subject = toSubject(s);
-                            js.publish(subject, null);
-                            progressInLoop(++count);
-                        }
-                    }
-                    progressAfterLoop(count);
-                }
-
-                case "create" -> {
-                    System.out.println("Custom Workload - Create Consumers");
-                    JetStreamManagement jsm = nc.jetStreamManagement();
-                    long count = 0;
-                    for (int i = 0; i < CONSUMER_COUNT; i++) {
-                        for (int s = 0; s < SUBJECT_COUNT; s++) {
-                            String consumerName = toConsumerName(i, s);
-                            String subject = toSubject(s);
-                            jsm.createConsumer(STREAM_NAME, ConsumerConfiguration.builder()
-                                .durable(consumerName)
-                                .filterSubject(subject)
-                                .build());
-                            progressInLoop(++count);
-                        }
-                    }
-                    progressAfterLoop(count);
-                }
-
-                case "list" -> {
-                    System.out.println("Custom Workload - List Consumers");
-                    JetStreamManagement jsm = nc.jetStreamManagement();
-                    List<String> list = jsm.getConsumerNames(STREAM_NAME);
-                    list.forEach(System.out::println);
-                    System.out.println(list.size());
-                }
-
-                case "clear" -> {
-                    System.out.println("Custom Workload - Clear Consumers");
-                    JetStreamManagement jsm = nc.jetStreamManagement();
-                    List<String> list = jsm.getConsumerNames(STREAM_NAME);
-                    int count = 0;
-                    for (String cn : list) {
-                        jsm.deleteConsumer(STREAM_NAME, cn);
-                        progressInLoop(++count);
-                    }
-                    progressAfterLoop(count);
-                }
-
-                case "info" -> {
-                    System.out.println("Custom Workload - Consumer Info");
-                    JetStreamManagement jsm = nc.jetStreamManagement();
-                    Thread waiter = null;
-                    List<List<String>> consumerNameLists = new ArrayList<>();
-                    for (int i = 0; i < CONSUMER_COUNT; i++) {
-                        List<String> list = new ArrayList<>();
-                        consumerNameLists.add(list);
-                        for (int s = 0; s < SUBJECT_COUNT; s++) {
-                            list.add(toConsumerName(i, s));
-                        }
-                    }
-
-                    for (int x = 0; x < THREAD_COUNT; x++) {
-                        waiter = info(x, consumerNameLists, jsm);
-                        waiter.start();
-                    }
-                    waiter.join();
-                }
+                case "stream"  -> doStream(nc);
+                case "create"  -> doCreate(nc);
+                case "list"    -> doList(nc);
+                case "clear"   -> doClear(nc);
+                case "publish" -> doPublish(nc);
+                case "info"    -> doInfo();
+                case "results" -> doResults(nc);
+                default        -> System.out.println("Custom Workload unknown [" + arg + "] " + commands());
             }
         }
     }
 
+    private static void doStream(Connection nc) throws IOException, JetStreamApiException {
+        System.out.println("Custom Workload - Stream");
+        JetStreamManagement jsm = nc.jetStreamManagement();
+        safeDeleteStream(jsm, DATA_STREAM_NAME);
+        jsm.addStream(StreamConfiguration.builder()
+            .name(DATA_STREAM_NAME)
+            .subjects(DATA_SUBJECT)
+            .retentionPolicy(RetentionPolicy.Limits)
+            .maxAge(Duration.ofMinutes(1))
+            .build());
+        safeDeleteStream(jsm, RESULT_STREAM_NAME);
+        jsm.addStream(StreamConfiguration.builder()
+            .name(RESULT_STREAM_NAME)
+            .subjects(RESULT_SUBJECT)
+            .retentionPolicy(RetentionPolicy.Limits)
+            .maxAge(Duration.ofMinutes(5))
+            .build());
+    }
+
+    private static void doPublish(Connection nc) throws IOException, JetStreamApiException {
+        System.out.println("Custom Workload - Publish");
+        JetStream js = nc.jetStream();
+        long count = 0;
+        while (true) {
+            for (int s = 0; s < SUBJECT_COUNT; s++) {
+                for (int m = 0; m < MESSAGE_COUNT_PER; m++) {
+                    jitter(PUBLISH_JITTER);
+                    String subject = toSubject(s);
+                    js.publish(subject, null);
+                    progressInLoop(++count);
+                }
+            }
+            progressAfterLoop(count);
+        }
+    }
+
+    private static void doCreate(Connection nc) throws IOException, JetStreamApiException {
+        System.out.println("Custom Workload - Create Consumers");
+        JetStreamManagement jsm = nc.jetStreamManagement();
+        long count = 0;
+        for (int i = 0; i < CONSUMER_COUNT; i++) {
+            for (int s = 0; s < SUBJECT_COUNT; s++) {
+                String consumerName = toConsumerName(i, s);
+                String subject = toSubject(s);
+                jsm.createConsumer(DATA_STREAM_NAME, ConsumerConfiguration.builder()
+                    .durable(consumerName)
+                    .filterSubject(subject)
+                    .build());
+                progressInLoop(++count);
+            }
+        }
+        progressAfterLoop(count);
+    }
+
+    private static void doList(Connection nc) throws IOException, JetStreamApiException {
+        System.out.println("Custom Workload - List Consumers");
+        JetStreamManagement jsm = nc.jetStreamManagement();
+        List<String> list = jsm.getConsumerNames(DATA_STREAM_NAME);
+        list.forEach(System.out::println);
+        System.out.println(list.size());
+    }
+
+    private static void doClear(Connection nc) throws IOException, JetStreamApiException {
+        System.out.println("Custom Workload - Clear Consumers");
+        JetStreamManagement jsm = nc.jetStreamManagement();
+        List<String> list = jsm.getConsumerNames(DATA_STREAM_NAME);
+        int count = 0;
+        for (String cn : list) {
+            jsm.deleteConsumer(DATA_STREAM_NAME, cn);
+            progressInLoop(++count);
+        }
+        progressAfterLoop(count);
+    }
+
+    private static void doResults(Connection nc) throws IOException, JetStreamApiException {
+        System.out.println("Custom Workload - Show Results");
+        JetStreamSubscription sub = nc.jetStream().subscribe(RESULT_STREAM_NAME);
+
+        boolean missed = false;
+        while (true) {
+            try {
+                Message m = sub.nextMessage(1000);
+                if (m == null) {
+                    if (missed) {
+                        return;
+                    }
+                    missed = true;
+                }
+                else {
+                    System.out.println(new String(m.getData()));
+                }
+            }
+            catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    private void doInfo() throws InterruptedException {
+        System.out.println("Custom Workload - Consumer Info");
+        List<Thread> threads = new ArrayList<>(THREAD_COUNT);
+        List<List<String>> consumerNameLists = new ArrayList<>();
+        for (int i = 0; i < CONSUMER_COUNT; i++) {
+            List<String> list = new ArrayList<>();
+            consumerNameLists.add(list);
+            for (int s = 0; s < SUBJECT_COUNT; s++) {
+                list.add(toConsumerName(i, s));
+            }
+        }
+
+        for (int x = 0; x < THREAD_COUNT; x++) {
+            Thread t = infoThread(x, consumerNameLists, getAdminOptions());
+            t.start();
+            threads.add(t);
+        }
+
+        for (Thread t : threads) {
+            t.join();
+        }
+    }
+
+    private static Thread infoThread(final Integer id, List<List<String>> consumerNameLists, Options adminOptions) {
+        return new Thread(() -> {
+            long got = 0;
+            long io = 0;
+            long jsapi = 0;
+            try (Connection nc = Nats.connect(adminOptions)) {
+                System.out.println("[" + id + "] INFO | " + nc.getServerInfo().getHost());
+                JetStreamManagement jsm = nc.jetStreamManagement();
+                JetStream js = nc.jetStream();
+                List<String> list = consumerNameLists.get(id);
+                while (true) {
+                    for (String consumerName : list) {
+                        try {
+                            jsm.getConsumerInfo(DATA_STREAM_NAME, consumerName);
+                            if (++got % INFO_REPORT_FREQUENCY == 0) {
+                                reportInfoResult(js, "INFO CI", id, got, null);
+                            }
+                        }
+                        catch (IOException e) {
+                            reportInfoResult(js, "INFO IO EX", id, ++io, e);
+                        }
+                        catch (JetStreamApiException e) {
+                            reportInfoResult(js, "INFO JSAPI EX", id, ++jsapi, e);
+                        }
+                    }
+                }
+            }
+            catch (IOException | InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    private static void reportInfoResult(JetStream js, String label, Integer id, long count, Exception e) {
+        String text = "[" + id + "] " + label + " | " + count + (e == null ? "" : " | " + e.getMessage());
+        System.out.println(text);
+        try {
+            js.publish(RESULT_SUBJECT, text.getBytes());
+        }
+        catch (IOException | JetStreamApiException ee) {
+            System.out.println("[" + id + "] Result Publish | " + ee);
+        }
+    }
+
     private static void progressAfterLoop(long count) {
-        if (count % 100 != 0) {
+        if (count % PROGRESS_FREQUENCY != 0) {
             System.out.println(count);
         }
     }
 
     private static void progressInLoop(long count) {
         System.out.print(".");
-        if (count % 100 == 0) {
+        if (count % PROGRESS_FREQUENCY == 0) {
             System.out.println(count);
         }
     }
 
     private static String toSubject(int s) {
-        return SUBJECT.replace(">", "" + s);
-    }
-
-    private static Thread info(final Integer id, List<List<String>> consumerNameLists, JetStreamManagement jsm) {
-        return new Thread(() -> {
-            List<String> list = consumerNameLists.get(id);
-            while (true) {
-                for (String consumerName : list) {
-                    System.out.println("GET CI, THREAD: " + id + " CN: " + consumerName);
-                    try {
-                        jsm.getConsumerInfo(STREAM_NAME, consumerName);
-                    }
-                    catch (IOException e) {
-                        System.out.println("IO " + e);
-                    }
-                    catch (JetStreamApiException e) {
-                        System.out.println("JSAPI " + e);
-                    }
-                }
-            }
-        });
+        return DATA_SUBJECT.replace(">", "" + s);
     }
 
     private static String toConsumerName(int i, int s) {

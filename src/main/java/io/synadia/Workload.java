@@ -6,6 +6,9 @@ import io.nats.client.api.StreamConfiguration;
 import io.synadia.utils.Debug;
 
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
+
+import static io.nats.jsmulti.shared.Utils.sleep;
 
 public abstract class Workload {
     protected String label;
@@ -30,6 +33,12 @@ public abstract class Workload {
         Debug.info(this.label + " " + label, k, v);
     }
 
+    protected static void jitter(long jitter) {
+        if (jitter > 0) {
+            sleep(ThreadLocalRandom.current().nextLong(jitter));
+        }
+    }
+
     public abstract void runWorkload() throws Exception;
 
     protected Options getAdminOptions() {
@@ -42,6 +51,10 @@ public abstract class Workload {
             .connectionListener((x, y) -> {})
             .errorListener(new ErrorListener() {})
             .build();
+    }
+
+    protected static void safeDeleteStream(JetStreamManagement jsm, String streamName) {
+        try { jsm.deleteStream(streamName); } catch (Exception ignore) {}
     }
 
     protected void createStream(StreamConfiguration streamConfig) throws Exception {
