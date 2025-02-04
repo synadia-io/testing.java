@@ -35,6 +35,9 @@ public class CustomWorkload extends Workload {
     public static final int PROGRESS_FREQUENCY = 100;
     public static final int INFO_REPORT_FREQUENCY = 500;
 
+    public static final int MAX_MESSAGES = 1_000_000;
+    public static final int SEED_MESSAGES = 300_000;
+
     public void init(CommandLine commandLine) {
         init("Custom Workload " + commandLine.action, commandLine);
         if (commandLine.args.isEmpty()) {
@@ -71,7 +74,7 @@ public class CustomWorkload extends Workload {
             .name(DATA_STREAM_NAME)
             .subjects(DATA_STREAM_SUBJECT)
             .retentionPolicy(RetentionPolicy.Limits)
-            .maxMessages(1_000_000)
+            .maxMessages(MAX_MESSAGES)
             .build());
         printFormatted(si.getJv());
         safeDeleteStream(jsm, LOG_STREAM_NAME);
@@ -145,7 +148,9 @@ public class CustomWorkload extends Workload {
                 while (true) {
                     Collections.shuffle(consumers);
                     for (Integer cx : consumers) {
-                        jitter(PUBLISH_JITTER);
+                        if (count.get() > SEED_MESSAGES) {
+                            jitter(PUBLISH_JITTER);
+                        }
                         try {
                             js.publish(toSubjectName(cx), null);
                         }
