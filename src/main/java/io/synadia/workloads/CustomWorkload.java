@@ -62,19 +62,16 @@ public class CustomWorkload extends Workload {
                         for (int m = 0; m < MESSAGE_COUNT_PER; m++) {
                             String subject = toSubject(s);
                             js.publish(subject, null);
-                            System.out.print(".");
-                            if (++count % 100 == 0) {
-                                System.out.println(count);
-                            }
+                            progressInLoop(++count);
                         }
                     }
-                    if (count % 100 != 0) {
-                        System.out.println(count);
-                    }
+                    progressAfterLoop(count);
                 }
+
                 case "create" -> {
                     System.out.println("Custom Workload - Create Consumers");
                     JetStreamManagement jsm = nc.jetStreamManagement();
+                    long count = 0;
                     for (int i = 0; i < CONSUMER_COUNT; i++) {
                         for (int s = 0; s < SUBJECT_COUNT; s++) {
                             String consumerName = toConsumerName(i, s);
@@ -83,9 +80,12 @@ public class CustomWorkload extends Workload {
                                 .durable(consumerName)
                                 .filterSubject(subject)
                                 .build());
+                            progressInLoop(++count);
                         }
                     }
+                    progressAfterLoop(count);
                 }
+
                 case "list" -> {
                     System.out.println("Custom Workload - List Consumers");
                     JetStreamManagement jsm = nc.jetStreamManagement();
@@ -93,14 +93,19 @@ public class CustomWorkload extends Workload {
                     list.forEach(System.out::println);
                     System.out.println(list.size());
                 }
+
                 case "clear" -> {
                     System.out.println("Custom Workload - Clear Consumers");
                     JetStreamManagement jsm = nc.jetStreamManagement();
                     List<String> list = jsm.getConsumerNames(STREAM_NAME);
+                    int count = 0;
                     for (String cn : list) {
                         jsm.deleteConsumer(STREAM_NAME, cn);
+                        progressInLoop(++count);
                     }
+                    progressAfterLoop(count);
                 }
+
                 case "info" -> {
                     System.out.println("Custom Workload - Consumer Info");
                     JetStreamManagement jsm = nc.jetStreamManagement();
@@ -121,6 +126,19 @@ public class CustomWorkload extends Workload {
                     waiter.join();
                 }
             }
+        }
+    }
+
+    private static void progressAfterLoop(long count) {
+        if (count % 100 != 0) {
+            System.out.println(count);
+        }
+    }
+
+    private static void progressInLoop(long count) {
+        System.out.print(".");
+        if (count % 100 == 0) {
+            System.out.println(count);
         }
     }
 
