@@ -17,8 +17,8 @@ import java.io.IOException;
 import static io.nats.jsmulti.shared.Utils.*;
 
 public class ObjectStoreMulti extends Workload {
-    public ObjectStoreMulti(CommandLine commandLine) {
-        super("os", commandLine);
+    public void init(CommandLine commandLine) {
+        init("os", commandLine);
     }
 
     public void runWorkload() throws Exception {

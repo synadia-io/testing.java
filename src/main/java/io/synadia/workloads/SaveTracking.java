@@ -20,8 +20,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 public class SaveTracking extends Workload {
-    public SaveTracking(CommandLine commandLine) {
-        super("Save Tracking", commandLine);
+    public void init(CommandLine commandLine) {
+        init("Save Tracking", commandLine);
     }
 
     @SuppressWarnings("ResultOfMethodCallIgnored")

@@ -18,8 +18,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 public class ListTracking extends Workload {
-    public ListTracking(CommandLine commandLine) {
-        super("List Tracking", commandLine);
+    public void init(CommandLine commandLine) {
+        init("List Tracking", commandLine);
     }
 
     @SuppressWarnings("ResultOfMethodCallIgnored")

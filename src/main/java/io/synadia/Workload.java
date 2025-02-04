@@ -8,11 +8,15 @@ import io.synadia.utils.Debug;
 import java.util.List;
 
 public abstract class Workload {
-    public final String label;
-    public final CommandLine commandLine;
-    public final Params params;
+    protected String label;
+    protected CommandLine commandLine;
+    protected Params params;
 
-    public Workload(String defaultLabel, CommandLine commandLine) {
+    public Workload() {}
+
+    public abstract void init(CommandLine commandLine);
+
+    protected void init(String defaultLabel, CommandLine commandLine) {
         this.label = commandLine.action == null ? defaultLabel : commandLine.action;
         this.commandLine = commandLine;
         this.params = new Params(commandLine.paramsFiles);
@@ -22,7 +26,7 @@ public abstract class Workload {
         params.debug();
     }
 
-    public void debug(String label, String k, String v) {
+    protected void debug(String label, String k, String v) {
         Debug.info(this.label + " " + label, k, v);
     }
 

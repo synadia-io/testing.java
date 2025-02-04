@@ -8,8 +8,8 @@ import io.synadia.TestingApplication;
 import io.synadia.Workload;
 
 public class Multi extends Workload {
-    public Multi(CommandLine commandLine) {
-        super("Multi", commandLine);
+    public void init(CommandLine commandLine) {
+        init("Multi", commandLine);
     }
 
     public void runWorkload() throws Exception {

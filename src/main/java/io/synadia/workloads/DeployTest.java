@@ -12,8 +12,8 @@ import io.synadia.CommandLine;
 import io.synadia.Workload;
 
 public class DeployTest extends Workload {
-    public DeployTest(CommandLine commandLine) {
-        super("Deploy Test", commandLine);
+    public void init(CommandLine commandLine) {
+        init("Deploy Test", commandLine);
     }
 
     @Override

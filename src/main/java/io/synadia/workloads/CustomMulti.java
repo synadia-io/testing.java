@@ -12,11 +12,12 @@ import io.synadia.CommandLine;
 import io.synadia.TestingApplication;
 import io.synadia.Workload;
 
-import static io.nats.jsmulti.shared.Utils.*;
+import static io.nats.jsmulti.shared.Utils.report;
+import static io.nats.jsmulti.shared.Utils.reportAndTrackMaybe;
 
-public class Custom extends Workload {
-    public Custom(CommandLine commandLine) {
-        super("custom", commandLine);
+public class CustomMulti extends Workload {
+    public void init(CommandLine commandLine) {
+        init("custom multi", commandLine);
     }
 
     public void runWorkload() throws Exception {
@@ -31,14 +32,14 @@ public class Custom extends Workload {
         SUBJECT = params.testingStreamSubject;
 
         if ("consumers".equals(params.customString("which"))) {
-            a.customAction(CustomConsumers.class);
+            a.customAction(CustomActionRunner.class);
             PREFIX = params.customString("prefix");
         }
 
         for (int i = 0; i < a.args.size(); i++) {
             String k = a.args.get(i);
             String v = a.args.get(++i);
-            debug("Custom Arg", k, v);
+            debug("CustomMulti Arg", k, v);
         }
 
         Context ctx = new Context(a);
@@ -50,16 +51,15 @@ public class Custom extends Workload {
     static String SUBJECT;
     static String PREFIX;
 
-    public static class CustomConsumers implements ActionRunner {
+    public static class CustomActionRunner implements ActionRunner {
         @Override
         public void run(Context ctx, Connection nc, Stats stats, int id) throws Exception {
             final JetStreamManagement jsm = nc.jetStreamManagement(ctx.getJetStreamOptions());
             long consumerCount = ctx.getPubCount(id);
             long consumers = 0;
             long unReported = 0;
-            report(ctx, consumers, "Begin Custom Consumers Run");
+            report(ctx, consumers, "Begin Custom Run");
             while (consumers < consumerCount) {
-                jitter(ctx);
                 stats.start();
                 ConsumerConfiguration config = ConsumerConfiguration.builder()
                     .durable(PREFIX + (consumers + 1))
@@ -69,7 +69,7 @@ public class Custom extends Workload {
                 stats.stopAndCount(ctx.payloadSize);
                 unReported = reportAndTrackMaybe(ctx, ++consumers, ++unReported, "Custom Consumers", stats);
             }
-            report(ctx, consumers, "Completed Custom Consumers Run");
+            report(ctx, consumers, "Completed Custom Run");
         }
     }
 }

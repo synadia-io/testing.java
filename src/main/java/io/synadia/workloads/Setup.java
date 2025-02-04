@@ -12,10 +12,10 @@ import io.synadia.Workload;
 import static io.synadia.utils.Constants.SETUP;
 
 public class Setup extends Workload {
-    private final Which which;
+    private Which which;
 
-    public Setup(CommandLine commandLine) {
-        super("Setup " + commandLine.action, commandLine);
+    public void init(CommandLine commandLine) {
+        init("Setup " + commandLine.action, commandLine);
         this.which = Which.instance(SETUP, commandLine.action);
     }
 

@@ -32,10 +32,9 @@ import java.util.Date;
 import static io.synadia.utils.Constants.TIME_MS;
 
 public class ChartProfile extends Workload {
-    final String filter;
-    public ChartProfile(CommandLine commandLine) {
-        super("Chart Profile", commandLine);
-
+    String filter;
+    public void init(CommandLine commandLine) {
+        init("Chart Profile", commandLine);
         if (commandLine.args.size() != 1) {
             throw new RuntimeException("Filter Required");
         }

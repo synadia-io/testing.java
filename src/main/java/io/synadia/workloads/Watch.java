@@ -27,11 +27,11 @@ import static io.synadia.utils.Reporting.*;
 
 public class Watch extends Workload {
 
-    private final Which which;
-    private final String bucket;
+    private Which which;
+    private String bucket;
 
-    public Watch(CommandLine commandLine) {
-        super(commandLine.action, commandLine);
+    public void init(CommandLine commandLine) {
+        init(commandLine.action, commandLine);
         this.which = Which.instance(WATCH, commandLine.action);
         switch (which){
             case Stats:
