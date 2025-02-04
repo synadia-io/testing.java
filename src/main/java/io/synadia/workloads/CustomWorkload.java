@@ -25,8 +25,12 @@ public class CustomWorkload extends Workload {
     public void init(CommandLine commandLine) {
         init("Custom Workload " + commandLine.action, commandLine);
         if (commandLine.args.isEmpty()) {
-            throw new RuntimeException("Argument(s) Required");
+            throw new RuntimeException("Argument(s) Required. " + commands());
         }
+    }
+
+    private static String commands() {
+        return "Comamnds: 'stream', 'messages', 'create', 'list', 'clear', 'info'";
     }
 
     @Override
@@ -34,7 +38,8 @@ public class CustomWorkload extends Workload {
         try (Connection nc = Nats.connect(getAdminOptions())) {
             String arg = commandLine.args.getFirst();
             switch (arg) {
-                default -> System.out.println("Custom Workload unknown [" + arg + "]. Choose 'stream', 'messages', 'create', 'list', 'clear', 'info'");
+                default -> System.out.println("Custom Workload unknown [" + arg + "] " + commands());
+
                 case "stream" -> {
                     System.out.println("Custom Workload - Stream");
                     JetStreamManagement jsm = nc.jetStreamManagement();
@@ -48,6 +53,7 @@ public class CustomWorkload extends Workload {
                         .subjects(SUBJECT)
                         .build());
                 }
+
                 case "messages" -> {
                     System.out.println("Custom Workload - Messages");
                     JetStream js = nc.jetStream();
