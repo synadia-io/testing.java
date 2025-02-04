@@ -17,6 +17,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static io.nats.client.support.JsonUtils.printFormatted;
 
@@ -119,8 +120,9 @@ public class CustomWorkload extends Workload {
     private void doPublish() throws InterruptedException {
         System.out.println("Custom Workload - Publish");
         List<Thread> threads = new ArrayList<>(PUBLISH_THREAD_COUNT);
+        AtomicLong count = new AtomicLong();
         for (int x = 0; x < PUBLISH_THREAD_COUNT; x++) {
-            Thread t = publishThread(x, getAdminOptions());
+            Thread t = publishThread(x, count, getAdminOptions());
             t.start();
             threads.add(t);
         }
@@ -129,12 +131,11 @@ public class CustomWorkload extends Workload {
         }
     }
 
-    private static Thread publishThread(final Integer id, Options adminOptions) {
+    private static Thread publishThread(final Integer id, AtomicLong count, Options adminOptions) {
         return new Thread(() -> {
             try (Connection nc = Nats.connect(adminOptions)) {
                 JetStream js = nc.jetStream();
                 printInfoResult("Connect", id, -1, nc.getServerInfo().getHost());
-                int count = 0;
                 int jsapi = 0;
                 List<Integer> consumers = new ArrayList<>();
                 for (int cx = 0; cx < CONSUMER_COUNT; cx++) {
@@ -150,9 +151,9 @@ public class CustomWorkload extends Workload {
                         catch (JetStreamApiException e) {
                             printInfoResult("Publish Exception:", id, ++jsapi, e);
                         }
-                        progressInLoop(++count);
+                        progressInLoop(count.incrementAndGet());
                     }
-                    progressAfterLoop(count);
+                    progressAfterLoop(count.get());
                 }
             }
             catch (IOException | InterruptedException e) {
