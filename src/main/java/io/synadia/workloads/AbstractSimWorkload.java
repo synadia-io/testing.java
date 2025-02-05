@@ -183,7 +183,11 @@ public abstract class AbstractSimWorkload extends Workload {
         }
 
         public String ident() {
-            return "[" + time + "] [" + segments().replace(DEFAULT_SEGMENT, "") + "]";
+            String segments = segments();
+            while (segments.endsWith(DEFAULT_SEGMENT)) {
+                segments = segments.substring(0, segments.length() - DEFAULT_SEGMENT.length());
+            }
+            return "[" + time + "] [" + segments + "]";
         }
 
         public String subject() {
@@ -206,6 +210,14 @@ public abstract class AbstractSimWorkload extends Workload {
 
     protected void autoResult(boolean background, JetStream js, String job, String runId, long count, Object details) {
         Result result = new Result(job, runId, NO_TIX, null, count, details);
+        if (!background) {
+            System.out.println(result);
+        }
+        publishResult(js, result);
+    }
+
+    protected void autoResult(boolean background, JetStream js, String job, String runId, int tix, long count, Object details) {
+        Result result = new Result(job, runId, tix, null, count, details);
         if (!background) {
             System.out.println(result);
         }

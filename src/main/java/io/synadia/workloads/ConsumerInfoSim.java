@@ -262,7 +262,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                             jsm.getConsumerInfo(DATA_STREAM_NAME, consumerName);
                             long gc = groupCount.incrementAndGet();
                             if (gc % INFO_REPORT_FREQUENCY == 0) {
-                                autoResult(background, js, INFO_JOB, runId, gc, null);
+                                autoResult(background, js, INFO_JOB, runId, tix, gc, null);
                             }
                         }
                         catch (IOException ie) {
