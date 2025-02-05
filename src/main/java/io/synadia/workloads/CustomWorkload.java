@@ -45,7 +45,7 @@ public class CustomWorkload extends Workload {
     }
 
     private static String commands() {
-        return "Commands: 'setup', 'list', 'clear', 'publish', 'info', 'local', 'results'";
+        return "Commands: 'setup', 'create', 'list', 'clear', 'publish', 'info', 'local', 'results'";
     }
 
     @Override
@@ -54,6 +54,7 @@ public class CustomWorkload extends Workload {
             String arg = commandLine.args.getFirst();
             switch (arg) {
                 case "setup"   -> doSetup(nc);
+                case "create"  -> doCreateConsumers(nc);
                 case "list"    -> doList(nc);
                 case "clear"   -> doClear(nc);
                 case "publish" -> doPublish();
@@ -66,7 +67,7 @@ public class CustomWorkload extends Workload {
 
     private void doSetup(Connection nc) throws IOException, JetStreamApiException {
         System.out.println("Custom Workload - Setup");
-        System.out.println("Creating Streams...");
+        System.out.println("Custom Workload - Creating Streams");
         JetStreamManagement jsm = nc.jetStreamManagement();
         safeDeleteStream(jsm, DATA_STREAM_NAME);
         StreamInfo si = jsm.addStream(StreamConfiguration.builder()
@@ -85,7 +86,13 @@ public class CustomWorkload extends Workload {
             .build());
         printFormatted(si.getJv());
 
-        System.out.println("Creating Consumers...");
+        doCreateConsumers(nc);
+    }
+
+    private void doCreateConsumers(Connection nc) throws IOException, JetStreamApiException {
+        JetStreamManagement jsm = nc.jetStreamManagement();
+
+        System.out.println("Custom Workload - Creating Consumers");
         long count = 0;
         for (int cx = 0; cx < CONSUMER_COUNT; cx++) {
             jsm.createConsumer(DATA_STREAM_NAME, ConsumerConfiguration.builder()
