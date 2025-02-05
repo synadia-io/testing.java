@@ -246,20 +246,16 @@ public class CustomWorkload extends Workload {
                         try {
                             jsm.getConsumerInfo(DATA_STREAM_NAME, consumerName);
                             if (got.incrementAndGet() % INFO_REPORT_FREQUENCY == 0) {
-                                infoResult(background, js, "Consumer Info Success", id, got.get(), null);
-                                if (io.get() > 0) {
-                                    infoResult(background, js, "Consumer Info IOException", id, io.get(), e);
-                                }
-                                if (jsapi.get() > 0) {
-                                    infoResult(background, js, "Consumer Info JetStreamApiException", id, jsapi.get(), e);
-                                }
+                                String ios = io.get() > 0 ? " | IO Ex: " + io.get() : "";
+                                String jss = jsapi.get() > 0 ? " | JSAPI Ex: " + jsapi.get() : "";
+                                infoResult(background, js, "Consumer Info Success. | Count: ", id, got.get(), ios + jss);
                             }
                         }
                         catch (IOException ie) {
-                            infoResult(background, js, "Consumer Info IOException", id, io.incrementAndGet(), e);
+                            infoResult(background, js, "Consumer Info IOException: ", id, io.incrementAndGet(), e);
                         }
                         catch (JetStreamApiException je) {
-                            infoResult(background, js, "Consumer Info JetStreamApiException", id, jsapi.incrementAndGet(), e);
+                            infoResult(background, js, "Consumer Info JetStreamApiException: ", id, jsapi.incrementAndGet(), e);
                         }
                     }
                 }
