@@ -258,12 +258,10 @@ public class CustomWorkload extends Workload {
 
 
     private static void infoResult(boolean background, JetStream js, String label, Integer id, long count, Object extra) {
-        if (background) {
-            submitInfoResult(js, label, id, count, extra);
-        }
-        else {
+        if (!background) {
             printInfoResult(label, id, count, extra);
         }
+        submitInfoResult(js, label, id, count, extra);
     }
 
     private static void printInfoResult(String label, Integer id, long count, Object extra) {
