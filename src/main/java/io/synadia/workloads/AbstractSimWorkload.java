@@ -32,7 +32,9 @@ public abstract class AbstractSimWorkload extends Workload {
     protected static final String RESULT_SUBJECT_PREFIX = "result.";
     protected static final String RESULT_STREAM_SUBJECT = RESULT_SUBJECT_PREFIX + ">";
     protected static final int WORKER_THREAD_COUNT = 3;
-    protected static final int NO_TIX = Integer.MAX_VALUE;
+    protected static final int NO_TIX = Integer.MIN_VALUE;
+    public static final String DEFAULT_SEGMENT = "._";
+    public static final String DOT = ".";
 
     protected final int progressFrequency;
 
@@ -115,7 +117,8 @@ public abstract class AbstractSimWorkload extends Workload {
         public final String job;
         public final String runId;
         public final int tix;
-        public final String operation;
+        public final String qualifier;
+        public final boolean defaultQualifier;
         public final long count;
         public final long time;
         public final String details;
@@ -125,21 +128,28 @@ public abstract class AbstractSimWorkload extends Workload {
             this.job = JsonValueUtils.readString(jv, "job");
             this.runId = JsonValueUtils.readString(jv, "run_id");
             this.tix = JsonValueUtils.readInteger(jv, "tix", NO_TIX);
-            this.operation = JsonValueUtils.readString(jv, "operation");
+            this.qualifier = JsonValueUtils.readString(jv, "qualifier");
+            this.defaultQualifier = qualifier == null || qualifier.trim().isEmpty();
             this.count = JsonValueUtils.readLong(jv, "count", 0);
             this.time = JsonValueUtils.readLong(jv, "time", 0);
             this.details = JsonValueUtils.readString(jv, "details");
         }
 
-        public Result(String job, String runId, int tix, String operation, long count, Object details) {
-            this.job = job.toLowerCase();
+        public Result(String job, String runId, int tix, String qualifier, long count, Object details) {
+            this.job = job;
             this.runId = runId;
             this.tix = tix;
-            this.operation = operation;
+            this.defaultQualifier = qualifier == null || qualifier.trim().isEmpty();
+            if (defaultQualifier) {
+                this.qualifier = null;
+            }
+            else {
+                this.qualifier = qualifier.toLowerCase().replace(" ", "").trim();
+            }
             this.count = count;
             this.time = System.currentTimeMillis();
-            String temp = details == null ? "" : details.toString().trim();
-            this.details = temp.isEmpty() ? null : temp;
+            String temp = details == null ? null : details.toString().trim();
+            this.details = temp == null || temp.isEmpty() ? null : temp;
         }
 
         @Override
@@ -150,7 +160,7 @@ public abstract class AbstractSimWorkload extends Workload {
                 mb.put("tix", tix);
             }
             mb.put("run_id", runId);
-            mb.put("operation", operation);
+            mb.put("qualifier", qualifier);
             mb.put("count", count);
             mb.put("time", time);
             mb.put("details", details);
@@ -173,48 +183,49 @@ public abstract class AbstractSimWorkload extends Workload {
         }
 
         public String ident() {
-            return "[" + time + " " + _jrt() + " " + operation + "]";
+            return "[" + time + "] [" + segments().replace(DEFAULT_SEGMENT, "") + "]";
         }
 
         public String subject() {
-            return RESULT_SUBJECT_PREFIX + _jrt();
+            return RESULT_SUBJECT_PREFIX + segments();
         }
 
-        private String _jrt() {
-            return job + "." + runId + _tix();
-        }
-
-        private String _tix() {
-            return tix < 0 ? "._" : "." + tix;
+        private String segments() {
+            return job + DOT + runId
+                + (defaultQualifier ? DEFAULT_SEGMENT : DOT + qualifier)
+                + (tix == NO_TIX    ? DEFAULT_SEGMENT : DOT + tix);
         }
     }
 
-    protected void autoProgress(boolean background, JetStream js, String job, String runId, int tix, String operation, long count, Object details) {
+    protected void autoProgress(boolean background, JetStream js, String job, String runId, long count, Object details) {
         showProgressMaybe(background, count);
-        publishResult(js, job, runId, tix, operation, count, details);
+        publishResult(js, job, runId, NO_TIX, null, count, details);
     }
 
-    protected void autoResult(boolean background, JetStream js, String job, String runId, int tix, String operation, long count, Object details) {
-        Result result = new Result(job, runId, tix, operation, count, details);
+    protected void autoResult(boolean background, JetStream js, String job, String runId, long count, Object details) {
+        Result result = new Result(job, runId, NO_TIX, null, count, details);
         if (!background) {
             System.out.println(result);
         }
         publishResult(js, result);
     }
 
-    protected void printResult(boolean background, String job, String runId, int tix, String operation, long count, Object details) {
+    protected void print(boolean background, String job, String runId, int tix, String qualifier, long count, Object details) {
         if (!background) {
-            Result result = new Result(job, runId, tix, operation, count, details);
-            System.out.println(result);
+            System.out.println(new Result(job, runId, tix, qualifier, count, details));
         }
     }
 
     protected void autoException(boolean background, JetStream js, String job, String runId, int tix, long count, Exception ex) {
-        autoResult(background, js, job, runId, tix, "Exception", count, ex);
+        Result result = new Result(job, runId, tix, ex.getClass().getSimpleName(), count, ex);
+        if (!background) {
+            System.out.println(result);
+        }
+        publishResult(js, result);
     }
 
-    protected void publishResult(JetStream js, String job, String runId, int tix, String operation, long count, Object details) {
-        publishResult(js, new Result(job, runId, tix, operation, count, details));
+    protected void publishResult(JetStream js, String job, String runId, int tix, String qualifier, long count, Object details) {
+        publishResult(js, new Result(job, runId, tix, qualifier, count, details));
     }
 
     protected void publishResult(JetStream js, Result result) {
@@ -228,7 +239,7 @@ public abstract class AbstractSimWorkload extends Workload {
 
     protected void showProgressMaybe(boolean background, long count) {
         if (!background) {
-            System.out.print(".");
+            System.out.print(DOT);
             if (count % progressFrequency == 0) {
                 System.out.println(count);
             }

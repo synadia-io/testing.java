@@ -16,16 +16,20 @@ import java.util.concurrent.atomic.AtomicLong;
 import static io.nats.jsmulti.shared.Utils.sleep;
 
 public class ConsumerInfoSim extends AbstractSimWorkload {
-    public static final String CONSUMER_PREFIX = "sim-con-";
-    public static final int CONSUMER_COUNT = 10000;
-    public static final long PUBLISH_JITTER = 250;
-    public static final long CONSUME_JITTER = 500;
-    public static final int INFO_THREAD_COUNT = 8;
-    public static final int PROGRESS_FREQUENCY = 100;
-    public static final long RESULTS_FREQUENCY = 5000;
-    public static final int INFO_REPORT_FREQUENCY = 10000;
-    public static final long SEED_MESSAGES = 300_000;
-    public static final long MAX_MESSAGES = 1_000_000;
+    private static final String CONSUMER_PREFIX = "sim-con-";
+    private static final int CONSUMER_COUNT = 10000;
+    private static final long PUBLISH_JITTER = 250;
+    private static final long CONSUME_JITTER = 500;
+    private static final int INFO_THREAD_COUNT = 8;
+    private static final int PROGRESS_FREQUENCY = 100;
+    private static final long RESULTS_FREQUENCY = 5000;
+    private static final int INFO_REPORT_FREQUENCY = 10000;
+    private static final long SEED_MESSAGES = 300_000;
+    private static final long MAX_MESSAGES = 1_000_000;
+
+    private static final String JOB_INFO =    "ConInfo";
+    private static final String JOB_PUBLISH = "Publish";
+    private static final String JOB_CONSUME = "Consume";
 
     public ConsumerInfoSim() {
         super(PROGRESS_FREQUENCY);
@@ -50,8 +54,8 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                 case "create"  -> doCreateConsumers(nc);
                 case "list"    -> doList(nc);
                 case "clear"   -> doClear(nc);
-                case "publish" -> doWorker("Publish", this::publishWorker);
-                case "consume" -> doWorker("Consume", this::consumeWorker);
+                case "publish" -> doWorker(JOB_PUBLISH, this::publishWorker);
+                case "consume" -> doWorker(JOB_CONSUME, this::consumeWorker);
                 case "info"    -> doInfo();
                 case "results" -> doResults(nc);
                 default        -> exit("Unknown custom workload");
@@ -106,7 +110,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
         return () -> {
             try (Connection nc = Nats.connect(options)) {
                 JetStream js = nc.jetStream();
-                printResult(background, job, runId, tix, "connect", 0, nc.getServerInfo().getServerId());
+                print(background, job, runId, tix, "connect", 0, nc.getServerInfo().getServerId());
                 List<Integer> consumers = new ArrayList<>();
                 for (int cx = 0; cx < CONSUMER_COUNT; cx++) {
                     consumers.add(cx);
@@ -121,7 +125,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                         }
                         try {
                             js.publish(toSubjectName(cx), null);
-                            autoProgress(background, js, job, runId, NO_TIX, "publish", groupCount.incrementAndGet(), null);
+                            autoProgress(background, js, job, runId, groupCount.incrementAndGet(), null);
                         }
                         catch (IOException ie) {
                             autoException(background, js, job, runId, tix, ++ioEx, ie);
@@ -144,7 +148,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
         return () -> {
             try (Connection nc = Nats.connect(options)) {
                 JetStream js = nc.jetStream();
-                printResult(background, job, runId, tix, "connect", 0, nc.getServerInfo().getServerId());
+                print(background, job, runId, tix, "connect", 0, nc.getServerInfo().getServerId());
 
                 List<Integer> consumers = new ArrayList<>();
                 for (int cx = 0; cx < CONSUMER_COUNT; cx++) {
@@ -162,7 +166,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                             if (m != null) {
                                 m.ack();
                             }
-                            autoProgress(background, js, job, runId, NO_TIX, "consume", groupCount.incrementAndGet(), null);
+                            autoProgress(background, js, job, runId, groupCount.incrementAndGet(), null);
                         }
                         catch (Exception ignore) {}
                     }
@@ -235,15 +239,13 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
         }
     }
 
-    static String INFO_JOB = "Consumer Info";
-
     @SuppressWarnings("InfiniteLoopStatement")
     private Runnable infoWorker(String runId, int tix, boolean background, AtomicLong groupCount, Options options, List<String> consumerNames) {
         return () -> {
             try (Connection nc = Nats.connect(options)) {
                 JetStreamManagement jsm = nc.jetStreamManagement();
                 JetStream js = nc.jetStream();
-                printResult(background, INFO_JOB, runId, tix, "connect", 0, nc.getServerInfo().getServerId());
+                print(background, JOB_INFO, runId, tix, "connect", 0, nc.getServerInfo().getServerId());
                 List<String> list = new ArrayList<>(consumerNames);
                 Collections.shuffle(list);
                 long ioEx = 0;
@@ -254,14 +256,14 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                             jsm.getConsumerInfo(DATA_STREAM_NAME, consumerName);
                             long gc = groupCount.incrementAndGet();
                             if (gc % INFO_REPORT_FREQUENCY == 0) {
-                                autoResult(background, js, INFO_JOB, runId, NO_TIX, "get", gc, null);
+                                autoResult(background, js, JOB_INFO, runId, gc, null);
                             }
                         }
                         catch (IOException ie) {
-                            autoException(background, js, INFO_JOB, runId, tix, ++ioEx, ie);
+                            autoException(background, js, JOB_INFO, runId, tix, ++ioEx, ie);
                         }
                         catch (JetStreamApiException je) {
-                            autoException(background, js, INFO_JOB, runId, tix, ++jsapiEx, je);
+                            autoException(background, js, JOB_INFO, runId, tix, ++jsapiEx, je);
                         }
                     }
                 }
