@@ -20,6 +20,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
     private static final int CONSUMER_COUNT = 10000;
     private static final long PUBLISH_JITTER = 250;
     private static final long CONSUME_JITTER = 500;
+    private static final int CONSUME_BATCH = 10;
     private static final int INFO_THREAD_COUNT = 8;
     private static final int PROGRESS_FREQUENCY = 100;
     private static final long RESULTS_FREQUENCY = 5000;
@@ -165,12 +166,16 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                     for (Integer cx : consumers) {
                         jitter(CONSUME_JITTER);
                         ConsumerContext cctx = sctx.getConsumerContext(toConsumerName(cx));
-                        try (FetchConsumer fc = cctx.fetch(FetchConsumeOptions.builder().maxMessages(1).build())) {
+                        try (FetchConsumer fc = cctx.fetch(FetchConsumeOptions.builder().maxMessages(CONSUME_BATCH).expiresIn(5000).build())) {
                             Message m = fc.nextMessage();
-                            if (m != null) {
+                            while (m != null) {
                                 m.ack();
+                                long gc = groupCount.incrementAndGet();
+                                if (gc % INFO_REPORT_FREQUENCY == 0) {
+                                    autoResult(background, js, CONSUME_JOB, runId, gc, null);
+                                }
+                                m = fc.nextMessage();
                             }
-                            autoProgress(background, js, CONSUME_JOB, runId, groupCount.incrementAndGet(), null);
                         }
                         catch (Exception ignore) {}
                     }
