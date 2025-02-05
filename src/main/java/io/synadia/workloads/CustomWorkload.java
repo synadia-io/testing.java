@@ -4,10 +4,7 @@
 package io.synadia.workloads;
 
 import io.nats.client.*;
-import io.nats.client.api.ConsumerConfiguration;
-import io.nats.client.api.RetentionPolicy;
-import io.nats.client.api.StreamConfiguration;
-import io.nats.client.api.StreamInfo;
+import io.nats.client.api.*;
 import io.synadia.CommandLine;
 import io.synadia.Workload;
 
@@ -185,17 +182,24 @@ public class CustomWorkload extends Workload {
 
     private void doResults(Connection nc) throws IOException, JetStreamApiException {
         System.out.println("Custom Workload - Show Results");
-        JetStreamSubscription sub = nc.jetStream().subscribe(LOG_SUBJECT);
-
+        StreamContext sctx = nc.getStreamContext(LOG_STREAM_NAME);
+        long lastSeq = 0;
         //noinspection InfiniteLoopStatement
         while (true) {
-            try {
-                Message m = sub.nextMessage(1000);
-                if (m != null) {
+            OrderedConsumerContext occtx = sctx.createOrderedConsumer(
+                new OrderedConsumerConfiguration()
+                    .deliverPolicy(lastSeq == 0 ? DeliverPolicy.All : DeliverPolicy.ByStartSequence)
+                    .startSequence(lastSeq)
+                    .filterSubject(LOG_SUBJECT));
+            try (IterableConsumer ic = occtx.iterate()) {
+                Message m = ic.nextMessage(5000);
+                while (m != null) {
+                    lastSeq = m.metaData().streamSequence();
                     System.out.println(new String(m.getData()) + " | " + stringify(m));
+                    m = ic.nextMessage(1000);
                 }
             }
-            catch (InterruptedException e) {
+            catch (Exception e) {
                 throw new RuntimeException(e);
             }
         }
