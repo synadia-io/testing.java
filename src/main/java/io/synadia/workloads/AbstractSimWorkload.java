@@ -243,10 +243,11 @@ public abstract class AbstractSimWorkload extends Workload {
         }
     }
 
-    protected void showProgressMaybe(boolean background, long count, String lineEnd) {
+    protected void showProgressMaybe(boolean background, long count, String lineStart) {
         if (!background) {
             if (count % progressFrequency == 0) {
-                System.out.println(count + " <-- " + lineEnd);
+                System.out.println(" " + count);
+                System.out.println(lineStart);
             }
             else {
                 System.out.print(DOT);
@@ -254,9 +255,9 @@ public abstract class AbstractSimWorkload extends Workload {
         }
     }
 
-    protected void endProgress(boolean background, long count, String lineEnd) {
+    protected void endProgress(boolean background, long count, String lineStart) {
         if (!background && count % progressFrequency != 0) { // last check because I might have already printed this count
-            System.out.println(count + " <-- " + lineEnd);
+            System.out.println(" " + count);
         }
     }
 
