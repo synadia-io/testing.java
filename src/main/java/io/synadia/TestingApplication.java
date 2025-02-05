@@ -106,7 +106,7 @@ public class TestingApplication implements Application, AutoCloseable {
             js.publish(workload.params.profileStreamSubject.replace(">", key), profileData);
         }
         catch (Exception e) {
-            Debug.stackTrace(workload.label, e);
+            Debug.stackTrace(workload.workLabel, e);
             throw new RuntimeException(e);
         }
     }

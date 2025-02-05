@@ -93,10 +93,10 @@ public abstract class Debug {
         if (PAUSE) { return; }
         String start;
         if (PRINT_TIME && PRINT_THREAD_ID) {
-            start = "[" + Thread.currentThread().getName() + "@" + time() + "] ";
+            start = "[" + Thread.currentThread().getName() + "@" + shortTime() + "] ";
         }
         else if (PRINT_TIME){
-            start = "[" + time() + "] ";
+            start = "[" + shortTime() + "] ";
         }
         else if (PRINT_THREAD_ID){
             start = "[" + Thread.currentThread().getName() + "] ";
@@ -178,9 +178,13 @@ public abstract class Debug {
         return msg.getReplyTo();
     }
 
-    public static String time() {
+    public static String shortTime() {
         String t = "" + System.currentTimeMillis();
         return t.substring(t.length() - 9);
+    }
+
+    public static String fullTime() {
+        return "" + System.currentTimeMillis();
     }
 
     public static String dataString(Message msg) {

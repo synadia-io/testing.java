@@ -152,7 +152,7 @@ public class Watch extends Workload {
                 }
             }
             catch (Exception e) {
-                Debug.stackTrace(label, e);
+                Debug.stackTrace(workLabel, e);
                 System.exit(-1);
             }
         }

@@ -54,7 +54,7 @@ public class SaveTracking extends Workload {
             Thread.sleep(1000); // so I don't have to wait for messages
             Message m = sub.nextMessage(1000);
             while (m != null) {
-                Debug.info(label, "profile", m.getSubject());
+                Debug.info(workLabel, "profile", m.getSubject());
                 jsTarget.publish(m);
                 m = sub.nextMessage(1000);
             }
@@ -97,7 +97,7 @@ public class SaveTracking extends Workload {
                 kvTarget.put(p.key, p.value);
             }
             catch (Exception e) {
-                Debug.stackTrace(label, e);
+                Debug.stackTrace(workLabel, e);
                 System.exit(-1);
             }
         }

@@ -101,21 +101,26 @@ public class CommandLine {
 
         if (args != null && args.length > 0) {
             try {
-                for (int x = 0; x < args.length; x++) {
-                    String arg = args[x].trim();
+                for (int ix = 0; ix < args.length; ix++) {
+                    String arg = args[ix].trim();
                     switch (arg) {
                         case "--action":
-                            _action = asString(args[++x]);
+                            _action = asString(args[++ix]);
                             break;
                         case "--workload":
-                            _workload = asString(args[++x]);
+                            _workload = asString(args[++ix]);
                             break;
                         case "--params":
-                            _paramsFiles.add(asString(args[++x]));
+                            _paramsFiles.add(asString(args[++ix]));
                             break;
                         case "--arg":
-                            if (++x < args.length) {
-                                _args.add(asString(args[x]));
+                            if (++ix < args.length) {
+                                if (args[ix].equals("--arg")) {
+                                    ix = args.length; // stops the loop because we encountered --arg --arg
+                                }
+                                else {
+                                    _args.add(asString(args[ix]));
+                                }
                             }
                             break;
                         case "":
