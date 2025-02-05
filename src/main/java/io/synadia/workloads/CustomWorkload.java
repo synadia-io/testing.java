@@ -16,8 +16,10 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static io.nats.client.support.JsonUtils.printFormatted;
+import static io.synadia.utils.Debug.time;
 
 public class CustomWorkload extends Workload {
+    public static final String TEXT_ID_PREFIX = "cw-";
     public static final String DATA_STREAM_NAME = "cw-data";
     public static final String LOG_STREAM_NAME = "cw-log";
     public static final String DATA_SUBJECT_PREFIX = "d.";
@@ -308,8 +310,8 @@ public class CustomWorkload extends Workload {
 
     private static String getInfoResultText(String label, Integer id, long count, Object extra) {
         String xs = extra == null ? "" : extra.toString().trim();
-        return "Thread " + id
-            + " | " + label
+
+        return "[" + time() + "][" + TEXT_ID_PREFIX + id + "] | " + label
             + (count < 0 ? "" : " | Count: " + count)
             + (xs.isEmpty() ? "" : " | " + xs);
     }
