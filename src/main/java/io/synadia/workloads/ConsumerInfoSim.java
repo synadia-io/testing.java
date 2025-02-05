@@ -45,7 +45,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
 
     @Override
     protected String commands() {
-        return "'setup', 'create', 'list', 'clear consumers|data|result', 'publish', 'consume', 'info', 'results'";
+        return "'setup', 'create', 'list', 'clear consumers|data|results', 'publish', 'consume', 'info', 'results'";
     }
 
     @Override
