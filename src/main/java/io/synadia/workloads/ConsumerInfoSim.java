@@ -231,10 +231,9 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
             list.add(toConsumerName(cx));
         }
 
-        AtomicLong groupCount = new AtomicLong();
         String runId = generateRunId();
         for (tix = 0; tix < INFO_THREAD_COUNT; tix++) {
-            Runnable infoWorker = infoWorker(runId, tix, background, groupCount, options.get(tix), cnLists.get(tix));
+            Runnable infoWorker = infoWorker(runId, tix, background, options.get(tix), cnLists.get(tix));
             Thread t = new Thread(infoWorker);
             t.start();
             threads.add(t);
@@ -246,7 +245,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
-    private Runnable infoWorker(String runId, int tix, boolean background, AtomicLong groupCount, Options options, List<String> consumerNames) {
+    private Runnable infoWorker(String runId, int tix, boolean background, Options options, List<String> consumerNames) {
         return () -> {
             try (Connection nc = Nats.connect(options)) {
                 JetStreamManagement jsm = nc.jetStreamManagement();
@@ -254,15 +253,15 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                 print(background, INFO_JOB, runId, tix, "connect", 0, nc.getServerInfo().getServerId());
                 List<String> list = new ArrayList<>(consumerNames);
                 Collections.shuffle(list);
+                long count = 0;
                 long ioEx = 0;
                 long jsapiEx = 0;
                 while (true) {
                     for (String consumerName : list) {
                         try {
                             jsm.getConsumerInfo(DATA_STREAM_NAME, consumerName);
-                            long gc = groupCount.incrementAndGet();
-                            if (gc % INFO_REPORT_FREQUENCY == 0) {
-                                autoResult(background, js, INFO_JOB, runId, tix, gc, null);
+                            if (++count % INFO_REPORT_FREQUENCY == 0) {
+                                autoResult(background, js, INFO_JOB, runId, tix, count, null);
                             }
                         }
                         catch (IOException ie) {
