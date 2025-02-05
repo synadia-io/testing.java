@@ -248,7 +248,7 @@ public class CustomWorkload extends Workload {
                             if (got.incrementAndGet() % INFO_REPORT_FREQUENCY == 0) {
                                 String ios = io.get() > 0 ? " | IO Ex: " + io.get() : "";
                                 String jss = jsapi.get() > 0 ? " | JSAPI Ex: " + jsapi.get() : "";
-                                infoResult(background, js, "Consumer Info Success. | Count: ", id, got.get(), ios + jss);
+                                infoResult(background, js, "Consumer Info Success.", id, got.get(), ios + jss);
                             }
                         }
                         catch (IOException ie) {
@@ -291,7 +291,7 @@ public class CustomWorkload extends Workload {
     private static String getInfoResultText(String label, Integer id, long count, Object extra) {
         return "Thread " + id
             + " | " + label
-            + (count < 0 ? "" : " | " + count)
+            + (count < 0 ? "" : " | Count: " + count)
             + (extra == null ? "" : " | " + extra);
     }
 
