@@ -145,8 +145,6 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                             if (gc % INFO_REPORT_FREQUENCY == 0) {
                                 autoResult(background, js, PUBLISH_JOB, runId, gc, null);
                             }
-
-                            autoProgress(background, js, PUBLISH_JOB, runId, groupCount.incrementAndGet(), null);
                         }
                         catch (IOException ie) {
                             autoException(background, js, PUBLISH_JOB, runId, tix, ++ioEx, ie);
