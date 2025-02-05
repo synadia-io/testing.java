@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static io.nats.client.support.JsonUtils.printFormatted;
 
+@SuppressWarnings("SameParameterValue")
 public abstract class AbstractSimWorkload extends Workload {
     protected static final String DATA_STREAM_NAME = "sim-data";
     protected static final String RESULT_STREAM_NAME = "sim-log";
@@ -30,6 +31,7 @@ public abstract class AbstractSimWorkload extends Workload {
     protected static final String RESULT_SUBJECT_PREFIX = "result.";
     protected static final String RESULT_STREAM_SUBJECT = RESULT_SUBJECT_PREFIX + ">";
     protected static final int WORKER_THREAD_COUNT = 3;
+    protected static final int NO_TIX = Integer.MAX_VALUE;
 
     protected final int progressFrequency;
 
@@ -78,7 +80,7 @@ public abstract class AbstractSimWorkload extends Workload {
     }
 
     protected interface Worker {
-        Runnable getWork(String job, String runId, int tix, boolean background, Counts count, Options options);
+        Runnable getWork(String job, String runId, int tix, boolean background, AtomicLong groupCount, Options options);
     }
 
     protected void doWorker(String job, Worker worker) throws InterruptedException {
@@ -86,7 +88,7 @@ public abstract class AbstractSimWorkload extends Workload {
         printHeader(job, background);
         List<Options> options = roundRobinOptions(WORKER_THREAD_COUNT);
         List<Thread> threads = new ArrayList<>(WORKER_THREAD_COUNT);
-        Counts groupCount = new Counts();
+        AtomicLong groupCount = new AtomicLong();
         String runId = generateRunId();
         for (int tix = 0; tix < WORKER_THREAD_COUNT; tix++) {
             Thread t = new Thread(worker.getWork(job, runId, tix, background, groupCount, options.get(tix)));
@@ -96,12 +98,6 @@ public abstract class AbstractSimWorkload extends Workload {
         for (Thread t : threads) {
             t.join();
         }
-    }
-
-    protected static class Counts {
-        public final AtomicLong count = new AtomicLong();
-        public final AtomicLong ioEx = new AtomicLong();
-        public final AtomicLong jsapiEx = new AtomicLong();
     }
 
     protected String generateRunId() {
@@ -114,7 +110,6 @@ public abstract class AbstractSimWorkload extends Workload {
         public final int tix;
         public final String operation;
         public final long count;
-        public final long groupCount;
         public final long time;
         public final String details;
 
@@ -122,34 +117,34 @@ public abstract class AbstractSimWorkload extends Workload {
             JsonValue jv = JsonParser.parseUnchecked(jsonBytes);
             this.job = JsonValueUtils.readString(jv, "job");
             this.runId = JsonValueUtils.readString(jv, "run_id");
-            this.tix = JsonValueUtils.readInteger(jv, "tix", -1);
+            this.tix = JsonValueUtils.readInteger(jv, "tix", NO_TIX);
             this.operation = JsonValueUtils.readString(jv, "operation");
             this.count = JsonValueUtils.readLong(jv, "count", 0);
-            this.groupCount = JsonValueUtils.readLong(jv, "group_count", -1);
             this.time = JsonValueUtils.readLong(jv, "time", 0);
             this.details = JsonValueUtils.readString(jv, "details");
         }
 
-        public Result(String job, String runId, int tix, String operation, long count, long groupCount, Object details) {
-            this.job = job;
+        public Result(String job, String runId, int tix, String operation, long count, Object details) {
+            this.job = job.toLowerCase();
             this.runId = runId;
             this.tix = tix;
             this.operation = operation;
             this.count = count;
-            this.groupCount = groupCount;
             this.time = System.currentTimeMillis();
-            this.details = details == null ? null : details.toString().trim();
+            String temp = details == null ? "" : details.toString().trim();
+            this.details = temp.isEmpty() ? null : temp;
         }
 
         @Override
         public String toJson() {
             JsonValueUtils.MapBuilder mb = JsonValueUtils.mapBuilder();
             mb.put("job", job);
-            mb.put("tix", tix);
+            if (tix != NO_TIX) {
+                mb.put("tix", tix);
+            }
             mb.put("run_id", runId);
             mb.put("operation", operation);
             mb.put("count", count);
-            mb.put("group_count", groupCount);
             mb.put("time", time);
             mb.put("details", details);
             return mb.jv.toJson();
@@ -157,40 +152,62 @@ public abstract class AbstractSimWorkload extends Workload {
 
         @Override
         public String toString() {
-            String xs = details == null ? "" : details;
-            return "[" + time + "]" + printLabel()
-                + (count < 0 ? "" : " | Count: " + count)
-                + (xs.isEmpty() ? "" : " | " + xs);
+            StringBuilder sb = new StringBuilder(ident());
+            if (count > 0) {
+                sb.append(" Count:").append(count);
+            }
+            if (details != null) {
+                if (count > 0) {
+                    sb.append(" | ");
+                }
+                sb.append(details);
+            }
+            return sb.toString();
         }
 
-        public String printLabel() {
-            return "[" + job + "-" + runId + "-" + tix + "][" + operation + "]";
+        public String ident() {
+            return "[" + time + " " + _jrt() + " " + operation + "]";
         }
 
         public String subject() {
-            return RESULT_SUBJECT_PREFIX + job + "." + runId + "." + tix;
+            return RESULT_SUBJECT_PREFIX + _jrt();
+        }
+
+        private String _jrt() {
+            return job + "." + runId + _tix();
+        }
+
+        private String _tix() {
+            return tix < 0 ? "._" : "." + tix;
         }
     }
 
-    protected void autoProgress(boolean background, JetStream js, String job, String runId, int tix, String operation, long count, long groupCount, Object details) {
-        showProgressMaybe(background, groupCount > 0 ? groupCount : count);
-        publishResult(js, job, runId, tix, operation, count, groupCount, details);
+    protected void autoProgress(boolean background, JetStream js, String job, String runId, int tix, String operation, long count, Object details) {
+        showProgressMaybe(background, count);
+        publishResult(js, job, runId, tix, operation, count, details);
     }
 
-    protected void autoResult(boolean background, JetStream js, String job, String runId, int tix, String operation, long count, long groupCount, Object details) {
-        Result result = new Result(job, runId, tix, operation, count, groupCount, details);
+    protected void autoResult(boolean background, JetStream js, String job, String runId, int tix, String operation, long count, Object details) {
+        Result result = new Result(job, runId, tix, operation, count, details);
         if (!background) {
             System.out.println(result);
         }
         publishResult(js, result);
     }
 
-    protected void autoException(boolean background, JetStream js, String job, String runId, int tix, long count, long groupCount, Exception ex) {
-        autoResult(background, js, job, runId, tix, "Exception", count, groupCount, ex);
+    protected void printResult(boolean background, String job, String runId, int tix, String operation, long count, Object details) {
+        if (!background) {
+            Result result = new Result(job, runId, tix, operation, count, details);
+            System.out.println(result);
+        }
     }
 
-    protected void publishResult(JetStream js, String job, String runId, int tix, String operation, long count, long groupCount, Object details) {
-        publishResult(js, new Result(job, runId, tix, operation, count, groupCount, details));
+    protected void autoException(boolean background, JetStream js, String job, String runId, int tix, long count, Exception ex) {
+        autoResult(background, js, job, runId, tix, "Exception", count, ex);
+    }
+
+    protected void publishResult(JetStream js, String job, String runId, int tix, String operation, long count, Object details) {
+        publishResult(js, new Result(job, runId, tix, operation, count, details));
     }
 
     protected void publishResult(JetStream js, Result result) {
@@ -198,7 +215,7 @@ public abstract class AbstractSimWorkload extends Workload {
             js.publish(result.subject(), result.serialize());
         }
         catch (IOException | JetStreamApiException ee) {
-            System.err.println(result.printLabel() + " Result Publish Error | " + ee);
+            System.err.println(result.ident() + " Result Publish Error | " + ee);
         }
     }
 

@@ -4,14 +4,16 @@
 package io.synadia.workloads;
 
 import io.nats.client.*;
-import io.nats.client.api.ConsumerConfiguration;
-import io.nats.client.api.OrderedConsumerConfiguration;
+import io.nats.client.api.*;
 import io.synadia.CommandLine;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
+
+import static io.nats.jsmulti.shared.Utils.sleep;
 
 public class ConsumerInfoSim extends AbstractSimWorkload {
     public static final String CONSUMER_PREFIX = "sim-con-";
@@ -20,6 +22,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
     public static final long CONSUME_JITTER = 500;
     public static final int INFO_THREAD_COUNT = 8;
     public static final int PROGRESS_FREQUENCY = 100;
+    public static final long RESULTS_FREQUENCY = 5000;
     public static final int INFO_REPORT_FREQUENCY = 10000;
     public static final long SEED_MESSAGES = 300_000;
     public static final long MAX_MESSAGES = 1_000_000;
@@ -101,36 +104,35 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
-    private Runnable publishWorker(String job, String runId, int tix, boolean background, Counts groupCount, Options options) {
+    private Runnable publishWorker(String job, String runId, int tix, boolean background, AtomicLong groupCount, Options options) {
         return () -> {
             try (Connection nc = Nats.connect(options)) {
                 JetStream js = nc.jetStream();
-                autoResult(background, js, job, runId, tix, "connect", -1, -1, nc.getServerInfo().getServerId());
+                printResult(background, job, runId, tix, "connect", 0, nc.getServerInfo().getServerId());
                 List<Integer> consumers = new ArrayList<>();
                 for (int cx = 0; cx < CONSUMER_COUNT; cx++) {
                     consumers.add(cx);
                 }
-                long count = 0;
                 long ioEx = 0;
                 long jsapiEx = 0;
                 while (true) {
                     Collections.shuffle(consumers);
                     for (Integer cx : consumers) {
-                        if (groupCount.count.get() > SEED_MESSAGES) {
+                        if (groupCount.get() > SEED_MESSAGES) {
                             jitter(PUBLISH_JITTER);
                         }
                         try {
                             js.publish(toSubjectName(cx), null);
-                            autoProgress(background, js, job, runId, tix, "publish", ++count, groupCount.count.incrementAndGet(), null);
+                            autoProgress(background, js, job, runId, NO_TIX, "publish", groupCount.incrementAndGet(), null);
                         }
                         catch (IOException ie) {
-                            autoException(background, js, INFO_JOB, runId, tix, ++ioEx, groupCount.ioEx.incrementAndGet(), ie);
+                            autoException(background, js, job, runId, tix, ++ioEx, ie);
                         }
                         catch (JetStreamApiException e) {
-                            autoException(background, js, job, runId, tix, ++jsapiEx, groupCount.jsapiEx.incrementAndGet(), e);
+                            autoException(background, js, job, runId, tix, ++jsapiEx, e);
                         }
                     }
-                    endProgress(background, groupCount.count.get());
+                    endProgress(background, groupCount.get());
                 }
             }
             catch (InterruptedException | IOException e) {
@@ -140,14 +142,12 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
-    private Runnable consumeWorker(String job, String runId, int tix, boolean background, Counts groupCount, Options options) {
+    private Runnable consumeWorker(String job, String runId, int tix, boolean background, AtomicLong groupCount, Options options) {
         return () -> {
             try (Connection nc = Nats.connect(options)) {
                 JetStream js = nc.jetStream();
-                autoResult(background, js, job, runId, tix, "connect", -1, -1, nc.getServerInfo().getServerId());
+                printResult(background, job, runId, tix, "connect", 0, nc.getServerInfo().getServerId());
 
-                int count = 0;
-                int jsapi = 0;
                 List<Integer> consumers = new ArrayList<>();
                 for (int cx = 0; cx < CONSUMER_COUNT; cx++) {
                     consumers.add(cx);
@@ -164,15 +164,12 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                             if (m != null) {
                                 m.ack();
                             }
-                            autoProgress(background, js, job, runId, tix, "consume", ++count, groupCount.count.incrementAndGet(), null);
+                            autoProgress(background, js, job, runId, NO_TIX, "consume", groupCount.incrementAndGet(), null);
                         }
-                        catch (JetStreamStatusCheckedException je) {
-                            autoException(background, js, INFO_JOB, runId, tix, ++jsapi, groupCount.jsapiEx.incrementAndGet(), je);
-                        }
-                        catch (Exception ignore) {} // AutoCloseable
+                        catch (Exception ignore) {}
                     }
                     if (!background) {
-                        endProgress(background, groupCount.count.get());
+                        endProgress(background, groupCount.get());
                     }
                 }
             }
@@ -183,21 +180,27 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
-    private void doResults(Connection nc) throws IOException, JetStreamApiException {
+    private void doResults(Connection nc) throws IOException {
         printHeader("Results");
-        StreamContext sctx = nc.getStreamContext(RESULT_STREAM_NAME);
-        OrderedConsumerContext occtx = sctx.createOrderedConsumer(
-            new OrderedConsumerConfiguration().filterSubject(RESULT_STREAM_SUBJECT));
-        try (IterableConsumer ic = occtx.iterate()) {
-            while (true) {
-                Message m = ic.nextMessage(10000);
-                if (m != null) {
-                    System.out.println(new String(m.getData()) + " | " + stringify(m));
+        JetStreamManagement jsm = nc.jetStreamManagement();
+        while (true) {
+            try {
+                System.out.println();
+                System.out.println("----------------------------------------------------------------------------------------------------");
+                StreamInfo si = jsm.getStreamInfo(RESULT_STREAM_NAME, StreamInfoOptions.allSubjects());
+                for (Subject subject : si.getStreamState().getSubjects()) {
+                    MessageInfo mi = jsm.getLastMessage(RESULT_STREAM_NAME, subject.getName());
+                    if (mi != null) {
+                        Result result = new Result(mi.getData());
+                        System.out.println(result);
+                    }
                 }
+                System.out.println("----------------------------------------------------------------------------------------------------");
+                sleep(RESULTS_FREQUENCY);
             }
-        }
-        catch (Exception e) {
-            throw new RuntimeException(e);
+            catch (Exception e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 
@@ -220,7 +223,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
             list.add(toConsumerName(cx));
         }
 
-        Counts groupCount = new Counts();
+        AtomicLong groupCount = new AtomicLong();
         String runId = generateRunId();
         for (tix = 0; tix < INFO_THREAD_COUNT; tix++) {
             Runnable infoWorker = infoWorker(runId, tix, background, groupCount, options.get(tix), cnLists.get(tix));
@@ -237,32 +240,30 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
     static String INFO_JOB = "Consumer Info";
 
     @SuppressWarnings("InfiniteLoopStatement")
-    private Runnable infoWorker(String runId, int tix, boolean background, Counts groupCount, Options options, List<String> consumerNames) {
+    private Runnable infoWorker(String runId, int tix, boolean background, AtomicLong groupCount, Options options, List<String> consumerNames) {
         return () -> {
             try (Connection nc = Nats.connect(options)) {
                 JetStreamManagement jsm = nc.jetStreamManagement();
                 JetStream js = nc.jetStream();
-                autoResult(background, js, INFO_JOB, runId, tix, "connect", -1, -1, nc.getServerInfo().getServerId());
+                printResult(background, INFO_JOB, runId, tix, "connect", 0, nc.getServerInfo().getServerId());
                 List<String> list = new ArrayList<>(consumerNames);
                 Collections.shuffle(list);
-                long count = 0;
                 long ioEx = 0;
                 long jsapiEx = 0;
                 while (true) {
                     for (String consumerName : list) {
                         try {
                             jsm.getConsumerInfo(DATA_STREAM_NAME, consumerName);
-                            ++count;
-                            long gc = groupCount.count.incrementAndGet();
+                            long gc = groupCount.incrementAndGet();
                             if (gc % INFO_REPORT_FREQUENCY == 0) {
-                                autoResult(background, js, INFO_JOB, runId, tix, "get", count, gc, null);
+                                autoResult(background, js, INFO_JOB, runId, NO_TIX, "get", gc, null);
                             }
                         }
                         catch (IOException ie) {
-                            autoException(background, js, INFO_JOB, runId, tix, ++ioEx, groupCount.ioEx.incrementAndGet(), ie);
+                            autoException(background, js, INFO_JOB, runId, tix, ++ioEx, ie);
                         }
                         catch (JetStreamApiException je) {
-                            autoException(background, js, INFO_JOB, runId, tix, ++jsapiEx, groupCount.jsapiEx.incrementAndGet(), je);
+                            autoException(background, js, INFO_JOB, runId, tix, ++jsapiEx, je);
                         }
                     }
                 }
