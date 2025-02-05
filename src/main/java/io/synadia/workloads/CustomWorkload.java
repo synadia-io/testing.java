@@ -8,7 +8,6 @@ import io.nats.client.api.ConsumerConfiguration;
 import io.nats.client.api.RetentionPolicy;
 import io.nats.client.api.StreamConfiguration;
 import io.nats.client.api.StreamInfo;
-import io.nats.client.impl.NatsJetStreamMetaData;
 import io.synadia.CommandLine;
 import io.synadia.Workload;
 
@@ -186,11 +185,6 @@ public class CustomWorkload extends Workload {
         }
     }
 
-    public static String stringify(Message msg) {
-        NatsJetStreamMetaData meta = msg.metaData();
-        return "StreamSeq: " + meta.streamSequence() + " | " + "ConSeq: " + meta.consumerSequence();
-    }
-
     private void doInfo() throws InterruptedException {
         boolean background = commandLine.args.contains("background");
         System.out.println("Custom Workload - Info | background: " + background);
@@ -248,7 +242,7 @@ public class CustomWorkload extends Workload {
                             if (got.incrementAndGet() % INFO_REPORT_FREQUENCY == 0) {
                                 String ios = io.get() > 0 ? " | IO Ex: " + io.get() : "";
                                 String jss = jsapi.get() > 0 ? " | JSAPI Ex: " + jsapi.get() : "";
-                                infoResult(background, js, "Consumer Info Success.", id, got.get(), ios + jss);
+                                infoResult(background, js, "Consumer Info", id, got.get(), ios + jss);
                             }
                         }
                         catch (IOException ie) {
