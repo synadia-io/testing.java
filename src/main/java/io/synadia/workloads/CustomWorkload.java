@@ -33,7 +33,7 @@ public class CustomWorkload extends Workload {
     public static final int PUBLISH_THREAD_COUNT = 4;
     public static final int INFO_THREAD_COUNT = 8;
     public static final int PROGRESS_FREQUENCY = 100;
-    public static final int INFO_REPORT_FREQUENCY = 1000;
+    public static final int INFO_REPORT_FREQUENCY = 10000;
 
     public static final int MAX_MESSAGES = 1_000_000;
     public static final int SEED_MESSAGES = 300_000;
@@ -210,8 +210,12 @@ public class CustomWorkload extends Workload {
             list.add(toConsumerName(cx));
         }
 
+        AtomicLong got = new AtomicLong();
+        AtomicLong io = new AtomicLong();
+        AtomicLong jsapi = new AtomicLong();
+
         for (int x = 0; x < INFO_THREAD_COUNT; x++) {
-            Thread t = infoThread(x, background, consumerNameLists, options.get(x));
+            Thread t = infoThread(x, background, got, io, jsapi, consumerNameLists, options.get(x));
             t.start();
             threads.add(t);
         }
@@ -221,11 +225,16 @@ public class CustomWorkload extends Workload {
         }
     }
 
-    private static Thread infoThread(final Integer id, boolean background, List<List<String>> consumerNameLists, Options options) {
+    private static Thread infoThread(
+        final Integer id,
+        boolean background,
+        AtomicLong got,
+        AtomicLong io,
+        AtomicLong jsapi,
+        List<List<String>> consumerNameLists,
+        Options options
+    ) {
         return new Thread(() -> {
-            long got = 0;
-            long io = 0;
-            long jsapi = 0;
             try (Connection nc = Nats.connect(options)) {
                 JetStreamManagement jsm = nc.jetStreamManagement();
                 JetStream js = nc.jetStream();
@@ -233,19 +242,20 @@ public class CustomWorkload extends Workload {
                 List<String> list = consumerNameLists.get(id);
                 while (true) {
                     for (String consumerName : list) {
-                        boolean report = false;
                         Exception e = null;
                         try {
                             jsm.getConsumerInfo(DATA_STREAM_NAME, consumerName);
-                            if (++got % INFO_REPORT_FREQUENCY == 0) {
-                                infoResult(background, js, "Consumer Info Success", id, got, null);
+                            if (got.incrementAndGet() % INFO_REPORT_FREQUENCY == 0) {
+                                infoResult(background, js, "Consumer Info Success", id, got.get(), null);
+                                infoResult(background, js, "Consumer Info IOException", id, io.get(), e);
+                                infoResult(background, js, "Consumer Info JetStreamApiException", id, jsapi.get(), e);
                             }
                         }
                         catch (IOException ie) {
-                            infoResult(background, js, "Consumer Info IOException", id, ++io, e);
+                            infoResult(background, js, "Consumer Info IOException", id, io.incrementAndGet(), e);
                         }
                         catch (JetStreamApiException je) {
-                            infoResult(background, js, "Consumer Info JetStreamApiException", id, ++jsapi, e);
+                            infoResult(background, js, "Consumer Info JetStreamApiException", id, jsapi.incrementAndGet(), e);
                         }
                     }
                 }
