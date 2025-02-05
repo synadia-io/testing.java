@@ -247,7 +247,7 @@ public abstract class AbstractSimWorkload extends Workload {
         if (!background) {
             if (count % progressFrequency == 0) {
                 System.out.println(" " + count);
-                System.out.println(lineStart);
+                System.out.print(lineStart);
             }
             else {
                 System.out.print(DOT);
