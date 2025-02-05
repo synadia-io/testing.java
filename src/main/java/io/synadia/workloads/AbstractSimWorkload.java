@@ -31,7 +31,7 @@ public abstract class AbstractSimWorkload extends Workload {
     protected static final String DATA_STREAM_SUBJECT = DATA_SUBJECT_PREFIX + ">";
     protected static final String RESULT_SUBJECT_PREFIX = "result.";
     protected static final String RESULT_STREAM_SUBJECT = RESULT_SUBJECT_PREFIX + ">";
-    protected static final int WORKER_THREAD_COUNT = 3;
+    protected static final int DEFAULT_WORKER_THREAD_COUNT = 3;
     protected static final int NO_TIX = Integer.MIN_VALUE;
     public static final String DEFAULT_SEGMENT = "._";
     public static final String DOT = ".";
@@ -93,13 +93,17 @@ public abstract class AbstractSimWorkload extends Workload {
     }
 
     protected void doWorker(String job, Worker worker) throws InterruptedException {
+        doWorker(job, DEFAULT_WORKER_THREAD_COUNT, worker);
+    }
+
+    protected void doWorker(String job, int threadCount, Worker worker) throws InterruptedException {
         boolean background = isBackground();
         startJob(job, background);
-        List<Options> options = roundRobinOptions(WORKER_THREAD_COUNT);
-        List<Thread> threads = new ArrayList<>(WORKER_THREAD_COUNT);
+        List<Options> options = roundRobinOptions(threadCount);
+        List<Thread> threads = new ArrayList<>(threadCount);
         AtomicLong groupCount = new AtomicLong();
         String runId = generateRunId();
-        for (int tix = 0; tix < WORKER_THREAD_COUNT; tix++) {
+        for (int tix = 0; tix < threadCount; tix++) {
             Thread t = new Thread(worker.getWork(runId, tix, background, groupCount, options.get(tix)));
             t.start();
             threads.add(t);
