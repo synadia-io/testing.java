@@ -45,7 +45,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
 
     @Override
     protected String commands() {
-        return "'setup', 'create', 'list', 'clear consumers|data|results', 'publish', 'consume', 'info', 'results'";
+        return "'setup', 'create', 'list', 'clear consumers|data|log', 'publish', 'consume', 'info', 'results'";
     }
 
     @Override
@@ -209,9 +209,9 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
             try {
                 System.out.println();
                 System.out.println("----------------------------------------------------------------------------------------------------");
-                StreamInfo si = jsm.getStreamInfo(RESULT_STREAM_NAME, StreamInfoOptions.allSubjects());
+                StreamInfo si = jsm.getStreamInfo(LOG_STREAM_NAME, StreamInfoOptions.allSubjects());
                 for (Subject subject : si.getStreamState().getSubjects()) {
-                    MessageInfo mi = jsm.getLastMessage(RESULT_STREAM_NAME, subject.getName());
+                    MessageInfo mi = jsm.getLastMessage(LOG_STREAM_NAME, subject.getName());
                     if (mi != null) {
                         Result result = new Result(mi.getData());
                         System.out.println(result);

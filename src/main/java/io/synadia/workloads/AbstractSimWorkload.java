@@ -26,11 +26,11 @@ import static io.nats.client.support.JsonUtils.printFormatted;
 @SuppressWarnings("SameParameterValue")
 public abstract class AbstractSimWorkload extends Workload {
     protected static final String DATA_STREAM_NAME = "sim-data";
-    protected static final String RESULT_STREAM_NAME = "sim-log";
+    protected static final String LOG_STREAM_NAME = "sim-log";
     protected static final String DATA_SUBJECT_PREFIX = "data.";
     protected static final String DATA_STREAM_SUBJECT = DATA_SUBJECT_PREFIX + ">";
-    protected static final String RESULT_SUBJECT_PREFIX = "result.";
-    protected static final String RESULT_STREAM_SUBJECT = RESULT_SUBJECT_PREFIX + ">";
+    protected static final String LOG_SUBJECT_PREFIX = "log.";
+    protected static final String LOG_STREAM_SUBJECT = LOG_SUBJECT_PREFIX + ">";
     protected static final int DEFAULT_WORKER_THREAD_COUNT = 3;
     protected static final int NO_TIX = Integer.MIN_VALUE;
     public static final String DEFAULT_SEGMENT = "._";
@@ -78,10 +78,10 @@ public abstract class AbstractSimWorkload extends Workload {
             .maxMessages(maxMessages)
             .build());
         printFormatted(si.getJv());
-        safeDeleteStream(jsm, RESULT_STREAM_NAME);
+        safeDeleteStream(jsm, LOG_STREAM_NAME);
         si = jsm.addStream(StreamConfiguration.builder()
-            .name(RESULT_STREAM_NAME)
-            .subjects(RESULT_STREAM_SUBJECT)
+            .name(LOG_STREAM_NAME)
+            .subjects(LOG_STREAM_SUBJECT)
             .retentionPolicy(RetentionPolicy.Limits)
             .maxAge(Duration.ofMinutes(5))
             .build());
@@ -95,7 +95,7 @@ public abstract class AbstractSimWorkload extends Workload {
 
     protected void doClearResults(Connection nc) throws IOException, JetStreamApiException {
         startJob("Clear Results");
-        nc.jetStreamManagement().purgeStream(RESULT_STREAM_NAME);
+        nc.jetStreamManagement().purgeStream(LOG_STREAM_NAME);
     }
 
     protected interface Worker {
@@ -205,7 +205,7 @@ public abstract class AbstractSimWorkload extends Workload {
         }
 
         public String subject() {
-            return RESULT_SUBJECT_PREFIX + segments();
+            return LOG_SUBJECT_PREFIX + segments();
         }
 
         private String segments() {
