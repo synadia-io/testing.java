@@ -13,6 +13,7 @@ import io.nats.client.support.JsonValue;
 import io.nats.client.support.JsonValueUtils;
 import io.synadia.CommandLine;
 import io.synadia.Workload;
+import io.synadia.utils.Debug;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -47,11 +48,17 @@ public abstract class AbstractSimWorkload extends Workload {
         this.progressFrequency = progressFrequency;
     }
 
-    public void init(String defaultLabel, boolean requiresArguments, CommandLine commandLine) {
+    public void aswInit(String defaultLabel, boolean requiresArguments, CommandLine commandLine) {
         init(defaultLabel, commandLine);
         if (requiresArguments && commandLine.args.isEmpty()) {
-            throw new RuntimeException("Argument(s) Required. " + commands());
+            exit("Argument(s) Required");
         }
+    }
+
+    protected void exit(String reason) {
+        Debug.info(workLabel, reason);
+        Debug.info(workLabel, "Commands: " + commands());
+        System.exit(0);
     }
 
     protected abstract String commands();

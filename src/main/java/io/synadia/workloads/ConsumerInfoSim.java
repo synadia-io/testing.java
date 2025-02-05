@@ -31,16 +31,14 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
         super(PROGRESS_FREQUENCY);
     }
 
+    @Override
     public void init(CommandLine commandLine) {
-        init("Consumer Info Sim", commandLine);
-        if (commandLine.args.isEmpty()) {
-            throw new RuntimeException("Argument(s) Required. " + commands());
-        }
+        aswInit("Consumer Info Sim", true, commandLine);
     }
 
     @Override
     protected String commands() {
-        return "Commands: 'setup', 'create', 'list', 'clear', 'publish', 'consume', 'info', 'local', 'results'";
+        return "'setup', 'create', 'list', 'clear', 'publish', 'consume', 'info', 'results'";
     }
 
     @Override
@@ -56,7 +54,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                 case "consume" -> doWorker("Consume", this::consumeWorker);
                 case "info"    -> doInfo();
                 case "results" -> doResults(nc);
-                default        -> System.out.println("Unknown custom workload '" + arg + "'. " + commands());
+                default        -> exit("Unknown custom workload");
             }
         }
     }
