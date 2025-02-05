@@ -251,8 +251,8 @@ public class CustomWorkload extends Workload {
                         }
                         if (report || e != null) {
                             infoResult(background, js, "Consumer Info Success", id, got, null);
-                            infoResult(background, js, "Consumer Info IOException", id, ++io, e);
-                            infoResult(background, js, "Consumer Info JetStreamApiException", id, ++jsapi, e);
+                            infoResult(background, js, "Consumer Info IOException", id, io, e);
+                            infoResult(background, js, "Consumer Info JetStreamApiException", id, jsapi, e);
                         }
                     }
                 }
