@@ -31,6 +31,8 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
     private static final String INFO_JOB =    "ConInfo";
     private static final String PUBLISH_JOB = "Publish";
     private static final String CONSUME_JOB = "Consume";
+    private static final String CONSUMERS = "consumers";
+    private static final String MESSAGES = "messages";
 
     public ConsumerInfoSim() {
         super(PROGRESS_FREQUENCY);
@@ -43,7 +45,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
 
     @Override
     protected String commands() {
-        return "'setup', 'create', 'list', 'clear', 'publish', 'consume', 'info', 'results'";
+        return "'setup', 'create', 'list', 'clear consumers|messages', 'publish', 'consume', 'info', 'results'";
     }
 
     @Override
@@ -94,16 +96,34 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
     }
 
     private void doClear(Connection nc) throws IOException, JetStreamApiException {
-        startProgressJob("Clear Consumers");
-        JetStreamManagement jsm = nc.jetStreamManagement();
-        List<String> list = jsm.getConsumerNames(DATA_STREAM_NAME);
-        int index = 0;
-        while (index < list.size()) {
-            String cn = list.get(index);
-            jsm.deleteConsumer(DATA_STREAM_NAME, cn);
-            showProgressMaybe(++index, "Clear Consumers");
+        String option = null;
+        if (commandLine.args.size() == 2) {
+            option = commandLine.args.get(1);
         }
-        endProgress(index);
+        if (option == null || option.isEmpty()) {
+            exit("Clear option not provided");
+        }
+        else {
+            switch (option) {
+                case CONSUMERS -> {
+                    startProgressJob("Clear Consumers");
+                    JetStreamManagement jsm = nc.jetStreamManagement();
+                    List<String> list = jsm.getConsumerNames(DATA_STREAM_NAME);
+                    int index = 0;
+                    while (index < list.size()) {
+                        String cn = list.get(index);
+                        jsm.deleteConsumer(DATA_STREAM_NAME, cn);
+                        showProgressMaybe(++index, "Clear Consumers");
+                    }
+                    endProgress(index);
+                }
+                case MESSAGES -> {
+                    startJob("Clear Messages");
+                    nc.jetStreamManagement().purgeStream(DATA_STREAM_NAME);
+                }
+                default -> exit("Unknown clear option: '" + option + "'");
+            }
+        }
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
