@@ -187,24 +187,26 @@ public class CustomWorkload extends Workload {
         StreamContext sctx = nc.getStreamContext(LOG_STREAM_NAME);
         long lastSeq = 0;
         //noinspection InfiniteLoopStatement
-        while (true) {
+//        while (true) {
             OrderedConsumerContext occtx = sctx.createOrderedConsumer(
                 new OrderedConsumerConfiguration()
-                    .deliverPolicy(lastSeq == 0 ? DeliverPolicy.All : DeliverPolicy.ByStartSequence)
+//                    .deliverPolicy(lastSeq == 0 ? DeliverPolicy.All : DeliverPolicy.ByStartSequence)
                     .startSequence(lastSeq)
                     .filterSubject(LOG_SUBJECT));
             try (IterableConsumer ic = occtx.iterate()) {
-                Message m = ic.nextMessage(5000);
-                while (m != null) {
-                    lastSeq = m.metaData().streamSequence();
-                    System.out.println(new String(m.getData()) + " | " + stringify(m));
-                    m = ic.nextMessage(1000);
+                //noinspection InfiniteLoopStatement
+                while (true) {
+                    Message m = ic.nextMessage(10000);
+                    if (m != null) {
+//                        lastSeq = m.metaData().streamSequence();
+                        System.out.println(new String(m.getData()) + " | " + stringify(m));
+                    }
                 }
             }
             catch (Exception e) {
                 throw new RuntimeException(e);
             }
-        }
+//        }
     }
 
     private void doInfo() throws InterruptedException {
@@ -310,7 +312,6 @@ public class CustomWorkload extends Workload {
 
     private static String getInfoResultText(String label, Integer id, long count, Object extra) {
         String xs = extra == null ? "" : extra.toString().trim();
-
         return "[" + time() + "][" + TEXT_ID_PREFIX + id + "] | " + label
             + (count < 0 ? "" : " | Count: " + count)
             + (xs.isEmpty() ? "" : " | " + xs);
