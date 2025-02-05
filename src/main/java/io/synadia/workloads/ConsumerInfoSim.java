@@ -32,6 +32,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
     private static final String CONSUME_JOB = "Consume";
     private static final String CONSUMERS = "consumers";
     private static final String MESSAGES = "messages";
+    private static final String RESULTS = "results";
 
     public ConsumerInfoSim() {
         super(PROGRESS_FREQUENCY);
@@ -44,7 +45,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
 
     @Override
     protected String commands() {
-        return "'setup', 'create', 'list', 'clear consumers|messages', 'publish', 'consume', 'info', 'results'";
+        return "'setup', 'create', 'list', 'clear consumers|data|result', 'publish', 'consume', 'info', 'results'";
     }
 
     @Override
@@ -116,10 +117,8 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                     }
                     endProgress(index);
                 }
-                case MESSAGES -> {
-                    startJob("Clear Messages");
-                    nc.jetStreamManagement().purgeStream(DATA_STREAM_NAME);
-                }
+                case MESSAGES -> doClearMessages(nc);
+                case RESULTS -> doClearResults(nc);
                 default -> exit("Unknown clear option: '" + option + "'");
             }
         }

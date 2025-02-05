@@ -88,6 +88,16 @@ public abstract class AbstractSimWorkload extends Workload {
         printFormatted(si.getJv());
     }
 
+    protected void doClearMessages(Connection nc) throws IOException, JetStreamApiException {
+        startJob("Clear Messages");
+        nc.jetStreamManagement().purgeStream(DATA_STREAM_NAME);
+    }
+
+    protected void doClearResults(Connection nc) throws IOException, JetStreamApiException {
+        startJob("Clear Results");
+        nc.jetStreamManagement().purgeStream(RESULT_STREAM_NAME);
+    }
+
     protected interface Worker {
         Runnable getWork(String runId, int tix, boolean background, AtomicLong groupCount, Options options);
     }
@@ -199,7 +209,8 @@ public abstract class AbstractSimWorkload extends Workload {
         }
 
         private String segments() {
-            return job + DOT + runId
+            return job
+                + (runId == null    ? DEFAULT_SEGMENT : DOT + runId)
                 + (defaultQualifier ? DEFAULT_SEGMENT : DOT + qualifier)
                 + (tix == NO_TIX    ? DEFAULT_SEGMENT : DOT + tix);
         }
