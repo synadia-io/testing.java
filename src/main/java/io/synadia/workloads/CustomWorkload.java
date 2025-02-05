@@ -289,10 +289,11 @@ public class CustomWorkload extends Workload {
     }
 
     private static String getInfoResultText(String label, Integer id, long count, Object extra) {
+        String xs = extra == null ? "" : extra.toString().trim();
         return "Thread " + id
             + " | " + label
             + (count < 0 ? "" : " | Count: " + count)
-            + (extra == null ? "" : " | " + extra);
+            + (xs.isEmpty() ? "" : " | " + xs);
     }
 
     private static void progressAfterLoop(long count) {
