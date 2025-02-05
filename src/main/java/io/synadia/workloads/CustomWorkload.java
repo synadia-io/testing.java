@@ -247,8 +247,12 @@ public class CustomWorkload extends Workload {
                             jsm.getConsumerInfo(DATA_STREAM_NAME, consumerName);
                             if (got.incrementAndGet() % INFO_REPORT_FREQUENCY == 0) {
                                 infoResult(background, js, "Consumer Info Success", id, got.get(), null);
-                                infoResult(background, js, "Consumer Info IOException", id, io.get(), e);
-                                infoResult(background, js, "Consumer Info JetStreamApiException", id, jsapi.get(), e);
+                                if (io.get() > 0) {
+                                    infoResult(background, js, "Consumer Info IOException", id, io.get(), e);
+                                }
+                                if (jsapi.get() > 0) {
+                                    infoResult(background, js, "Consumer Info JetStreamApiException", id, jsapi.get(), e);
+                                }
                             }
                         }
                         catch (IOException ie) {
