@@ -77,9 +77,9 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                 .durable(toConsumerName(cx))
                 .filterSubject(toSubjectName(cx))
                 .build());
-            showProgressMaybe(false, ++count);
+            showProgressMaybe(false, ++count, "Creating Consumers");
         }
-        endProgress(false, count);
+        endProgress(false, count, "Creating Consumers");
         List<String> list = jsm.getConsumerNames(DATA_STREAM_NAME);
         System.out.println(list.size());
     }
@@ -100,9 +100,9 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
         while (index < list.size()) {
             String cn = list.get(index);
             jsm.deleteConsumer(DATA_STREAM_NAME, cn);
-            showProgressMaybe(false, ++index);
+            showProgressMaybe(false, ++index, "Clear Consumers");
         }
-        endProgress(false, index);
+        endProgress(false, index, "Clear Consumers");
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
@@ -134,7 +134,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                             autoException(background, js, job, runId, tix, ++jsapiEx, e);
                         }
                     }
-                    endProgress(background, groupCount.get());
+                    endProgress(background, groupCount.get(), job);
                 }
             }
             catch (InterruptedException | IOException e) {
@@ -171,7 +171,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                         catch (Exception ignore) {}
                     }
                     if (!background) {
-                        endProgress(background, groupCount.get());
+                        endProgress(background, groupCount.get(), job);
                     }
                 }
             }

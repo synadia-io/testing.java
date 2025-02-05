@@ -198,7 +198,7 @@ public abstract class AbstractSimWorkload extends Workload {
     }
 
     protected void autoProgress(boolean background, JetStream js, String job, String runId, long count, Object details) {
-        showProgressMaybe(background, count);
+        showProgressMaybe(background, count, job);
         publishResult(js, job, runId, NO_TIX, null, count, details);
     }
 
@@ -237,24 +237,26 @@ public abstract class AbstractSimWorkload extends Workload {
         }
     }
 
-    protected void showProgressMaybe(boolean background, long count) {
-        if (!background) {
-            System.out.print(DOT);
-            if (count % progressFrequency == 0) {
-                System.out.println(count);
-            }
-        }
-    }
-
     protected void print(boolean background, String message) {
         if (!background) {
             System.out.println(System.lineSeparator() + message);
         }
     }
 
-    protected void endProgress(boolean background, long count) {
+    protected void showProgressMaybe(boolean background, long count, String lineEnd) {
+        if (!background) {
+            if (count % progressFrequency == 0) {
+                System.out.println(count + " <-- " + lineEnd);
+            }
+            else {
+                System.out.print(DOT);
+            }
+        }
+    }
+
+    protected void endProgress(boolean background, long count, String lineEnd) {
         if (!background && count % progressFrequency != 0) { // last check because I might have already printed this count
-            System.out.println(count);
+            System.out.println(count + " <-- " + lineEnd);
         }
     }
 
