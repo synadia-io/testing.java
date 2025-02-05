@@ -453,7 +453,7 @@ public class Generator {
             JsonValue jv = JsonValueUtils.mapBuilder()
                 .put("do_public", false)
                 .put("os", "unix")
-                .put("shell_ext", ".sh")
+                // .put("shell_ext", ".sh")
                 .put("key_file", NA)
                 .put("server_user", "ubuntu")
                 .put("client_user", "ec2-user")
