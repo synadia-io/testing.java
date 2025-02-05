@@ -67,8 +67,8 @@ public abstract class AbstractSimWorkload extends Workload {
 
     @SuppressWarnings("SameParameterValue")
     protected void doSetup(Connection nc, long maxMessages) throws IOException, JetStreamApiException {
-        printHeader("Setup");
-        printHeader("Creating Streams");
+        startJob("Setup");
+        startJob("Creating Streams");
         JetStreamManagement jsm = nc.jetStreamManagement();
         safeDeleteStream(jsm, DATA_STREAM_NAME);
         StreamInfo si = jsm.addStream(StreamConfiguration.builder()
@@ -89,18 +89,18 @@ public abstract class AbstractSimWorkload extends Workload {
     }
 
     protected interface Worker {
-        Runnable getWork(String job, String runId, int tix, boolean background, AtomicLong groupCount, Options options);
+        Runnable getWork(String runId, int tix, boolean background, AtomicLong groupCount, Options options);
     }
 
     protected void doWorker(String job, Worker worker) throws InterruptedException {
         boolean background = isBackground();
-        printHeader(job, background);
+        startJob(job, background);
         List<Options> options = roundRobinOptions(WORKER_THREAD_COUNT);
         List<Thread> threads = new ArrayList<>(WORKER_THREAD_COUNT);
         AtomicLong groupCount = new AtomicLong();
         String runId = generateRunId();
         for (int tix = 0; tix < WORKER_THREAD_COUNT; tix++) {
-            Thread t = new Thread(worker.getWork(job, runId, tix, background, groupCount, options.get(tix)));
+            Thread t = new Thread(worker.getWork(runId, tix, background, groupCount, options.get(tix)));
             t.start();
             threads.add(t);
         }
@@ -198,7 +198,9 @@ public abstract class AbstractSimWorkload extends Workload {
     }
 
     protected void autoProgress(boolean background, JetStream js, String job, String runId, long count, Object details) {
-        showProgressMaybe(background, count, job);
+        if (!background) {
+            showProgressMaybe(count, job);
+        }
         publishResult(js, job, runId, NO_TIX, null, count, details);
     }
 
@@ -237,35 +239,32 @@ public abstract class AbstractSimWorkload extends Workload {
         }
     }
 
-    protected void print(boolean background, String message) {
-        if (!background) {
-            System.out.println(System.lineSeparator() + message);
+    protected void showProgressMaybe(long count, String lineStart) {
+        if (count % progressFrequency == 0) {
+            System.out.println(" " + count);
+            System.out.print(lineStart);
+        }
+        else {
+            System.out.print(DOT);
         }
     }
 
-    protected void showProgressMaybe(boolean background, long count, String lineStart) {
-        if (!background) {
-            if (count % progressFrequency == 0) {
-                System.out.println(" " + count);
-                System.out.print(lineStart);
-            }
-            else {
-                System.out.print(DOT);
-            }
-        }
-    }
-
-    protected void endProgress(boolean background, long count, String lineStart) {
-        if (!background && count % progressFrequency != 0) { // last check because I might have already printed this count
+    protected void endProgress(long count) {
+        if (count % progressFrequency != 0) { // last check because I might have already printed this count
             System.out.println(" " + count);
         }
     }
 
-    protected void printHeader(String job) {
+    protected void startProgressJob(String job) {
+        System.out.println(workLabel);
+        System.out.print(job);
+    }
+
+    protected void startJob(String job) {
         System.out.println(workLabel + " - " + job);
     }
 
-    protected void printHeader(String job, boolean background) {
+    protected void startJob(String job, boolean background) {
         System.out.println(workLabel + " - " + job + " (background=" + background + ")");
     }
 }

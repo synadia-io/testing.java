@@ -27,9 +27,9 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
     private static final long SEED_MESSAGES = 300_000;
     private static final long MAX_MESSAGES = 1_000_000;
 
-    private static final String JOB_INFO =    "ConInfo";
-    private static final String JOB_PUBLISH = "Publish";
-    private static final String JOB_CONSUME = "Consume";
+    private static final String INFO_JOB =    "ConInfo";
+    private static final String PUBLISH_JOB = "Publish";
+    private static final String CONSUME_JOB = "Consume";
 
     public ConsumerInfoSim() {
         super(PROGRESS_FREQUENCY);
@@ -54,8 +54,8 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                 case "create"  -> doCreateConsumers(nc);
                 case "list"    -> doList(nc);
                 case "clear"   -> doClear(nc);
-                case "publish" -> doWorker(JOB_PUBLISH, this::publishWorker);
-                case "consume" -> doWorker(JOB_CONSUME, this::consumeWorker);
+                case "publish" -> doWorker(PUBLISH_JOB, this::publishWorker);
+                case "consume" -> doWorker(CONSUME_JOB, this::consumeWorker);
                 case "info"    -> doInfo();
                 case "results" -> doResults(nc);
                 default        -> exit("Unknown custom workload");
@@ -69,7 +69,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
     }
 
     private void doCreateConsumers(Connection nc) throws IOException, JetStreamApiException {
-        printHeader("Creating Consumers");
+        startProgressJob("Creating Consumers");
         JetStreamManagement jsm = nc.jetStreamManagement();
         long count = 0;
         for (int cx = 0; cx < CONSUMER_COUNT; cx++) {
@@ -77,40 +77,40 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                 .durable(toConsumerName(cx))
                 .filterSubject(toSubjectName(cx))
                 .build());
-            showProgressMaybe(false, ++count, "Creating Consumers");
+            showProgressMaybe(++count, "Creating Consumers");
         }
-        endProgress(false, count, "Creating Consumers");
+        endProgress(count);
         List<String> list = jsm.getConsumerNames(DATA_STREAM_NAME);
         System.out.println(list.size());
     }
 
     private void doList(Connection nc) throws IOException, JetStreamApiException {
-        printHeader("List Consumers");
+        startProgressJob("List Consumers");
         JetStreamManagement jsm = nc.jetStreamManagement();
-        List<String> list = jsm.getConsumerNames(DATA_STREAM_NAME);
-        list.forEach(System.out::println);
-        System.out.println(list.size());
+        List<String> consumerNames = jsm.getConsumerNames(DATA_STREAM_NAME);
+        consumerNames.forEach(cn -> System.out.println("Consumer: " + cn));
+        System.out.println("Total: " + consumerNames.size());
     }
 
     private void doClear(Connection nc) throws IOException, JetStreamApiException {
-        printHeader("Clear Consumers");
+        startProgressJob("Clear Consumers");
         JetStreamManagement jsm = nc.jetStreamManagement();
         List<String> list = jsm.getConsumerNames(DATA_STREAM_NAME);
         int index = 0;
         while (index < list.size()) {
             String cn = list.get(index);
             jsm.deleteConsumer(DATA_STREAM_NAME, cn);
-            showProgressMaybe(false, ++index, "Clear Consumers");
+            showProgressMaybe(++index, "Clear Consumers");
         }
-        endProgress(false, index, "Clear Consumers");
+        endProgress(index);
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
-    private Runnable publishWorker(String job, String runId, int tix, boolean background, AtomicLong groupCount, Options options) {
+    private Runnable publishWorker(String runId, int tix, boolean background, AtomicLong groupCount, Options options) {
         return () -> {
             try (Connection nc = Nats.connect(options)) {
                 JetStream js = nc.jetStream();
-                print(background, job, runId, tix, "connect", 0, nc.getServerInfo().getServerId());
+                print(background, PUBLISH_JOB, runId, tix, "connect", 0, nc.getServerInfo().getServerId());
                 List<Integer> consumers = new ArrayList<>();
                 for (int cx = 0; cx < CONSUMER_COUNT; cx++) {
                     consumers.add(cx);
@@ -125,16 +125,20 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                         }
                         try {
                             js.publish(toSubjectName(cx), null);
-                            autoProgress(background, js, job, runId, groupCount.incrementAndGet(), null);
+                            long gc = groupCount.incrementAndGet();
+                            if (gc % INFO_REPORT_FREQUENCY == 0) {
+                                autoResult(background, js, PUBLISH_JOB, runId, gc, null);
+                            }
+
+                            autoProgress(background, js, PUBLISH_JOB, runId, groupCount.incrementAndGet(), null);
                         }
                         catch (IOException ie) {
-                            autoException(background, js, job, runId, tix, ++ioEx, ie);
+                            autoException(background, js, PUBLISH_JOB, runId, tix, ++ioEx, ie);
                         }
                         catch (JetStreamApiException e) {
-                            autoException(background, js, job, runId, tix, ++jsapiEx, e);
+                            autoException(background, js, PUBLISH_JOB, runId, tix, ++jsapiEx, e);
                         }
                     }
-                    endProgress(background, groupCount.get(), job);
                 }
             }
             catch (InterruptedException | IOException e) {
@@ -144,11 +148,11 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
-    private Runnable consumeWorker(String job, String runId, int tix, boolean background, AtomicLong groupCount, Options options) {
+    private Runnable consumeWorker(String runId, int tix, boolean background, AtomicLong groupCount, Options options) {
         return () -> {
             try (Connection nc = Nats.connect(options)) {
                 JetStream js = nc.jetStream();
-                print(background, job, runId, tix, "connect", 0, nc.getServerInfo().getServerId());
+                print(background, CONSUME_JOB, runId, tix, "connect", 0, nc.getServerInfo().getServerId());
 
                 List<Integer> consumers = new ArrayList<>();
                 for (int cx = 0; cx < CONSUMER_COUNT; cx++) {
@@ -166,12 +170,9 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                             if (m != null) {
                                 m.ack();
                             }
-                            autoProgress(background, js, job, runId, groupCount.incrementAndGet(), null);
+                            autoProgress(background, js, CONSUME_JOB, runId, groupCount.incrementAndGet(), null);
                         }
                         catch (Exception ignore) {}
-                    }
-                    if (!background) {
-                        endProgress(background, groupCount.get(), job);
                     }
                 }
             }
@@ -183,7 +184,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
 
     @SuppressWarnings("InfiniteLoopStatement")
     private void doResults(Connection nc) throws IOException {
-        printHeader("Results");
+        startJob("Results");
         JetStreamManagement jsm = nc.jetStreamManagement();
         while (true) {
             try {
@@ -208,7 +209,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
 
     private void doInfo() throws InterruptedException {
         boolean background = isBackground();
-        printHeader("Info", background);
+        startJob("Info", background);
         List<Options> options = roundRobinOptions(INFO_THREAD_COUNT);
         List<Thread> threads = new ArrayList<>(INFO_THREAD_COUNT);
         List<List<String>> cnLists = new ArrayList<>();
@@ -245,7 +246,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
             try (Connection nc = Nats.connect(options)) {
                 JetStreamManagement jsm = nc.jetStreamManagement();
                 JetStream js = nc.jetStream();
-                print(background, JOB_INFO, runId, tix, "connect", 0, nc.getServerInfo().getServerId());
+                print(background, INFO_JOB, runId, tix, "connect", 0, nc.getServerInfo().getServerId());
                 List<String> list = new ArrayList<>(consumerNames);
                 Collections.shuffle(list);
                 long ioEx = 0;
@@ -256,14 +257,14 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                             jsm.getConsumerInfo(DATA_STREAM_NAME, consumerName);
                             long gc = groupCount.incrementAndGet();
                             if (gc % INFO_REPORT_FREQUENCY == 0) {
-                                autoResult(background, js, JOB_INFO, runId, gc, null);
+                                autoResult(background, js, INFO_JOB, runId, gc, null);
                             }
                         }
                         catch (IOException ie) {
-                            autoException(background, js, JOB_INFO, runId, tix, ++ioEx, ie);
+                            autoException(background, js, INFO_JOB, runId, tix, ++ioEx, ie);
                         }
                         catch (JetStreamApiException je) {
-                            autoException(background, js, JOB_INFO, runId, tix, ++jsapiEx, je);
+                            autoException(background, js, INFO_JOB, runId, tix, ++jsapiEx, je);
                         }
                     }
                 }
