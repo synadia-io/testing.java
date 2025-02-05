@@ -28,8 +28,8 @@ public class CustomWorkload extends Workload {
     public static final String LOG_SUBJECT = "l";
     public static final String CONSUMER_PREFIX = "con-";
     public static final int CONSUMER_COUNT = 10000;
-    public static final long PUBLISH_JITTER = 100;
-    public static final int PUBLISH_THREAD_COUNT = 4;
+    public static final long PUBLISH_JITTER = 175;
+    public static final int PUBLISH_THREAD_COUNT = 3;
     public static final int INFO_THREAD_COUNT = 8;
     public static final int PROGRESS_FREQUENCY = 100;
     public static final int INFO_REPORT_FREQUENCY = 10000;
@@ -127,12 +127,13 @@ public class CustomWorkload extends Workload {
     }
 
     private void doPublish() throws InterruptedException {
-        System.out.println("Custom Workload - Publish");
+        boolean background = isBackground();
+        System.out.println("Custom Workload - Publish | background: " + background);
         List<Options> options = roundRobinOptions(PUBLISH_THREAD_COUNT);
         List<Thread> threads = new ArrayList<>(PUBLISH_THREAD_COUNT);
         AtomicLong count = new AtomicLong();
         for (int x = 0; x < PUBLISH_THREAD_COUNT; x++) {
-            Thread t = publishThread(x, count, options.get(x));
+            Thread t = publishThread(x, background, count, options.get(x));
             t.start();
             threads.add(t);
         }
@@ -141,11 +142,13 @@ public class CustomWorkload extends Workload {
         }
     }
 
-    private static Thread publishThread(final Integer id, AtomicLong count, Options options) {
+    private static Thread publishThread(final Integer id, boolean background, AtomicLong count, Options options) {
         return new Thread(() -> {
             try (Connection nc = Nats.connect(options)) {
                 JetStream js = nc.jetStream();
-                printInfoResult("Connect", id, -1, nc.getServerInfo().getServerId());
+                if (!background) {
+                    printInfoResult("Connect", id, -1, nc.getServerInfo().getServerId());
+                }
                 int jsapi = 0;
                 List<Integer> consumers = new ArrayList<>();
                 for (int cx = 0; cx < CONSUMER_COUNT; cx++) {
@@ -161,11 +164,17 @@ public class CustomWorkload extends Workload {
                             js.publish(toSubjectName(cx), null);
                         }
                         catch (JetStreamApiException e) {
-                            printInfoResult("Publish Exception:", id, ++jsapi, e);
+                            if (!background) {
+                                printInfoResult("Publish Exception:", id, ++jsapi, e);
+                            }
                         }
-                        progressInLoop(count.incrementAndGet());
+                        if (!background) {
+                            progressInLoop(count.incrementAndGet());
+                        }
                     }
-                    progressAfterLoop(count.get());
+                    if (!background) {
+                        progressAfterLoop(count.get());
+                    }
                 }
             }
             catch (IOException | InterruptedException e) {
@@ -193,7 +202,7 @@ public class CustomWorkload extends Workload {
     }
 
     private void doInfo() throws InterruptedException {
-        boolean background = commandLine.args.contains("background");
+        boolean background = isBackground();
         System.out.println("Custom Workload - Info | background: " + background);
         List<Options> options = roundRobinOptions(INFO_THREAD_COUNT);
         List<Thread> threads = new ArrayList<>(INFO_THREAD_COUNT);
@@ -224,6 +233,10 @@ public class CustomWorkload extends Workload {
         for (Thread t : threads) {
             t.join();
         }
+    }
+
+    private boolean isBackground() {
+        return commandLine.args.contains("background");
     }
 
     private static Thread infoThread(
