@@ -238,21 +238,14 @@ public class CustomWorkload extends Workload {
                         try {
                             jsm.getConsumerInfo(DATA_STREAM_NAME, consumerName);
                             if (++got % INFO_REPORT_FREQUENCY == 0) {
-                                report = true;
+                                infoResult(background, js, "Consumer Info Success", id, got, null);
                             }
                         }
                         catch (IOException ie) {
-                            e = ie;
-                            ++io;
+                            infoResult(background, js, "Consumer Info IOException", id, ++io, e);
                         }
                         catch (JetStreamApiException je) {
-                            e = je;
-                            ++jsapi;
-                        }
-                        if (report || e != null) {
-                            infoResult(background, js, "Consumer Info Success", id, got, null);
-                            infoResult(background, js, "Consumer Info IOException", id, io, e);
-                            infoResult(background, js, "Consumer Info JetStreamApiException", id, jsapi, e);
+                            infoResult(background, js, "Consumer Info JetStreamApiException", id, ++jsapi, e);
                         }
                     }
                 }
