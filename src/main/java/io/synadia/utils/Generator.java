@@ -73,7 +73,7 @@ public class Generator {
             calculateLocal(cfg, calc);
         }
         else {
-            calculateAws(cfg, calc);
+            calculateAws(cfg, calc, which);
         }
 
         if (calc.clients > 0) {
@@ -229,7 +229,7 @@ public class Generator {
         }
     }
 
-    private static void calculateAws(Config cfg, Calculations calc) throws IOException {
+    private static void calculateAws(Config cfg, Calculations calc, Which which) throws IOException {
         // parse the aws json
         JsonValue jv = JsonParser.parse(Files.readAllBytes(Paths.get("aws.json")));
         for (JsonValue jvRes : jv.map.get("Reservations").array) {
@@ -237,7 +237,9 @@ public class Generator {
                 try {
                     Instance instance = new Instance(jvInstance, cfg.natsPort);
                     if (instance.name.contains(cfg.serverFilter)) {
-                        // heading("server " + instance.name + " [" + instance.stateName + "]");
+                        if (which == Which.Local && !cfg.doPublic) {
+                            heading("server " + instance.name + " [" + instance.stateName + "]");
+                        }
                         if (instance.isRunning()) {
                             calc.runningServers.add(instance);
                         }
