@@ -237,7 +237,7 @@ public class Generator {
                 try {
                     Instance instance = new Instance(jvInstance, cfg.natsPort);
                     if (instance.name.contains(cfg.serverFilter)) {
-                        if (which == Which.Local && !cfg.doPublic) {
+                        if (which == Which.Local || !cfg.doPublic) {
                             heading("server " + instance.name + " [" + instance.stateName + "]");
                         }
                         if (instance.isRunning()) {
