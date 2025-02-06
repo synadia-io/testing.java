@@ -205,7 +205,7 @@ public abstract class AbstractSimWorkload extends Workload {
         final String workId;
         private final ReentrantLock iLock;
         private final ReentrantLock uLock;
-        private long count;
+        private long groupCount;
         private long elapsed;
         final long startTime;
 
@@ -213,7 +213,7 @@ public abstract class AbstractSimWorkload extends Workload {
             this.workId = generateWorkId();
             this.iLock = new ReentrantLock();
             this.uLock = new ReentrantLock();
-            this.count = 0;
+            this.groupCount = 0;
             this.startTime = System.currentTimeMillis();
             this.elapsed = 0;
         }
@@ -221,7 +221,7 @@ public abstract class AbstractSimWorkload extends Workload {
         public long increment() {
             iLock.lock();
             try {
-                return ++count;
+                return ++groupCount;
             }
             finally {
                 iLock.unlock();

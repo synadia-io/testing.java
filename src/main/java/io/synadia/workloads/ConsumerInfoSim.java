@@ -19,7 +19,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
     private static final int PROGRESS_FREQUENCY = 100;
 
     private static final long PUBLISH_JITTER = 50;
-    private static final int PUBLISH_REPORT_FREQUENCY = 1000;
+    private static final int PUBLISH_REPORT_FREQUENCY = 100;
 
     private static final long CONSUME_JITTER = 250;
     private static final int CONSUME_REPORT_FREQUENCY = 100;
@@ -262,14 +262,19 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                 List<String> list = new ArrayList<>(consumerNames);
                 Collections.shuffle(list);
                 jitter(INFO_JITTER / 10);
+                long ownCount = 0;
                 while (true) {
                     for (String consumerName : list) {
                         try {
                             jsm.getConsumerInfo(DATA_STREAM_NAME, consumerName);
-                            long count = ws.increment();
-                            if (count % INFO_REPORT_FREQUENCY == 0) {
-                                logInfo(js, INFO_JOB, ws.workId, tix, count, ws.elapse());
+                            long groupCount = ws.increment();
+                            if (groupCount % INFO_REPORT_FREQUENCY == 0) {
+                                logInfo(js, INFO_JOB, ws.workId, NO_TIX, groupCount, ws.elapse());
                             }
+                            if (++ownCount % INFO_REPORT_FREQUENCY == 0) {
+                                logInfo(js, INFO_JOB, ws.workId, tix, ownCount, ws.elapse());
+                            }
+
                         }
                         catch (IOException | JetStreamApiException e) {
                             logException(js, INFO_JOB, ws.workId, ws.elapse(), e);
