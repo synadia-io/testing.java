@@ -19,7 +19,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
     private static final int PROGRESS_FREQUENCY = 100;
 
     private static final long PUBLISH_JITTER = 50;
-    private static final int PUBLISH_REPORT_FREQUENCY = 5000;
+    private static final int PUBLISH_REPORT_FREQUENCY = 1000;
 
     private static final long CONSUME_JITTER = 250;
     private static final int CONSUME_REPORT_FREQUENCY = 100;
