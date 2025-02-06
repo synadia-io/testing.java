@@ -33,15 +33,17 @@ public abstract class AbstractSimWorkload extends Workload {
     protected static final String LOG_STREAM_SUBJECT = LOG_SUBJECT_PREFIX + ">";
     protected static final int DEFAULT_WORKER_THREAD_COUNT = 3;
     protected static final int NO_TIX = Integer.MIN_VALUE;
-    public static final String DEFAULT_SEGMENT = "._";
-    public static final String DOT = ".";
+    protected static final String DEFAULT_SEGMENT = "._";
+    protected static final String DOT = ".";
+    protected static final String EXCEPTION_QUALIFIER = "exception";
+    protected static final String EXCEPTION_QUALIFIER_SEGMENT = DOT + EXCEPTION_QUALIFIER + DOT;
 
     protected final int progressFrequency;
 
     private Boolean _background;
     protected boolean isBackground() {
         if (_background == null) {
-            _background = commandLine.args.contains("background");
+            _background = containsFlag("background");
         }
         return _background;
     }
@@ -180,16 +182,18 @@ public abstract class AbstractSimWorkload extends Workload {
             mb.put("details", details);
             return mb.jv.toJson();
         }
-
         @Override
         public String toString() {
-            StringBuilder sb = new StringBuilder(ident());
+            StringBuilder sb = new StringBuilder(pad(ident(), 39));
             if (count > 0) {
-                sb.append(" Count:").append(count);
+                sb.append(" | Count: ").append(pad(count, 11));
             }
             if (details != null) {
                 if (count > 0) {
                     sb.append(" | ");
+                }
+                else {
+                    sb.append(" ");
                 }
                 sb.append(details);
             }
@@ -197,22 +201,18 @@ public abstract class AbstractSimWorkload extends Workload {
         }
 
         public String ident() {
-            String segments = segments();
-            while (segments.endsWith(DEFAULT_SEGMENT)) {
-                segments = segments.substring(0, segments.length() - DEFAULT_SEGMENT.length());
-            }
-            return "[" + time + "] [" + segments + "]";
+            return "[" + time + "] " + segments("");
         }
 
         public String subject() {
-            return LOG_SUBJECT_PREFIX + segments();
+            return LOG_SUBJECT_PREFIX + segments(DEFAULT_SEGMENT);
         }
 
-        private String segments() {
+        private String segments(String missing) {
             return job
-                + (runId == null    ? DEFAULT_SEGMENT : DOT + runId)
-                + (defaultQualifier ? DEFAULT_SEGMENT : DOT + qualifier)
-                + (tix == NO_TIX    ? DEFAULT_SEGMENT : DOT + tix);
+                + (runId == null    ? missing : DOT + runId)
+                + (defaultQualifier ? missing : DOT + qualifier)
+                + (tix == NO_TIX    ? missing : DOT + tix);
         }
     }
 
@@ -245,12 +245,17 @@ public abstract class AbstractSimWorkload extends Workload {
         }
     }
 
-    protected void autoException(boolean background, JetStream js, String job, String runId, int tix, long count, Exception ex) {
-        Result result = new Result(job, runId, tix, ex.getClass().getSimpleName(), count, ex);
+    protected void autoException(boolean background, JetStream js, String job, String runId, Exception ex) {
+        String details = ex.getClass().getSimpleName() + "," + ex.getMessage();
+        Result result = new Result(job, runId, NO_TIX, EXCEPTION_QUALIFIER, 0, details);
         if (!background) {
             System.out.println(result);
         }
         publishResult(js, result);
+    }
+
+    protected void clearException(JetStream js, String job, String runId) {
+        publishResult(js, new Result(job, runId, NO_TIX, EXCEPTION_QUALIFIER, 0, null));
     }
 
     protected void publishResult(JetStream js, String job, String runId, int tix, String qualifier, long count, Object details) {

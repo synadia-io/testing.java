@@ -12,6 +12,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import static io.nats.jsmulti.shared.Utils.sleep;
 
+@SuppressWarnings("SameParameterValue")
 public abstract class Workload {
     protected String workLabel;
     protected CommandLine commandLine;
@@ -20,6 +21,8 @@ public abstract class Workload {
     public Workload() {}
 
     public abstract void init(CommandLine commandLine);
+
+    public abstract void runWorkload() throws Exception;
 
     protected void init(String defaultLabel, CommandLine commandLine) {
         this.workLabel = commandLine.action == null ? defaultLabel : commandLine.action;
@@ -41,8 +44,27 @@ public abstract class Workload {
         }
     }
 
-    public abstract void runWorkload() throws Exception;
+    protected String getArg(String name) {
+        String key = name + "=";
+        for (String arg : commandLine.args) {
+            if (arg.startsWith(key)) {
+                return arg.substring(key.length() + 1);
+            }
+        }
+        return null;
+    }
 
+    protected boolean containsFlag(String name) {
+        return commandLine.args.contains(name);
+    }
+
+    protected String getArgFromPosition(int pos) {
+        String option = null;
+        if (commandLine.args.size() >= pos) {
+            option = commandLine.args.get(pos - 1);
+        }
+        return option;
+    }
     protected Options getAdminOptions() {
         return getOptions(params.adminServer);
     }
@@ -109,6 +131,11 @@ public abstract class Workload {
             }
         }
 
+    }
+
+    public static final String PADDING = "                                        ";
+    public static String pad(Object s, int width) {
+        return (s + PADDING).substring(0, width);
     }
 
     public static String stringify(Message msg) {

@@ -32,7 +32,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
     private static final String CONSUME_JOB = "Consume";
     private static final String CONSUMERS = "consumers";
     private static final String MESSAGES = "messages";
-    private static final String RESULTS = "results";
+    private static final String LOG = "log";
 
     public ConsumerInfoSim() {
         super(PROGRESS_FREQUENCY);
@@ -96,10 +96,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
     }
 
     private void doClear(Connection nc) throws IOException, JetStreamApiException {
-        String option = null;
-        if (commandLine.args.size() == 2) {
-            option = commandLine.args.get(1);
-        }
+        String option = getArgFromPosition(2);
         if (option == null || option.isEmpty()) {
             exit("Clear option not provided");
         }
@@ -118,7 +115,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                     endProgress(index);
                 }
                 case MESSAGES -> doClearMessages(nc);
-                case RESULTS -> doClearResults(nc);
+                case LOG -> doClearResults(nc);
                 default -> exit("Unknown clear option: '" + option + "'");
             }
         }
@@ -141,16 +138,14 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                     for (Integer cx : consumers) {
                         try {
                             js.publish(toSubject(cx), null);
-                            long gc = groupCount.incrementAndGet();
-                            if (gc % INFO_REPORT_FREQUENCY == 0) {
-                                autoResult(background, js, PUBLISH_JOB, runId, gc, null);
+                            long count = groupCount.incrementAndGet();
+                            if (count % INFO_REPORT_FREQUENCY == 0) {
+                                autoResult(background, js, PUBLISH_JOB, runId, count, null);
+                                clearException(js, PUBLISH_JOB, runId);
                             }
                         }
-                        catch (IOException ie) {
-                            autoException(background, js, PUBLISH_JOB, runId, tix, ++ioEx, ie);
-                        }
-                        catch (JetStreamApiException e) {
-                            autoException(background, js, PUBLISH_JOB, runId, tix, ++jsapiEx, e);
+                        catch (IOException | JetStreamApiException e) {
+                            autoException(background, js, PUBLISH_JOB, runId, e);
                         }
                         jitter(PUBLISH_JITTER);
                     }
@@ -184,9 +179,9 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                             Message m = fc.nextMessage();
                             while (m != null) {
                                 m.ack();
-                                long gc = groupCount.incrementAndGet();
-                                if (gc % INFO_REPORT_FREQUENCY == 0) {
-                                    autoResult(background, js, CONSUME_JOB, runId, gc, null);
+                                long count = groupCount.incrementAndGet();
+                                if (count % INFO_REPORT_FREQUENCY == 0) {
+                                    autoResult(background, js, CONSUME_JOB, runId, count, null);
                                 }
                                 m = fc.nextMessage();
                             }
@@ -201,6 +196,8 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
         };
     }
 
+    private static final String RESULT_BREAK = "--------------------------------------------------------------------------------------------------------------";
+
     @SuppressWarnings("InfiniteLoopStatement")
     private void doResults(Connection nc) throws IOException {
         startJob("Results");
@@ -208,16 +205,35 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
         while (true) {
             try {
                 System.out.println();
-                System.out.println("----------------------------------------------------------------------------------------------------");
-                StreamInfo si = jsm.getStreamInfo(LOG_STREAM_NAME, StreamInfoOptions.allSubjects());
-                for (Subject subject : si.getStreamState().getSubjects()) {
-                    MessageInfo mi = jsm.getLastMessage(LOG_STREAM_NAME, subject.getName());
-                    if (mi != null) {
-                        Result result = new Result(mi.getData());
-                        System.out.println(result);
-                    }
+                System.out.println();
+                System.out.println(RESULT_BREAK);
+                StreamInfo si = jsm.getStreamInfo(DATA_STREAM_NAME);
+                StreamState ss = si.getStreamState();
+                System.out.println("STREAM | " + pad(DATA_STREAM_NAME, 10) + " | Subjects: " + pad(ss.getSubjectCount(), 10) + " | Messages: " + pad(ss.getMsgCount(), 12));
+
+                si = jsm.getStreamInfo(LOG_STREAM_NAME, StreamInfoOptions.allSubjects());
+                ss = si.getStreamState();
+                System.out.println("STREAM | " + pad(LOG_STREAM_NAME, 10) + " | Subjects: " + pad(ss.getSubjectCount(), 10) + " | Messages: " + pad(ss.getMsgCount(), 12));
+
+                System.out.println(RESULT_BREAK);
+
+                List<String> allSubjects = new ArrayList<>();
+                for (Subject subject : ss.getSubjects()) {
+                    allSubjects.add(subject.getName());
                 }
-                System.out.println("----------------------------------------------------------------------------------------------------");
+                Collections.sort(allSubjects);
+
+                for (String subject : allSubjects) {
+                    try {
+                        MessageInfo mi = jsm.getLastMessage(LOG_STREAM_NAME, subject);
+                        if (mi != null) {
+                            Result result = new Result(mi.getData());
+                            System.out.println("LOG    | " + mi.getSubject() + " | " + result);
+                        }
+                    }
+                    catch (IOException | JetStreamApiException ignore) {}
+                }
+                System.out.println(RESULT_BREAK);
                 sleep(RESULTS_FREQUENCY);
             }
             catch (Exception e) {
@@ -276,13 +292,11 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                             jsm.getConsumerInfo(DATA_STREAM_NAME, consumerName);
                             if (++count % INFO_REPORT_FREQUENCY == 0) {
                                 autoResult(background, js, INFO_JOB, runId, tix, count, null);
+                                clearException(js, INFO_JOB, runId);
                             }
                         }
-                        catch (IOException ie) {
-                            autoException(background, js, INFO_JOB, runId, tix, ++ioEx, ie);
-                        }
-                        catch (JetStreamApiException je) {
-                            autoException(background, js, INFO_JOB, runId, tix, ++jsapiEx, je);
+                        catch (IOException | JetStreamApiException e) {
+                            autoException(background, js, INFO_JOB, runId, e);
                         }
                     }
                 }
