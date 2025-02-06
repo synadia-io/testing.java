@@ -18,7 +18,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 
 import static io.nats.client.support.JsonUtils.printFormatted;
 import static io.nats.jsmulti.shared.Utils.sleep;
@@ -169,7 +168,7 @@ public abstract class AbstractSimWorkload extends Workload {
     // WORKER
     // ----------------------------------------------------------------------------------------------------
     protected interface Worker {
-        Runnable getWork(String runId, int tix, AtomicLong groupCount, Options options);
+        Runnable getWork(String runId, int tix, Options options);
     }
 
     protected void doWorker(String job, Worker worker) throws InterruptedException {
@@ -180,10 +179,9 @@ public abstract class AbstractSimWorkload extends Workload {
         startJob(job);
         List<Options> options = roundRobinOptions(threadCount);
         List<Thread> threads = new ArrayList<>(threadCount);
-        AtomicLong groupCount = new AtomicLong();
         String runId = generateRunId();
         for (int tix = 0; tix < threadCount; tix++) {
-            Thread t = new Thread(worker.getWork(runId, tix, groupCount, options.get(tix)));
+            Thread t = new Thread(worker.getWork(runId, tix, options.get(tix)));
             t.start();
             threads.add(t);
         }
@@ -290,7 +288,8 @@ public abstract class AbstractSimWorkload extends Workload {
         }
 
         public String subject() {
-            return (exceptionClass == null  ? INFO_SUBJECT_PREFIX : EX_SUBJECT_PREFIX) + segments(DEFAULT_SEGMENT);
+            return (exceptionClass == null  ? INFO_SUBJECT_PREFIX : EX_SUBJECT_PREFIX)
+                + segments(DEFAULT_SEGMENT);
         }
 
         public String ident() {
@@ -299,7 +298,7 @@ public abstract class AbstractSimWorkload extends Workload {
 
         private String segments(String missing) {
             return job
-                + (runId == null    ? missing : DOT + runId)
+                // + (runId == null    ? missing : DOT + runId)
                 + (defaultQualifier ? missing : DOT + qualifier)
                 + (tix == NO_TIX    ? missing : DOT + tix);
         }

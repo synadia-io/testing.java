@@ -11,7 +11,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 
 public class ConsumerInfoSim extends AbstractSimWorkload {
     private static final String CONSUMER_PREFIX = "sim-con-";
@@ -54,8 +53,8 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                 case "setup"   -> doSetup(nc);
                 case "create"  -> doCreateConsumers(nc);
                 case "list"    -> doList(nc);
-                case "publish" -> doWorker(PUBLISH_JOB, (runId, tix, groupCount, options) -> publishWorker(runId, tix, groupCount, options));
-                case "consume" -> doWorker(CONSUME_JOB, (runId, tix, groupCount, options) -> consumeWorker(runId, tix, groupCount, options));
+                case "publish" -> doWorker(PUBLISH_JOB, this::publishWorker);
+                case "consume" -> doWorker(CONSUME_JOB, this::consumeWorker);
                 case "gci"     -> doGetConsumerInfo();
                 case "watch"   -> doWatch(nc);
                 case "clear"   -> doClear(nc);
@@ -147,20 +146,20 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
-    private Runnable publishWorker(String runId, int tix, AtomicLong groupCount, Options options) {
+    private Runnable publishWorker(String runId, int tix, Options options) {
         return () -> {
             try (Connection nc = Nats.connect(options)) {
                 JetStream js = nc.jetStream();
                 printConnect(nc, PUBLISH_JOB, runId, tix);
                 List<Integer> consumers = generateConsumerList();
+                long count = 0;
                 while (true) {
                     Collections.shuffle(consumers);
                     for (Integer cx : consumers) {
                         try {
                             js.publish(toSubject(cx), null);
-                            long gc = groupCount.incrementAndGet();
-                            if (gc % INFO_FREQUENCY == 0) {
-                                logInfo(js, PUBLISH_JOB, runId, NO_TIX, gc);
+                            if (++count % INFO_FREQUENCY == 0) {
+                                logInfo(js, PUBLISH_JOB, runId, NO_TIX, count);
                             }
                         }
                         catch (IOException | JetStreamApiException e) {
@@ -177,16 +176,15 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
-    private Runnable consumeWorker(String runId, int tix, AtomicLong groupCount, Options options) {
+    private Runnable consumeWorker(String runId, int tix, Options options) {
         return () -> {
             try (Connection nc = Nats.connect(options)) {
                 JetStream js = nc.jetStream();
                 printConnect(nc, CONSUME_JOB, runId, tix);
                 List<Integer> consumers = generateConsumerList();
-
-                StreamContext sctx = nc.getStreamContext(DATA_STREAM_NAME);
-
+                long count = 0;
                 while (true) {
+                    StreamContext sctx = nc.getStreamContext(DATA_STREAM_NAME);
                     Collections.shuffle(consumers);
                     for (Integer cx : consumers) {
                         jitter(CONSUME_JITTER);
@@ -195,9 +193,8 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                             Message m = fc.nextMessage();
                             while (m != null) {
                                 m.ack();
-                                long gc = groupCount.incrementAndGet();
-                                if (gc % INFO_FREQUENCY == 0) {
-                                    logInfo(js, CONSUME_JOB, runId, NO_TIX, gc);
+                                if (++count % INFO_FREQUENCY == 0) {
+                                    logInfo(js, CONSUME_JOB, runId, NO_TIX, count);
                                 }
                                 m = fc.nextMessage();
                             }
