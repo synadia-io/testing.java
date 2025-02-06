@@ -17,7 +17,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
     private static final int CONSUMER_COUNT = 10000;
     private static final long PUBLISH_JITTER = 100;
     private static final long CONSUME_JITTER = 250;
-    private static final long INFO_JITTER = 250;
+    private static final long INFO_JITTER = 5000;
     private static final int CONSUME_BATCH = 10;
     private static final int INFO_THREAD_COUNT = 8;
     private static final int PROGRESS_FREQUENCY = 100;
@@ -153,6 +153,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                 JetStream js = nc.jetStream();
                 printConnect(nc, PUBLISH_JOB, ws.workId, tix);
                 List<Integer> consumers = generateConsumerList();
+                jitter(PUBLISH_JITTER / 10);
                 while (true) {
                     Collections.shuffle(consumers);
                     for (Integer cx : consumers) {
@@ -183,6 +184,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                 JetStream js = nc.jetStream();
                 printConnect(nc, CONSUME_JOB, ws.workId, tix);
                 List<Integer> consumers = generateConsumerList();
+                jitter(CONSUME_JITTER / 10);
                 while (true) {
                     StreamContext sctx = nc.getStreamContext(DATA_STREAM_NAME);
                     Collections.shuffle(consumers);
@@ -250,6 +252,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                 printConnect(nc, INFO_JOB, ws.workId, tix);
                 List<String> list = new ArrayList<>(consumerNames);
                 Collections.shuffle(list);
+                jitter(INFO_JITTER / 10);
                 while (true) {
                     for (String consumerName : list) {
                         try {
@@ -262,8 +265,8 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                         catch (IOException | JetStreamApiException e) {
                             logException(js, INFO_JOB, ws.workId, ws.elapse(), e);
                         }
-                        jitter(INFO_JITTER);
                     }
+                    jitter(INFO_JITTER);
                 }
             }
             catch (IOException | InterruptedException e) {
