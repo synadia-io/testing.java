@@ -14,14 +14,21 @@ import java.util.List;
 
 public class ConsumerInfoSim extends AbstractSimWorkload {
     private static final String CONSUMER_PREFIX = "sim-con-";
+
     private static final int CONSUMER_COUNT = 10000;
-    private static final long PUBLISH_JITTER = 100;
-    private static final long CONSUME_JITTER = 250;
-    private static final long INFO_JITTER = 5000;
-    private static final int CONSUME_BATCH = 10;
-    private static final int INFO_THREAD_COUNT = 8;
     private static final int PROGRESS_FREQUENCY = 100;
-    private static final int INFO_FREQUENCY = 1000;
+
+    private static final long PUBLISH_JITTER = 50;
+    private static final int PUBLISH_REPORT_FREQUENCY = 5000;
+
+    private static final long CONSUME_JITTER = 250;
+    private static final int CONSUME_REPORT_FREQUENCY = 100;
+    private static final int CONSUME_BATCH = 10;
+
+    private static final long INFO_JITTER = 10000;
+    private static final int INFO_REPORT_FREQUENCY = 1000;
+    private static final int INFO_THREAD_COUNT = 8;
+
     private static final long MAX_MESSAGES = 1_000_000;
 
     private static final String INFO_JOB =    "ConInfo";
@@ -57,6 +64,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                 case "publish" -> doWorker(PUBLISH_JOB, this::publishWorker);
                 case "consume" -> doWorker(CONSUME_JOB, this::consumeWorker);
                 case "gci"     -> doGetConsumerInfo();
+                case "info"    -> doGetConsumerInfo();
                 case "watch"   -> doWatch(nc);
                 case "clear"   -> doClear(nc);
                 case "purge"   -> doPurge(nc);
@@ -160,7 +168,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                         try {
                             js.publish(toSubject(cx), null);
                             long count = ws.increment();
-                            if (count % INFO_FREQUENCY == 0) {
+                            if (count % PUBLISH_REPORT_FREQUENCY == 0) {
                                 logInfo(js, PUBLISH_JOB, ws.workId, NO_TIX, count, ws.elapse());
                             }
                         }
@@ -190,12 +198,13 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                     Collections.shuffle(consumers);
                     for (Integer cx : consumers) {
                         ConsumerContext cctx = sctx.getConsumerContext(toConsumerName(cx));
-                        try (FetchConsumer fc = cctx.fetch(FetchConsumeOptions.builder().maxMessages(CONSUME_BATCH).noWait().build())) {
+                        try (FetchConsumer fc = cctx.fetch(FetchConsumeOptions.builder()
+                            .maxMessages(CONSUME_BATCH).noWait().build())) {
                             Message m = fc.nextMessage();
                             while (m != null) {
                                 m.ack();
                                 long count = ws.increment();
-                                if (count % INFO_FREQUENCY == 0) {
+                                if (count % CONSUME_REPORT_FREQUENCY == 0) {
                                     logInfo(js, CONSUME_JOB, ws.workId, NO_TIX, count, ws.elapse());
                                 }
                                 m = fc.nextMessage();
@@ -258,7 +267,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                         try {
                             jsm.getConsumerInfo(DATA_STREAM_NAME, consumerName);
                             long count = ws.increment();
-                            if (count % INFO_FREQUENCY == 0) {
+                            if (count % INFO_REPORT_FREQUENCY == 0) {
                                 logInfo(js, INFO_JOB, ws.workId, tix, count, ws.elapse());
                             }
                         }
