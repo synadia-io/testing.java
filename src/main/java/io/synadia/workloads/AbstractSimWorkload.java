@@ -163,8 +163,8 @@ public abstract class AbstractSimWorkload extends Workload {
                     hadAnyMessages = true;
                     if (first) {
                         first = false;
-                        System.out.println("       | ? Job (Thread)  | Count       | Elapsed      | Details");
-                        System.out.println("       | --------------- | ----------- | ------------ | --------------------");
+                        System.out.println("       | ? Job (Thread)  | Count       | Elapsed        | Details");
+                        System.out.println("       | --------------- | ----------- | -------------- | ----------------------------------------------------");
                     }
                     Event prev = watchMap.get(subject);
                     Event event = new Event(mi.getData());
@@ -182,7 +182,7 @@ public abstract class AbstractSimWorkload extends Workload {
                     }
                     sb.append(pad(temp, 11))
                         .append(" | ")
-                        .append(pad(humanTime(event.elapsed),20));
+                        .append(pad(humanTime(event.elapsed), 14));
 
                     if (event.exceptionClass == null) {
                         sb.append(" |");
@@ -190,7 +190,7 @@ public abstract class AbstractSimWorkload extends Workload {
                     else {
                         sb.append(" | ").append(event.exceptionClass).append(": ").append(event.exceptionMessage);
                     }
-                    System.out.println(sb + " " + event.toJson());
+                    System.out.println(sb);
                 }
             }
             catch (IOException | JetStreamApiException ignore) {}
