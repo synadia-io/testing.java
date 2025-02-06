@@ -14,10 +14,9 @@ import io.synadia.Workload;
 import io.synadia.utils.Debug;
 
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static io.nats.client.support.JsonUtils.printFormatted;
@@ -99,7 +98,7 @@ public abstract class AbstractSimWorkload extends Workload {
     }
 
     protected void doClearInfo(Connection nc) throws IOException, JetStreamApiException {
-        startJob("Clear Log");
+        startJob("Clear Info");
         nc.jetStreamManagement().purgeStream(INFO_STREAM_NAME);
     }
 
@@ -112,6 +111,7 @@ public abstract class AbstractSimWorkload extends Workload {
     protected void doWatch(Connection nc) throws IOException {
         startJob("Watch");
         JetStreamManagement jsm = nc.jetStreamManagement();
+        Map<String, Event> watchMap = new HashMap<>();
         while (true) {
             try {
                 System.out.println();
@@ -130,10 +130,10 @@ public abstract class AbstractSimWorkload extends Workload {
                 System.out.println("STREAM | " + pad(INFO_STREAM_NAME, 10) + " | Subjects: " + pad(infoSs.getSubjectCount(), 10) + " | Messages: " + pad(infoSs.getMsgCount(), 12));
 
                 System.out.println(WATCH_BREAK);
-                boolean hadAnyMessages = watchStream(jsm, EX_STREAM_NAME, infoSs, "EX     | ");
+                boolean hadAnyMessages = watchStream(jsm, watchMap, EX_STREAM_NAME, infoSs, "EX     | ");
 
                 if (hadAnyMessages) { System.out.println(WATCH_BREAK); }
-                watchStream(jsm, INFO_STREAM_NAME, infoSs, "INFO   | ");
+                watchStream(jsm, watchMap, INFO_STREAM_NAME, infoSs, "INFO   | ");
 
                 System.out.println(WATCH_BREAK);
                 sleep(WATCH_FREQUENCY);
@@ -144,7 +144,9 @@ public abstract class AbstractSimWorkload extends Workload {
         }
     }
 
-    private static boolean watchStream(JetStreamManagement jsm, String streamName, StreamState ss, String lineStart) {
+    private static final SimpleDateFormat WATCH_DATE_FORMAT = new SimpleDateFormat("HH:mm:ss.SSS");
+
+    private static boolean watchStream(JetStreamManagement jsm, Map<String, Event> watchMap, String streamName, StreamState ss, String lineStart) {
         List<String> allSubjects = new ArrayList<>();
         for (Subject subject : ss.getSubjects()) {
             allSubjects.add(subject.getName());
@@ -152,12 +154,42 @@ public abstract class AbstractSimWorkload extends Workload {
         Collections.sort(allSubjects);
 
         boolean hadAnyMessages = false;
+        boolean first = true;
         for (String subject : allSubjects) {
             try {
                 MessageInfo mi = jsm.getLastMessage(streamName, subject);
                 if (mi != null) {
                     hadAnyMessages = true;
-                    System.out.println(lineStart + new Event(mi.getData()));
+                    if (first) {
+                        first = false;
+                        System.out.println("       | ? Job (Thread)  | Count     | Time         | Details");
+                        System.out.println("       | --------------- | --------- | ------------ | --------------------");
+                    }
+                    Event prev = watchMap.get(subject);
+                    Event event = new Event(mi.getData());
+                    watchMap.put(subject, event);
+                    StringBuilder sb = new StringBuilder(lineStart);
+                    sb.append(prev == null || !prev.equals(event) ? "* " : "  ");
+                    String temp = event.job;
+                    if (event.tix != NO_TIX) {
+                        temp = temp + " (" + event.tix + ")";
+                    }
+                    sb.append(pad(temp, 13)).append(" | ");
+                    temp = "";
+                    if (event.count > 0) {
+                        temp = "" + event.count;
+                    }
+                    sb.append(pad(temp, 9))
+                        .append(" | ")
+                        .append(WATCH_DATE_FORMAT.format(new Date(event.time)));
+
+                    if (event.exceptionClass == null) {
+                        sb.append(" |");
+                    }
+                    else {
+                        sb.append(" | ").append(event.exceptionClass).append(": ").append(event.exceptionMessage);
+                    }
+                    System.out.println(sb);
                 }
             }
             catch (IOException | JetStreamApiException ignore) {}
@@ -303,6 +335,29 @@ public abstract class AbstractSimWorkload extends Workload {
                 // + (runId == null    ? missing : DOT + runId)
                 + (defaultQualifier ? missing : DOT + qualifier)
                 + (tix == NO_TIX    ? missing : DOT + tix);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+
+            Event event = (Event) o;
+            return tix == event.tix && defaultQualifier == event.defaultQualifier && count == event.count && time == event.time && Objects.equals(job, event.job) && Objects.equals(runId, event.runId) && Objects.equals(qualifier, event.qualifier) && Objects.equals(exceptionClass, event.exceptionClass) && Objects.equals(exceptionMessage, event.exceptionMessage);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = Objects.hashCode(job);
+            result = 31 * result + Objects.hashCode(runId);
+            result = 31 * result + tix;
+            result = 31 * result + Objects.hashCode(qualifier);
+            result = 31 * result + Boolean.hashCode(defaultQualifier);
+            result = 31 * result + Long.hashCode(count);
+            result = 31 * result + Long.hashCode(time);
+            result = 31 * result + Objects.hashCode(exceptionClass);
+            result = 31 * result + Objects.hashCode(exceptionMessage);
+            return result;
         }
     }
 
