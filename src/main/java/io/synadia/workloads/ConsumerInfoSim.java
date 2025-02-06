@@ -158,9 +158,9 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                     for (Integer cx : consumers) {
                         try {
                             js.publish(toSubject(cx), null);
-                            long count = groupCount.incrementAndGet();
-                            if (count % INFO_FREQUENCY == 0) {
-                                logInfo(js, PUBLISH_JOB, runId, NO_TIX, count);
+                            long gc = groupCount.incrementAndGet();
+                            if (gc % INFO_FREQUENCY == 0) {
+                                logInfo(js, PUBLISH_JOB, runId, NO_TIX, gc);
                             }
                         }
                         catch (IOException | JetStreamApiException e) {
@@ -191,13 +191,13 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                     for (Integer cx : consumers) {
                         jitter(CONSUME_JITTER);
                         ConsumerContext cctx = sctx.getConsumerContext(toConsumerName(cx));
-                        try (FetchConsumer fc = cctx.fetch(FetchConsumeOptions.builder().maxMessages(CONSUME_BATCH).expiresIn(5000).build())) {
+                        try (FetchConsumer fc = cctx.fetch(FetchConsumeOptions.builder().maxMessages(CONSUME_BATCH).noWait().build())) {
                             Message m = fc.nextMessage();
                             while (m != null) {
                                 m.ack();
-                                long count = groupCount.incrementAndGet();
-                                if (count % INFO_FREQUENCY == 0) {
-                                    logInfo(js, CONSUME_JOB, runId, NO_TIX, count);
+                                long gc = groupCount.incrementAndGet();
+                                if (gc % INFO_FREQUENCY == 0) {
+                                    logInfo(js, CONSUME_JOB, runId, NO_TIX, gc);
                                 }
                                 m = fc.nextMessage();
                             }
