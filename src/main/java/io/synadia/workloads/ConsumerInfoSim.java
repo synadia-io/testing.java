@@ -21,7 +21,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
     private static final int CONSUME_BATCH = 10;
     private static final int INFO_THREAD_COUNT = 8;
     private static final int PROGRESS_FREQUENCY = 100;
-    private static final int INFO_REPORT_FREQUENCY = 10000;
+    private static final int INFO_FREQUENCY = 1000;
     private static final long MAX_MESSAGES = 1_000_000;
 
     private static final String INFO_JOB =    "ConInfo";
@@ -159,7 +159,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                         try {
                             js.publish(toSubject(cx), null);
                             long count = groupCount.incrementAndGet();
-                            if (count % INFO_REPORT_FREQUENCY == 0) {
+                            if (count % INFO_FREQUENCY == 0) {
                                 logInfo(background, js, PUBLISH_JOB, runId, NO_TIX, count);
                             }
                         }
@@ -196,7 +196,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                             while (m != null) {
                                 m.ack();
                                 long count = groupCount.incrementAndGet();
-                                if (count % INFO_REPORT_FREQUENCY == 0) {
+                                if (count % INFO_FREQUENCY == 0) {
                                     logInfo(background, js, CONSUME_JOB, runId, NO_TIX, count);
                                 }
                                 m = fc.nextMessage();
@@ -258,7 +258,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                     for (String consumerName : list) {
                         try {
                             jsm.getConsumerInfo(DATA_STREAM_NAME, consumerName);
-                            if (++count % INFO_REPORT_FREQUENCY == 0) {
+                            if (++count % INFO_FREQUENCY == 0) {
                                 logInfo(background, js, INFO_JOB, runId, tix, count);
                             }
                         }
