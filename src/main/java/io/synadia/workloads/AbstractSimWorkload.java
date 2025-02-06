@@ -18,6 +18,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static io.nats.client.support.JsonUtils.printFormatted;
 import static io.nats.jsmulti.shared.Utils.sleep;
@@ -168,7 +169,7 @@ public abstract class AbstractSimWorkload extends Workload {
     // WORKER
     // ----------------------------------------------------------------------------------------------------
     protected interface Worker {
-        Runnable getWork(String runId, int tix, Options options);
+        Runnable getWork(String runId, int tix, AtomicLong groupCount, Options options);
     }
 
     protected void doWorker(String job, Worker worker) throws InterruptedException {
@@ -180,8 +181,9 @@ public abstract class AbstractSimWorkload extends Workload {
         List<Options> options = roundRobinOptions(threadCount);
         List<Thread> threads = new ArrayList<>(threadCount);
         String runId = generateRunId();
+        AtomicLong groupCount = new AtomicLong();
         for (int tix = 0; tix < threadCount; tix++) {
-            Thread t = new Thread(worker.getWork(runId, tix, options.get(tix)));
+            Thread t = new Thread(worker.getWork(runId, tix, groupCount, options.get(tix)));
             t.start();
             threads.add(t);
         }
