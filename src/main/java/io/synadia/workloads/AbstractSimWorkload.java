@@ -272,14 +272,13 @@ public abstract class AbstractSimWorkload extends Workload {
 
         public Object[] extras(String... messages) {
             List<Object> list = new ArrayList<>();
-            list.add(time);
             if (count > 0) {
                 list.add("Count: " + count);
             }
             if (exceptionClass != null) {
                 list.add(exceptionClass + ": " + exceptionMessage);
             }
-            list.add(time);
+            list.add("@" + time);
             if (messages != null) {
                 for (String m : messages) {
                     if (m != null) {
@@ -330,6 +329,10 @@ public abstract class AbstractSimWorkload extends Workload {
 
     protected void publish(JetStream js, Event event) {
         try {
+            System.out.println("!!!!!");
+            System.out.println(event.subject());
+            System.out.println(event.toJson());
+            System.out.println("-----");
             js.publish(event.subject(), event.serialize());
         }
         catch (IOException | JetStreamApiException ee) {
