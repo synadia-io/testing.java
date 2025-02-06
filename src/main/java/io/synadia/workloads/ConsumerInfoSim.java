@@ -130,7 +130,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
             JetStreamManagement jsm = nc.jetStreamManagement();
             String purge = INFO_SUBJECT_PREFIX + code + ".>";
             startProgressJob("Purge: " + code + "(" + purge + ")");
-            jsm.purgeStream(INFO_SUBJECT_PREFIX, PurgeOptions.builder().subject(purge).build());
+            jsm.purgeStream(INFO_STREAM_NAME, PurgeOptions.builder().subject(purge).build());
         }
     }
 

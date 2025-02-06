@@ -29,7 +29,7 @@ public abstract class AbstractSimWorkload extends Workload {
     protected static final String INFO_STREAM_NAME = "sim-info";
     protected static final String EX_STREAM_NAME = "sim-exception";
     protected static final String DATA_SUBJECT_PREFIX = "data.";
-    protected static final String INFO_SUBJECT_PREFIX = "log.";
+    protected static final String INFO_SUBJECT_PREFIX = "info.";
     protected static final String EX_SUBJECT_PREFIX = "ex.";
     protected static final String DATA_STREAM_SUBJECT = DATA_SUBJECT_PREFIX + ">";
     protected static final String INFO_STREAM_SUBJECT = INFO_SUBJECT_PREFIX + ">";
