@@ -93,7 +93,7 @@ public abstract class AbstractSimWorkload extends Workload {
         printFormatted(si.getJv());
     }
 
-    protected void doClearMessages(Connection nc) throws IOException, JetStreamApiException {
+    protected void doClearData(Connection nc) throws IOException, JetStreamApiException {
         startJob("Clear Messages");
         nc.jetStreamManagement().purgeStream(DATA_STREAM_NAME);
     }

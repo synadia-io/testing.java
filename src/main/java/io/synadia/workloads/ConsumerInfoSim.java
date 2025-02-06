@@ -28,7 +28,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
     private static final String PUBLISH_JOB = "Publish";
     private static final String CONSUME_JOB = "Consume";
     private static final String CONSUMERS = "consumers";
-    private static final String MESSAGES = "messages";
+    private static final String DATA = "data";
     private static final String INFO = "info";
     private static final String EX = "ex";
 
@@ -113,7 +113,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                     }
                     endProgress(index);
                 }
-                case MESSAGES -> doClearMessages(nc);
+                case DATA -> doClearData(nc);
                 case INFO -> doClearInfo(nc);
                 case EX -> doClearExceptions(nc);
                 default -> exit("Unknown clear option: '" + option + "'");
