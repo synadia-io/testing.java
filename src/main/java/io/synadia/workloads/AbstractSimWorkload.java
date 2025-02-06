@@ -35,8 +35,7 @@ public abstract class AbstractSimWorkload extends Workload {
     protected static final int NO_TIX = Integer.MIN_VALUE;
     protected static final String DEFAULT_SEGMENT = "._";
     protected static final String DOT = ".";
-    protected static final String EXCEPTION_QUALIFIER = "exception";
-    protected static final String EXCEPTION_QUALIFIER_SEGMENT = DOT + EXCEPTION_QUALIFIER + DOT;
+    protected static final String EXCEPTION_QUALIFIER = "ex";
 
     protected final int progressFrequency;
 
@@ -95,8 +94,8 @@ public abstract class AbstractSimWorkload extends Workload {
         nc.jetStreamManagement().purgeStream(DATA_STREAM_NAME);
     }
 
-    protected void doClearResults(Connection nc) throws IOException, JetStreamApiException {
-        startJob("Clear Results");
+    protected void doClearLog(Connection nc) throws IOException, JetStreamApiException {
+        startJob("Clear Log");
         nc.jetStreamManagement().purgeStream(LOG_STREAM_NAME);
     }
 

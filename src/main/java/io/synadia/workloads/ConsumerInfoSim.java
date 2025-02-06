@@ -45,7 +45,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
 
     @Override
     protected String commands() {
-        return "'setup', 'create', 'list', 'clear consumers|data|log', 'publish', 'consume', 'info', 'results'";
+        return "'setup', 'create', 'list', 'publish', 'consume', 'info', 'results', 'clear consumers|data|log', 'purge <job.runId>'";
     }
 
     @Override
@@ -56,11 +56,12 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                 case "setup"   -> doSetup(nc);
                 case "create"  -> doCreateConsumers(nc);
                 case "list"    -> doList(nc);
-                case "clear"   -> doClear(nc);
                 case "publish" -> doWorker(PUBLISH_JOB, this::publishWorker);
                 case "consume" -> doWorker(CONSUME_JOB, this::consumeWorker);
                 case "info"    -> doInfo();
                 case "results" -> doResults(nc);
+                case "clear"   -> doClear(nc);
+                case "purge"   -> doPurge(nc);
                 default        -> exit("Unknown custom workload");
             }
         }
@@ -115,9 +116,22 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                     endProgress(index);
                 }
                 case MESSAGES -> doClearMessages(nc);
-                case LOG -> doClearResults(nc);
+                case LOG -> doClearLog(nc);
                 default -> exit("Unknown clear option: '" + option + "'");
             }
+        }
+    }
+
+    private void doPurge(Connection nc) throws IOException, JetStreamApiException {
+        String option = getArgFromPosition(2);
+        if (option == null || option.isEmpty()) {
+            exit("Purge option not provided");
+        }
+        else {
+            JetStreamManagement jsm = nc.jetStreamManagement();
+            String purge = LOG_SUBJECT_PREFIX + option + ".>";
+            startProgressJob("Purge: " + option + "(" + purge + ")");
+            jsm.purgeStream(LOG_STREAM_NAME, PurgeOptions.builder().subject(purge).build());
         }
     }
 
@@ -227,8 +241,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                     try {
                         MessageInfo mi = jsm.getLastMessage(LOG_STREAM_NAME, subject);
                         if (mi != null) {
-                            Result result = new Result(mi.getData());
-                            System.out.println("LOG    | " + mi.getSubject() + " | " + result);
+                            System.out.println("LOG    | " + new Result(mi.getData()));
                         }
                     }
                     catch (IOException | JetStreamApiException ignore) {}
