@@ -16,7 +16,8 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
     private static final String CONSUMER_PREFIX = "sim-con-";
     private static final int CONSUMER_COUNT = 10000;
     private static final long PUBLISH_JITTER = 100;
-    private static final long CONSUME_JITTER = 500;
+    private static final long CONSUME_JITTER = 250;
+    private static final long INFO_JITTER = 250;
     private static final int CONSUME_BATCH = 10;
     private static final int INFO_THREAD_COUNT = 8;
     private static final int PROGRESS_FREQUENCY = 100;
@@ -157,13 +158,13 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                     for (Integer cx : consumers) {
                         try {
                             js.publish(toSubject(cx), null);
-                            long count = ws.update();
+                            long count = ws.increment();
                             if (count % INFO_FREQUENCY == 0) {
-                                logInfo(js, PUBLISH_JOB, ws.workId, NO_TIX, count, ws.elapsed());
+                                logInfo(js, PUBLISH_JOB, ws.workId, NO_TIX, count, ws.elapse());
                             }
                         }
                         catch (IOException | JetStreamApiException e) {
-                            logException(js, PUBLISH_JOB, ws.workId, ws.elapsed(), e);
+                            logException(js, PUBLISH_JOB, ws.workId, ws.elapse(), e);
                         }
                         jitter(PUBLISH_JITTER);
                     }
@@ -186,20 +187,20 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                     StreamContext sctx = nc.getStreamContext(DATA_STREAM_NAME);
                     Collections.shuffle(consumers);
                     for (Integer cx : consumers) {
-                        jitter(CONSUME_JITTER);
                         ConsumerContext cctx = sctx.getConsumerContext(toConsumerName(cx));
                         try (FetchConsumer fc = cctx.fetch(FetchConsumeOptions.builder().maxMessages(CONSUME_BATCH).noWait().build())) {
                             Message m = fc.nextMessage();
                             while (m != null) {
                                 m.ack();
-                                long count = ws.update();
+                                long count = ws.increment();
                                 if (count % INFO_FREQUENCY == 0) {
-                                    logInfo(js, CONSUME_JOB, ws.workId, NO_TIX, count, ws.elapsed());
+                                    logInfo(js, CONSUME_JOB, ws.workId, NO_TIX, count, ws.elapse());
                                 }
                                 m = fc.nextMessage();
                             }
                         }
                         catch (Exception ignore) {}
+                        jitter(CONSUME_JITTER);
                     }
                 }
             }
@@ -249,18 +250,19 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                 printConnect(nc, INFO_JOB, ws.workId, tix);
                 List<String> list = new ArrayList<>(consumerNames);
                 Collections.shuffle(list);
-                long count = 0;
                 while (true) {
                     for (String consumerName : list) {
                         try {
                             jsm.getConsumerInfo(DATA_STREAM_NAME, consumerName);
-                            if (++count % INFO_FREQUENCY == 0) {
-                                logInfo(js, INFO_JOB, ws.workId, tix, count, ws.elapsed());
+                            long count = ws.increment();
+                            if (count % INFO_FREQUENCY == 0) {
+                                logInfo(js, INFO_JOB, ws.workId, tix, count, ws.elapse());
                             }
                         }
                         catch (IOException | JetStreamApiException e) {
-                            logException(js, INFO_JOB, ws.workId, ws.elapsed(), e);
+                            logException(js, INFO_JOB, ws.workId, ws.elapse(), e);
                         }
+                        jitter(INFO_JITTER);
                     }
                 }
             }

@@ -190,7 +190,7 @@ public abstract class AbstractSimWorkload extends Workload {
                     else {
                         sb.append(" | ").append(event.exceptionClass).append(": ").append(event.exceptionMessage);
                     }
-                    System.out.println(sb);
+                    System.out.println(sb + " " + event.toJson());
                 }
             }
             catch (IOException | JetStreamApiException ignore) {}
@@ -203,37 +203,42 @@ public abstract class AbstractSimWorkload extends Workload {
     // ----------------------------------------------------------------------------------------------------
     protected class WorkState {
         final String workId;
-        private final ReentrantLock lock;
+        private final ReentrantLock iLock;
+        private final ReentrantLock uLock;
         private long count;
         private long elapsed;
         final long startTime;
 
         public WorkState() {
             this.workId = generateWorkId();
-            this.lock = new ReentrantLock();
+            this.iLock = new ReentrantLock();
+            this.uLock = new ReentrantLock();
             this.count = 0;
             this.startTime = System.currentTimeMillis();
             this.elapsed = 0;
         }
 
-        public long update() {
-            lock.lock();
+        public long increment() {
+            iLock.lock();
             try {
-                elapsed = System.currentTimeMillis() - startTime;
                 return ++count;
             }
             finally {
-                lock.unlock();
+                iLock.unlock();
             }
         }
 
-        public long count() {
-            return count;
-        }
-
-        public long elapsed() {
+        public long elapse() {
+            uLock.lock();
+            try {
+                elapsed = System.currentTimeMillis() - startTime;
+            }
+            finally {
+                uLock.unlock();
+            }
             return elapsed;
         }
+
     }
 
     protected interface Worker {
