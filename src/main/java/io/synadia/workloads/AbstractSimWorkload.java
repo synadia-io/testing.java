@@ -340,7 +340,7 @@ public abstract class AbstractSimWorkload extends Workload {
             js.publish(event.subject(), event.serialize());
         }
         catch (IOException | JetStreamApiException ee) {
-            System.err.println(event.ident() + " Event Publish Error | " + ee);
+            System.err.println(event.ident() + " Event Publish Error | " + event.subject() + " | " + ee);
         }
     }
 
