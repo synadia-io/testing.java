@@ -193,13 +193,12 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                             Message m = fc.nextMessage();
                             while (m != null) {
                                 m.ack();
-                                if (++count % INFO_FREQUENCY == 0) {
-                                    logInfo(js, CONSUME_JOB, runId, NO_TIX, count);
-                                }
+                                ++count;
                                 m = fc.nextMessage();
                             }
                         }
                         catch (Exception ignore) {}
+                        logInfo(js, CONSUME_JOB, runId, NO_TIX, count);
                     }
                 }
             }
