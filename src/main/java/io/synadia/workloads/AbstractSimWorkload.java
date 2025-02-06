@@ -17,9 +17,10 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 
 import static io.nats.client.support.JsonUtils.printFormatted;
+import static io.nats.jsmulti.shared.Stats.humanTime;
 import static io.nats.jsmulti.shared.Utils.sleep;
 
 @SuppressWarnings("SameParameterValue")
@@ -162,8 +163,8 @@ public abstract class AbstractSimWorkload extends Workload {
                     hadAnyMessages = true;
                     if (first) {
                         first = false;
-                        System.out.println("       | ? Job (Thread)  | Count     | Time         | Details");
-                        System.out.println("       | --------------- | --------- | ------------ | --------------------");
+                        System.out.println("       | ? Job (Thread)  | Count       | Elapsed      | Details");
+                        System.out.println("       | --------------- | ----------- | ------------ | --------------------");
                     }
                     Event prev = watchMap.get(subject);
                     Event event = new Event(mi.getData());
@@ -177,11 +178,11 @@ public abstract class AbstractSimWorkload extends Workload {
                     sb.append(pad(temp, 13)).append(" | ");
                     temp = "";
                     if (event.count > 0) {
-                        temp = "" + event.count;
+                        temp = String.format("%,d", event.count);
                     }
-                    sb.append(pad(temp, 9))
+                    sb.append(pad(temp, 11))
                         .append(" | ")
-                        .append(WATCH_DATE_FORMAT.format(new Date(event.time)));
+                        .append(pad(humanTime(event.elapsed),20));
 
                     if (event.exceptionClass == null) {
                         sb.append(" |");
@@ -200,8 +201,43 @@ public abstract class AbstractSimWorkload extends Workload {
     // ----------------------------------------------------------------------------------------------------
     // WORKER
     // ----------------------------------------------------------------------------------------------------
+    protected class WorkState {
+        final String workId;
+        private final ReentrantLock lock;
+        private long count;
+        private long elapsed;
+        final long startTime;
+
+        public WorkState() {
+            this.workId = generateWorkId();
+            this.lock = new ReentrantLock();
+            this.count = 0;
+            this.startTime = System.currentTimeMillis();
+            this.elapsed = 0;
+        }
+
+        public long update() {
+            lock.lock();
+            try {
+                elapsed = System.currentTimeMillis() - startTime;
+                return ++count;
+            }
+            finally {
+                lock.unlock();
+            }
+        }
+
+        public long count() {
+            return count;
+        }
+
+        public long elapsed() {
+            return elapsed;
+        }
+    }
+
     protected interface Worker {
-        Runnable getWork(String runId, int tix, AtomicLong groupCount, Options options);
+        Runnable getWork(Options options, int tix, WorkState workState);
     }
 
     protected void doWorker(String job, Worker worker) throws InterruptedException {
@@ -212,10 +248,9 @@ public abstract class AbstractSimWorkload extends Workload {
         startJob(job);
         List<Options> options = roundRobinOptions(threadCount);
         List<Thread> threads = new ArrayList<>(threadCount);
-        String runId = generateRunId();
-        AtomicLong groupCount = new AtomicLong();
+        WorkState ws = new WorkState();
         for (int tix = 0; tix < threadCount; tix++) {
-            Thread t = new Thread(worker.getWork(runId, tix, groupCount, options.get(tix)));
+            Thread t = new Thread(worker.getWork(options.get(tix), tix, ws));
             t.start();
             threads.add(t);
         }
@@ -227,8 +262,8 @@ public abstract class AbstractSimWorkload extends Workload {
     // ----------------------------------------------------------------------------------------------------
     // GENERAL HELPERS
     // ----------------------------------------------------------------------------------------------------
-    protected String generateRunId() {
-        return Long.toHexString(System.currentTimeMillis()).toLowerCase();
+    protected String generateWorkId() {
+        return Long.toHexString(System.currentTimeMillis()).toLowerCase() + NUID.nextGlobalSequence();
     }
 
     // ----------------------------------------------------------------------------------------------------
@@ -236,31 +271,32 @@ public abstract class AbstractSimWorkload extends Workload {
     // ----------------------------------------------------------------------------------------------------
     protected static class Event implements JsonSerializable {
         public final String job;
-        public final String runId;
+        public final String workId;
         public final int tix;
         public final String qualifier;
         public final boolean defaultQualifier;
         public final long count;
-        public final long time;
+        public final long elapsed;
         public final String exceptionClass;
         public final String exceptionMessage;
 
         public Event(byte[] jsonBytes) {
             JsonValue jv = JsonParser.parseUnchecked(jsonBytes);
             this.job = JsonValueUtils.readString(jv, "job");
-            this.runId = JsonValueUtils.readString(jv, "run_id");
+            this.workId = JsonValueUtils.readString(jv, "work_id");
             this.tix = JsonValueUtils.readInteger(jv, "tix", NO_TIX);
             this.qualifier = JsonValueUtils.readString(jv, "qualifier");
             this.defaultQualifier = qualifier == null || qualifier.trim().isEmpty();
             this.count = JsonValueUtils.readLong(jv, "count", 0);
-            this.time = JsonValueUtils.readLong(jv, "time", 0);
+            this.elapsed = JsonValueUtils.readLong(jv, "elapsed", 0);
+
             this.exceptionClass = JsonValueUtils.readString(jv, "exception_class");
             this.exceptionMessage = JsonValueUtils.readString(jv, "exception_message");
         }
 
-        public Event(String job, String runId, int tix, String qualifier, long count, Exception exception) {
+        public Event(String job, String workId, int tix, String qualifier, long count, long elapsed, Exception exception) {
             this.job = job;
-            this.runId = runId;
+            this.workId = workId;
             this.tix = tix;
             this.defaultQualifier = qualifier == null || qualifier.trim().isEmpty();
             if (defaultQualifier) {
@@ -270,7 +306,7 @@ public abstract class AbstractSimWorkload extends Workload {
                 this.qualifier = qualifier.toLowerCase().replace(" ", "").trim();
             }
             this.count = count;
-            this.time = System.currentTimeMillis();
+            this.elapsed = elapsed;
             if (exception == null) {
                 exceptionClass = null;
                 exceptionMessage = null;
@@ -288,10 +324,10 @@ public abstract class AbstractSimWorkload extends Workload {
             if (tix != NO_TIX) {
                 mb.put("tix", tix);
             }
-            mb.put("run_id", runId);
+            mb.put("work_id", workId);
             mb.put("qualifier", qualifier);
             mb.put("count", count);
-            mb.put("time", time);
+            mb.put("elapsed", elapsed);
             mb.put("exception_class", exceptionClass);
             mb.put("exception_message", exceptionMessage);
             return mb.jv.toJson();
@@ -310,7 +346,7 @@ public abstract class AbstractSimWorkload extends Workload {
             if (exceptionClass != null) {
                 list.add(exceptionClass + ": " + exceptionMessage);
             }
-            list.add("@" + time);
+            list.add(humanTime(elapsed));
             if (messages != null) {
                 for (String m : messages) {
                     if (m != null) {
@@ -332,7 +368,7 @@ public abstract class AbstractSimWorkload extends Workload {
 
         private String segments(String missing) {
             return job
-                // + (runId == null    ? missing : DOT + runId)
+                // + (workId == null    ? missing : DOT + workId)
                 + (defaultQualifier ? missing : DOT + qualifier)
                 + (tix == NO_TIX    ? missing : DOT + tix);
         }
@@ -343,18 +379,19 @@ public abstract class AbstractSimWorkload extends Workload {
             if (o == null || getClass() != o.getClass()) return false;
 
             Event event = (Event) o;
-            return tix == event.tix && defaultQualifier == event.defaultQualifier && count == event.count && time == event.time && Objects.equals(job, event.job) && Objects.equals(runId, event.runId) && Objects.equals(qualifier, event.qualifier) && Objects.equals(exceptionClass, event.exceptionClass) && Objects.equals(exceptionMessage, event.exceptionMessage);
+            return tix == event.tix
+                && defaultQualifier == event.defaultQualifier && count == event.count && elapsed == event.elapsed && Objects.equals(job, event.job) && Objects.equals(workId, event.workId) && Objects.equals(qualifier, event.qualifier) && Objects.equals(exceptionClass, event.exceptionClass) && Objects.equals(exceptionMessage, event.exceptionMessage);
         }
 
         @Override
         public int hashCode() {
             int result = Objects.hashCode(job);
-            result = 31 * result + Objects.hashCode(runId);
+            result = 31 * result + Objects.hashCode(workId);
             result = 31 * result + tix;
             result = 31 * result + Objects.hashCode(qualifier);
             result = 31 * result + Boolean.hashCode(defaultQualifier);
             result = 31 * result + Long.hashCode(count);
-            result = 31 * result + Long.hashCode(time);
+            result = 31 * result + Long.hashCode(elapsed);
             result = 31 * result + Objects.hashCode(exceptionClass);
             result = 31 * result + Objects.hashCode(exceptionMessage);
             return result;
@@ -366,21 +403,21 @@ public abstract class AbstractSimWorkload extends Workload {
     // ----------------------------------------------------------------------------------------------------
     protected static final String WATCH_BREAK = "--------------------------------------------------------------------------------------------------------------";
 
-    protected void logInfo(JetStream js, String job, String runId, int tix, long count) {
-        Event event = new Event(job, runId, tix, null, count, null);
+    protected void logInfo(JetStream js, String job, String workId, int tix, long count, long elapsed) {
+        Event event = new Event(job, workId, tix, null, count, elapsed, null);
         Debug.info(event.ident(), event.extras());
         publish(js, event);
     }
 
-    protected void logException(JetStream js, String job, String runId, Exception exception) {
-        Event event = new Event(job, runId, NO_TIX, null, 0, exception);
+    protected void logException(JetStream js, String job, String workId, long elapsed, Exception exception) {
+        Event event = new Event(job, workId, NO_TIX, null, 0, elapsed, exception);
         Debug.info(event.ident(), event.extras());
         publish(js, event);
     }
 
-    protected void print(String job, String runId, int tix, String qualifier, long count, String message) {
-        Event event = new Event(job, runId, tix, qualifier, count, null);
-        Debug.info(event.ident(), event.extras());
+    protected void print(String job, String workId, int tix, String qualifier, long count, long elapsed, String message) {
+        Event event = new Event(job, workId, tix, qualifier, count, elapsed, null);
+        Debug.info(event.ident(), event.extras(message));
     }
 
     protected void publish(JetStream js, Event event) {

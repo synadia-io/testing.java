@@ -106,7 +106,7 @@ public class Generator {
             calc.configTemplatePublic = calc.configTemplatePublic.replace(SERVER_PREFIX + x + TAG_END, publicServer);
 
             if (which != Which.Local && cfg.doPublic) {
-                heading(scriptName + " " + current.stateName);
+                heading("server " + current.name + " [" + current.stateName + "] " + scriptName);
                 printSsh(current, cfg);
                 printNatsCli(current);
 
@@ -237,7 +237,7 @@ public class Generator {
                 try {
                     Instance instance = new Instance(jvInstance, cfg.natsPort);
                     if (instance.name.contains(cfg.serverFilter)) {
-                        heading("server " + instance.name + " [" + instance.stateName + "]");
+                        // heading("server " + instance.name + " [" + instance.stateName + "]");
                         if (instance.isRunning()) {
                             calc.runningServers.add(instance);
                         }
