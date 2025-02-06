@@ -329,10 +329,6 @@ public abstract class AbstractSimWorkload extends Workload {
 
     protected void publish(JetStream js, Event event) {
         try {
-            System.out.println("!!!!!");
-            System.out.println(event.subject());
-            System.out.println(event.toJson());
-            System.out.println("-----");
             js.publish(event.subject(), event.serialize());
         }
         catch (IOException | JetStreamApiException ee) {
