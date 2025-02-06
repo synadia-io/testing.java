@@ -105,7 +105,7 @@ public abstract class AbstractSimWorkload extends Workload {
 
     protected void doClearExceptions(Connection nc) throws IOException, JetStreamApiException {
         startJob("Clear Exception");
-        nc.jetStreamManagement().purgeStream(INFO_STREAM_NAME);
+        nc.jetStreamManagement().purgeStream(EX_STREAM_NAME);
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
