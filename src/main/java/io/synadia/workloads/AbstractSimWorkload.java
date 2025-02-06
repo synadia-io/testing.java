@@ -4,9 +4,7 @@
 package io.synadia.workloads;
 
 import io.nats.client.*;
-import io.nats.client.api.RetentionPolicy;
-import io.nats.client.api.StreamConfiguration;
-import io.nats.client.api.StreamInfo;
+import io.nats.client.api.*;
 import io.nats.client.support.JsonParser;
 import io.nats.client.support.JsonSerializable;
 import io.nats.client.support.JsonValue;
@@ -18,34 +16,31 @@ import io.synadia.utils.Debug;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static io.nats.client.support.JsonUtils.printFormatted;
+import static io.nats.jsmulti.shared.Utils.sleep;
 
 @SuppressWarnings("SameParameterValue")
 public abstract class AbstractSimWorkload extends Workload {
     protected static final String DATA_STREAM_NAME = "sim-data";
-    protected static final String LOG_STREAM_NAME = "sim-log";
+    protected static final String INFO_STREAM_NAME = "sim-info";
+    protected static final String EX_STREAM_NAME = "sim-exception";
     protected static final String DATA_SUBJECT_PREFIX = "data.";
+    protected static final String INFO_SUBJECT_PREFIX = "log.";
+    protected static final String EX_SUBJECT_PREFIX = "ex.";
     protected static final String DATA_STREAM_SUBJECT = DATA_SUBJECT_PREFIX + ">";
-    protected static final String LOG_SUBJECT_PREFIX = "log.";
-    protected static final String LOG_STREAM_SUBJECT = LOG_SUBJECT_PREFIX + ">";
+    protected static final String INFO_STREAM_SUBJECT = INFO_SUBJECT_PREFIX + ">";
+    protected static final String EX_STREAM_SUBJECT = EX_SUBJECT_PREFIX + ">";
     protected static final int DEFAULT_WORKER_THREAD_COUNT = 3;
     protected static final int NO_TIX = Integer.MIN_VALUE;
     protected static final String DEFAULT_SEGMENT = "._";
     protected static final String DOT = ".";
-    protected static final String EXCEPTION_QUALIFIER = "ex";
+    protected static final long WATCH_FREQUENCY = 5000;
 
     protected final int progressFrequency;
-
-    private Boolean _background;
-    protected boolean isBackground() {
-        if (_background == null) {
-            _background = containsFlag("background");
-        }
-        return _background;
-    }
 
     protected AbstractSimWorkload(int progressFrequency) {
         this.progressFrequency = progressFrequency;
@@ -66,6 +61,9 @@ public abstract class AbstractSimWorkload extends Workload {
 
     protected abstract String commands();
 
+    // ----------------------------------------------------------------------------------------------------
+    // COMMANDS
+    // ----------------------------------------------------------------------------------------------------
     @SuppressWarnings("SameParameterValue")
     protected void doSetup(Connection nc, long maxMessages) throws IOException, JetStreamApiException {
         startJob("Setup");
@@ -79,12 +77,18 @@ public abstract class AbstractSimWorkload extends Workload {
             .maxMessages(maxMessages)
             .build());
         printFormatted(si.getJv());
-        safeDeleteStream(jsm, LOG_STREAM_NAME);
+        safeDeleteStream(jsm, INFO_STREAM_NAME);
         si = jsm.addStream(StreamConfiguration.builder()
-            .name(LOG_STREAM_NAME)
-            .subjects(LOG_STREAM_SUBJECT)
+            .name(INFO_STREAM_NAME)
+            .subjects(INFO_STREAM_SUBJECT)
             .retentionPolicy(RetentionPolicy.Limits)
-            .maxAge(Duration.ofMinutes(5))
+            .maxAge(Duration.ofMinutes(60))
+            .build());
+        printFormatted(si.getJv());
+        safeDeleteStream(jsm, EX_STREAM_NAME);
+        si = jsm.addStream(StreamConfiguration.builder()
+            .name(EX_STREAM_NAME)
+            .subjects(EX_STREAM_SUBJECT)
             .build());
         printFormatted(si.getJv());
     }
@@ -94,11 +98,76 @@ public abstract class AbstractSimWorkload extends Workload {
         nc.jetStreamManagement().purgeStream(DATA_STREAM_NAME);
     }
 
-    protected void doClearLog(Connection nc) throws IOException, JetStreamApiException {
+    protected void doClearInfo(Connection nc) throws IOException, JetStreamApiException {
         startJob("Clear Log");
-        nc.jetStreamManagement().purgeStream(LOG_STREAM_NAME);
+        nc.jetStreamManagement().purgeStream(INFO_STREAM_NAME);
     }
 
+    protected void doClearExceptions(Connection nc) throws IOException, JetStreamApiException {
+        startJob("Clear Exception");
+        nc.jetStreamManagement().purgeStream(INFO_STREAM_NAME);
+    }
+
+    @SuppressWarnings("InfiniteLoopStatement")
+    protected void doWatch(Connection nc) throws IOException {
+        startJob("Watch");
+        JetStreamManagement jsm = nc.jetStreamManagement();
+        while (true) {
+            try {
+                System.out.println();
+                System.out.println();
+                System.out.println(WATCH_BREAK);
+                StreamInfo dataSi = jsm.getStreamInfo(DATA_STREAM_NAME);
+                StreamState dataSs = dataSi.getStreamState();
+                System.out.println("STREAM | " + pad(DATA_STREAM_NAME, 10) + " | Subjects: " + pad(dataSs.getSubjectCount(), 10) + " | Messages: " + pad(dataSs.getMsgCount(), 12));
+
+                StreamInfo exSi = jsm.getStreamInfo(EX_STREAM_NAME, StreamInfoOptions.allSubjects());
+                StreamState exSs = exSi.getStreamState();
+                System.out.println("STREAM | " + pad(EX_STREAM_NAME, 10) + " | Subjects: " + pad(exSs.getSubjectCount(), 10) + " | Messages: " + pad(exSs.getMsgCount(), 12));
+
+                StreamInfo infoSi = jsm.getStreamInfo(INFO_STREAM_NAME, StreamInfoOptions.allSubjects());
+                StreamState infoSs = infoSi.getStreamState();
+                System.out.println("STREAM | " + pad(INFO_STREAM_NAME, 10) + " | Subjects: " + pad(infoSs.getSubjectCount(), 10) + " | Messages: " + pad(infoSs.getMsgCount(), 12));
+
+                System.out.println(WATCH_BREAK);
+                boolean hadAnyMessages = watchStream(jsm, EX_STREAM_NAME, infoSs, "EX     | ");
+
+                if (hadAnyMessages) { System.out.println(WATCH_BREAK); }
+                watchStream(jsm, INFO_STREAM_NAME, infoSs, "INFO   | ");
+
+                System.out.println(WATCH_BREAK);
+                sleep(WATCH_FREQUENCY);
+            }
+            catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    private static boolean watchStream(JetStreamManagement jsm, String streamName, StreamState ss, String lineStart) {
+        List<String> allSubjects = new ArrayList<>();
+        for (Subject subject : ss.getSubjects()) {
+            allSubjects.add(subject.getName());
+        }
+        Collections.sort(allSubjects);
+
+        boolean hadAnyMessages = false;
+        for (String subject : allSubjects) {
+            try {
+                MessageInfo mi = jsm.getLastMessage(streamName, subject);
+                if (mi != null) {
+                    hadAnyMessages = true;
+                    System.out.println(lineStart + new Event(mi.getData()));
+                }
+            }
+            catch (IOException | JetStreamApiException ignore) {}
+        }
+        return hadAnyMessages;
+    }
+
+    // ----------------------------------------------------------------------------------------------------
+    // WORKER
+    // ----------------------------------------------------------------------------------------------------
     protected interface Worker {
         Runnable getWork(String runId, int tix, boolean background, AtomicLong groupCount, Options options);
     }
@@ -124,11 +193,25 @@ public abstract class AbstractSimWorkload extends Workload {
         }
     }
 
+    // ----------------------------------------------------------------------------------------------------
+    // GENERAL HELPERS
+    // ----------------------------------------------------------------------------------------------------
     protected String generateRunId() {
         return Long.toHexString(System.currentTimeMillis()).toLowerCase();
     }
 
-    protected static class Result implements JsonSerializable {
+    private Boolean _background;
+    protected boolean isBackground() {
+        if (_background == null) {
+            _background = containsFlag("background");
+        }
+        return _background;
+    }
+
+    // ----------------------------------------------------------------------------------------------------
+    // EVENT
+    // ----------------------------------------------------------------------------------------------------
+    protected static class Event implements JsonSerializable {
         public final String job;
         public final String runId;
         public final int tix;
@@ -136,9 +219,10 @@ public abstract class AbstractSimWorkload extends Workload {
         public final boolean defaultQualifier;
         public final long count;
         public final long time;
-        public final String details;
+        public final String exceptionClass;
+        public final String exceptionMessage;
 
-        public Result(byte[] jsonBytes) {
+        public Event(byte[] jsonBytes) {
             JsonValue jv = JsonParser.parseUnchecked(jsonBytes);
             this.job = JsonValueUtils.readString(jv, "job");
             this.runId = JsonValueUtils.readString(jv, "run_id");
@@ -147,10 +231,11 @@ public abstract class AbstractSimWorkload extends Workload {
             this.defaultQualifier = qualifier == null || qualifier.trim().isEmpty();
             this.count = JsonValueUtils.readLong(jv, "count", 0);
             this.time = JsonValueUtils.readLong(jv, "time", 0);
-            this.details = JsonValueUtils.readString(jv, "details");
+            this.exceptionClass = JsonValueUtils.readString(jv, "exception_class");
+            this.exceptionMessage = JsonValueUtils.readString(jv, "exception_message");
         }
 
-        public Result(String job, String runId, int tix, String qualifier, long count, Object details) {
+        public Event(String job, String runId, int tix, String qualifier, long count, Exception exception) {
             this.job = job;
             this.runId = runId;
             this.tix = tix;
@@ -163,8 +248,14 @@ public abstract class AbstractSimWorkload extends Workload {
             }
             this.count = count;
             this.time = System.currentTimeMillis();
-            String temp = details == null ? null : details.toString().trim();
-            this.details = temp == null || temp.isEmpty() ? null : temp;
+            if (exception == null) {
+                exceptionClass = null;
+                exceptionMessage = null;
+            }
+            else {
+                exceptionClass = exception.getClass().getSimpleName();
+                exceptionMessage = exception.getMessage();
+            }
         }
 
         @Override
@@ -178,23 +269,25 @@ public abstract class AbstractSimWorkload extends Workload {
             mb.put("qualifier", qualifier);
             mb.put("count", count);
             mb.put("time", time);
-            mb.put("details", details);
+            mb.put("exception_class", exceptionClass);
+            mb.put("exception_message", exceptionMessage);
             return mb.jv.toJson();
         }
+
         @Override
         public String toString() {
             StringBuilder sb = new StringBuilder(pad(ident(), 39));
             if (count > 0) {
                 sb.append(" | Count: ").append(pad(count, 11));
             }
-            if (details != null) {
+            if (exceptionClass != null) {
                 if (count > 0) {
                     sb.append(" | ");
                 }
                 else {
                     sb.append(" ");
                 }
-                sb.append(details);
+                sb.append(exceptionClass).append(": ").append(exceptionMessage);
             }
             return sb.toString();
         }
@@ -204,7 +297,7 @@ public abstract class AbstractSimWorkload extends Workload {
         }
 
         public String subject() {
-            return LOG_SUBJECT_PREFIX + segments(DEFAULT_SEGMENT);
+            return (exceptionClass == null  ? INFO_SUBJECT_PREFIX : EX_SUBJECT_PREFIX) + segments(DEFAULT_SEGMENT);
         }
 
         private String segments(String missing) {
@@ -215,58 +308,39 @@ public abstract class AbstractSimWorkload extends Workload {
         }
     }
 
-    protected void autoProgress(boolean background, JetStream js, String job, String runId, long count, Object details) {
+    // ----------------------------------------------------------------------------------------------------
+    // EVENT HELPERS
+    // ----------------------------------------------------------------------------------------------------
+    protected static final String WATCH_BREAK = "--------------------------------------------------------------------------------------------------------------";
+
+    protected void logInfo(boolean background, JetStream js, String job, String runId, int tix, long count) {
+        Event event = new Event(job, runId, tix, null, count, null);
         if (!background) {
-            showProgressMaybe(count, job);
+            System.out.println(event);
         }
-        publishResult(js, job, runId, NO_TIX, null, count, details);
+        publish(js, event);
     }
 
-    protected void autoResult(boolean background, JetStream js, String job, String runId, long count, Object details) {
-        Result result = new Result(job, runId, NO_TIX, null, count, details);
+    protected void logException(boolean background, JetStream js, String job, String runId, Exception exception) {
+        Event event = new Event(job, runId, NO_TIX, null, 0, exception);
         if (!background) {
-            System.out.println(result);
+            System.out.println(event);
         }
-        publishResult(js, result);
+        publish(js, event);
     }
 
-    protected void autoResult(boolean background, JetStream js, String job, String runId, int tix, long count, Object details) {
-        Result result = new Result(job, runId, tix, null, count, details);
+    protected void print(boolean background, String job, String runId, int tix, String qualifier, long count, String message) {
         if (!background) {
-            System.out.println(result);
-        }
-        publishResult(js, result);
-    }
-
-    protected void print(boolean background, String job, String runId, int tix, String qualifier, long count, Object details) {
-        if (!background) {
-            System.out.println(new Result(job, runId, tix, qualifier, count, details));
+            System.out.println(new Event(job, runId, tix, qualifier, count, null) + " | " + message);
         }
     }
 
-    protected void autoException(boolean background, JetStream js, String job, String runId, Exception ex) {
-        String details = ex.getClass().getSimpleName() + "," + ex.getMessage();
-        Result result = new Result(job, runId, NO_TIX, EXCEPTION_QUALIFIER, 0, details);
-        if (!background) {
-            System.out.println(result);
-        }
-        publishResult(js, result);
-    }
-
-    protected void clearException(JetStream js, String job, String runId) {
-        publishResult(js, new Result(job, runId, NO_TIX, EXCEPTION_QUALIFIER, 0, null));
-    }
-
-    protected void publishResult(JetStream js, String job, String runId, int tix, String qualifier, long count, Object details) {
-        publishResult(js, new Result(job, runId, tix, qualifier, count, details));
-    }
-
-    protected void publishResult(JetStream js, Result result) {
+    protected void publish(JetStream js, Event event) {
         try {
-            js.publish(result.subject(), result.serialize());
+            js.publish(event.subject(), event.serialize());
         }
         catch (IOException | JetStreamApiException ee) {
-            System.err.println(result.ident() + " Result Publish Error | " + ee);
+            System.err.println(event.ident() + " Event Publish Error | " + ee);
         }
     }
 

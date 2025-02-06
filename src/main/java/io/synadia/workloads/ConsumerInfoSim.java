@@ -4,7 +4,7 @@
 package io.synadia.workloads;
 
 import io.nats.client.*;
-import io.nats.client.api.*;
+import io.nats.client.api.ConsumerConfiguration;
 import io.synadia.CommandLine;
 
 import java.io.IOException;
@@ -12,8 +12,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
-
-import static io.nats.jsmulti.shared.Utils.sleep;
 
 public class ConsumerInfoSim extends AbstractSimWorkload {
     private static final String CONSUMER_PREFIX = "sim-con-";
@@ -23,7 +21,6 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
     private static final int CONSUME_BATCH = 10;
     private static final int INFO_THREAD_COUNT = 8;
     private static final int PROGRESS_FREQUENCY = 100;
-    private static final long RESULTS_FREQUENCY = 5000;
     private static final int INFO_REPORT_FREQUENCY = 10000;
     private static final long MAX_MESSAGES = 1_000_000;
 
@@ -32,7 +29,8 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
     private static final String CONSUME_JOB = "Consume";
     private static final String CONSUMERS = "consumers";
     private static final String MESSAGES = "messages";
-    private static final String LOG = "log";
+    private static final String INFO = "info";
+    private static final String EX = "ex";
 
     public ConsumerInfoSim() {
         super(PROGRESS_FREQUENCY);
@@ -45,7 +43,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
 
     @Override
     protected String commands() {
-        return "'setup', 'create', 'list', 'publish', 'consume', 'info', 'results', 'clear consumers|data|log', 'purge <job.runId>'";
+        return "'setup', 'create', 'list', 'publish', 'consume', 'gci', 'watch', 'clear consumers|data|info|ex', 'purge <job.runId>'";
     }
 
     @Override
@@ -58,8 +56,8 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                 case "list"    -> doList(nc);
                 case "publish" -> doWorker(PUBLISH_JOB, this::publishWorker);
                 case "consume" -> doWorker(CONSUME_JOB, this::consumeWorker);
-                case "info"    -> doInfo();
-                case "results" -> doResults(nc);
+                case "gci"     -> doGetConsumerInfo();
+                case "watch"   -> doWatch(nc);
                 case "clear"   -> doClear(nc);
                 case "purge"   -> doPurge(nc);
                 default        -> exit("Unknown custom workload");
@@ -116,23 +114,36 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                     endProgress(index);
                 }
                 case MESSAGES -> doClearMessages(nc);
-                case LOG -> doClearLog(nc);
+                case INFO -> doClearInfo(nc);
+                case EX -> doClearExceptions(nc);
                 default -> exit("Unknown clear option: '" + option + "'");
             }
         }
     }
 
     private void doPurge(Connection nc) throws IOException, JetStreamApiException {
-        String option = getArgFromPosition(2);
-        if (option == null || option.isEmpty()) {
+        String code = getArgFromPosition(2);
+        if (code == null || code.isEmpty()) {
             exit("Purge option not provided");
         }
         else {
             JetStreamManagement jsm = nc.jetStreamManagement();
-            String purge = LOG_SUBJECT_PREFIX + option + ".>";
-            startProgressJob("Purge: " + option + "(" + purge + ")");
-            jsm.purgeStream(LOG_STREAM_NAME, PurgeOptions.builder().subject(purge).build());
+            String purge = INFO_SUBJECT_PREFIX + code + ".>";
+            startProgressJob("Purge: " + code + "(" + purge + ")");
+            jsm.purgeStream(INFO_SUBJECT_PREFIX, PurgeOptions.builder().subject(purge).build());
         }
+    }
+
+    private void printConnect(boolean background, Connection nc, String job, String runId, int tix) {
+        print(background, job, runId, tix, "connect", 0, nc.getServerInfo().getServerId());
+    }
+
+    private static List<Integer> generateConsumerList() {
+        List<Integer> consumers = new ArrayList<>();
+        for (int cx = 0; cx < CONSUMER_COUNT; cx++) {
+            consumers.add(cx);
+        }
+        return consumers;
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
@@ -140,13 +151,8 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
         return () -> {
             try (Connection nc = Nats.connect(options)) {
                 JetStream js = nc.jetStream();
-                print(background, PUBLISH_JOB, runId, tix, "connect", 0, nc.getServerInfo().getServerId());
-                List<Integer> consumers = new ArrayList<>();
-                for (int cx = 0; cx < CONSUMER_COUNT; cx++) {
-                    consumers.add(cx);
-                }
-                long ioEx = 0;
-                long jsapiEx = 0;
+                printConnect(background, nc, PUBLISH_JOB, runId, tix);
+                List<Integer> consumers = generateConsumerList();
                 while (true) {
                     Collections.shuffle(consumers);
                     for (Integer cx : consumers) {
@@ -154,12 +160,11 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                             js.publish(toSubject(cx), null);
                             long count = groupCount.incrementAndGet();
                             if (count % INFO_REPORT_FREQUENCY == 0) {
-                                autoResult(background, js, PUBLISH_JOB, runId, count, null);
-                                clearException(js, PUBLISH_JOB, runId);
+                                logInfo(background, js, PUBLISH_JOB, runId, NO_TIX, count);
                             }
                         }
                         catch (IOException | JetStreamApiException e) {
-                            autoException(background, js, PUBLISH_JOB, runId, e);
+                            logException(background, js, PUBLISH_JOB, runId, e);
                         }
                         jitter(PUBLISH_JITTER);
                     }
@@ -176,12 +181,9 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
         return () -> {
             try (Connection nc = Nats.connect(options)) {
                 JetStream js = nc.jetStream();
-                print(background, CONSUME_JOB, runId, tix, "connect", 0, nc.getServerInfo().getServerId());
+                printConnect(background, nc, CONSUME_JOB, runId, tix);
+                List<Integer> consumers = generateConsumerList();
 
-                List<Integer> consumers = new ArrayList<>();
-                for (int cx = 0; cx < CONSUMER_COUNT; cx++) {
-                    consumers.add(cx);
-                }
                 StreamContext sctx = nc.getStreamContext(DATA_STREAM_NAME);
 
                 while (true) {
@@ -195,7 +197,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                                 m.ack();
                                 long count = groupCount.incrementAndGet();
                                 if (count % INFO_REPORT_FREQUENCY == 0) {
-                                    autoResult(background, js, CONSUME_JOB, runId, count, null);
+                                    logInfo(background, js, CONSUME_JOB, runId, NO_TIX, count);
                                 }
                                 m = fc.nextMessage();
                             }
@@ -210,52 +212,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
         };
     }
 
-    private static final String RESULT_BREAK = "--------------------------------------------------------------------------------------------------------------";
-
-    @SuppressWarnings("InfiniteLoopStatement")
-    private void doResults(Connection nc) throws IOException {
-        startJob("Results");
-        JetStreamManagement jsm = nc.jetStreamManagement();
-        while (true) {
-            try {
-                System.out.println();
-                System.out.println();
-                System.out.println(RESULT_BREAK);
-                StreamInfo si = jsm.getStreamInfo(DATA_STREAM_NAME);
-                StreamState ss = si.getStreamState();
-                System.out.println("STREAM | " + pad(DATA_STREAM_NAME, 10) + " | Subjects: " + pad(ss.getSubjectCount(), 10) + " | Messages: " + pad(ss.getMsgCount(), 12));
-
-                si = jsm.getStreamInfo(LOG_STREAM_NAME, StreamInfoOptions.allSubjects());
-                ss = si.getStreamState();
-                System.out.println("STREAM | " + pad(LOG_STREAM_NAME, 10) + " | Subjects: " + pad(ss.getSubjectCount(), 10) + " | Messages: " + pad(ss.getMsgCount(), 12));
-
-                System.out.println(RESULT_BREAK);
-
-                List<String> allSubjects = new ArrayList<>();
-                for (Subject subject : ss.getSubjects()) {
-                    allSubjects.add(subject.getName());
-                }
-                Collections.sort(allSubjects);
-
-                for (String subject : allSubjects) {
-                    try {
-                        MessageInfo mi = jsm.getLastMessage(LOG_STREAM_NAME, subject);
-                        if (mi != null) {
-                            System.out.println("LOG    | " + new Result(mi.getData()));
-                        }
-                    }
-                    catch (IOException | JetStreamApiException ignore) {}
-                }
-                System.out.println(RESULT_BREAK);
-                sleep(RESULTS_FREQUENCY);
-            }
-            catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
-
-    private void doInfo() throws InterruptedException {
+    private void doGetConsumerInfo() throws InterruptedException {
         boolean background = isBackground();
         startJob("Info", background);
         List<Options> options = roundRobinOptions(INFO_THREAD_COUNT);
@@ -293,23 +250,20 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
             try (Connection nc = Nats.connect(options)) {
                 JetStreamManagement jsm = nc.jetStreamManagement();
                 JetStream js = nc.jetStream();
-                print(background, INFO_JOB, runId, tix, "connect", 0, nc.getServerInfo().getServerId());
+                printConnect(background, nc, INFO_JOB, runId, tix);
                 List<String> list = new ArrayList<>(consumerNames);
                 Collections.shuffle(list);
                 long count = 0;
-                long ioEx = 0;
-                long jsapiEx = 0;
                 while (true) {
                     for (String consumerName : list) {
                         try {
                             jsm.getConsumerInfo(DATA_STREAM_NAME, consumerName);
                             if (++count % INFO_REPORT_FREQUENCY == 0) {
-                                autoResult(background, js, INFO_JOB, runId, tix, count, null);
-                                clearException(js, INFO_JOB, runId);
+                                logInfo(background, js, INFO_JOB, runId, tix, count);
                             }
                         }
                         catch (IOException | JetStreamApiException e) {
-                            autoException(background, js, INFO_JOB, runId, e);
+                            logException(background, js, INFO_JOB, runId, e);
                         }
                     }
                 }
