@@ -94,7 +94,7 @@ public abstract class AbstractSimWorkload extends Workload {
     }
 
     protected void doClearData(Connection nc) throws IOException, JetStreamApiException {
-        startJob("Clear Messages");
+        startJob("Clear Data");
         nc.jetStreamManagement().purgeStream(DATA_STREAM_NAME);
     }
 
