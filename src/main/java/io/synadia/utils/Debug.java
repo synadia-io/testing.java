@@ -6,18 +6,21 @@ import io.nats.client.JetStreamManagement;
 import io.nats.client.Message;
 import io.nats.client.api.ConsumerConfiguration;
 import io.nats.client.api.ConsumerInfo;
+import io.nats.client.api.SequenceInfo;
 import io.nats.client.api.StreamInfo;
 import io.nats.client.impl.Headers;
 import io.nats.client.impl.NatsJetStreamMetaData;
 import io.nats.client.impl.NatsMessage;
+import io.nats.client.support.DateTimeUtils;
 import io.nats.client.support.JsonSerializable;
 
 import java.io.IOException;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-// MODIFIED 09/16/2024 1
+// MODIFIED 1/16/2024
 
 @SuppressWarnings("SameParameterValue")
 public abstract class Debug {
@@ -27,12 +30,15 @@ public abstract class Debug {
     }
 
     public static final String SEP = " | ";
+    public static final String DIV = "/";
     public static final String PAD = "                                                                                                                                                                                                                                                                                                                                                                                                                                    ";
+    public static final String REPLACE = "\\Q%s\\E";
     public static boolean DO_NOT_TRUNCATE = true;
     public static boolean PRINT_THREAD_ID = true;
     public static boolean PRINT_TIME = true;
     public static boolean PAUSE = false;
     public static DebugPrinter DEBUG_PRINTER = System.out::println;
+    public static int MAX_DATA_DISPLAY = 50;
 
     private Debug() {}  /* ensures cannot be constructed */
 
@@ -60,7 +66,13 @@ public abstract class Debug {
 
     public static void stackTrace(String label, Throwable t) {
         if (PAUSE) { return; }
-        info(label, t.getMessage());
+        String m = t.getMessage();
+        if (m == null) {
+            info(label);
+        }
+        else {
+            info(label, t.getMessage());
+        }
         StackTraceElement[] elements = t.getStackTrace();
         for (int i = 0; i < elements.length; i++) {
             String ts = elements[i].toString();
@@ -93,10 +105,10 @@ public abstract class Debug {
         if (PAUSE) { return; }
         String start;
         if (PRINT_TIME && PRINT_THREAD_ID) {
-            start = "[" + Thread.currentThread().getName() + "@" + shortTime() + "] ";
+            start = "[" + Thread.currentThread().getName() + "@" + time() + "] ";
         }
         else if (PRINT_TIME){
-            start = "[" + shortTime() + "] ";
+            start = "[" + time() + "] ";
         }
         else if (PRINT_THREAD_ID){
             start = "[" + Thread.currentThread().getName() + "] ";
@@ -133,18 +145,22 @@ public abstract class Debug {
         }
 
         if (msg.isStatusMessage()) {
-            DEBUG_PRINTER.println(label + sidString(msg) + subjString(msg) + msg.getStatus() + extra);
+            DEBUG_PRINTER.println(label + sidString(msg) + msgInfoString(msg) + msg.getStatus() + extra);
         }
         else if (msg.isJetStream()) {
-            DEBUG_PRINTER.println(label + sidString(msg) + subjString(msg) + dataString(msg) + replyToString(msg) + extra);
+            DEBUG_PRINTER.println(label + sidString(msg) + msgInfoString(msg) + dataString(msg) + replyToString(msg) + extra);
         }
         else if (msg.getSubject() == null) {
             DEBUG_PRINTER.println(label + sidString(msg) + msg + extra);
         }
         else {
-            DEBUG_PRINTER.println(label + sidString(msg) + subjString(msg) + dataString(msg) + replyToString(msg) + extra);
+            DEBUG_PRINTER.println(label + sidString(msg) + msgInfoString(msg) + dataString(msg) + replyToString(msg) + extra);
         }
         debugHdr(label.length() + 1, msg);
+    }
+
+    private static String messageString(Message msg) {
+        return sidString(msg) + msgInfoString(msg) + dataString(msg) + replyToString(msg);
     }
 
     public static void warn(String label, Object... extras) {
@@ -159,7 +175,13 @@ public abstract class Debug {
         return msg.getSID() == null ? SEP : " sid:" + msg.getSID() + SEP;
     }
 
-    public static String subjString(Message msg) {
+    public static String msgInfoString(Message msg) {
+        if (msg.isJetStream()) {
+            return msg.metaData().streamSequence()
+                + DIV + msg.metaData().consumerSequence()
+                + SEP + msg.getSubject()
+                + SEP;
+        }
         return msg.getSubject() + SEP;
     }
 
@@ -178,13 +200,9 @@ public abstract class Debug {
         return msg.getReplyTo();
     }
 
-    public static String shortTime() {
+    public static String time() {
         String t = "" + System.currentTimeMillis();
-        return t.substring(t.length() - 9);
-    }
-
-    public static String fullTime() {
-        return "" + System.currentTimeMillis();
+        return t.substring(t.length() - 10);
     }
 
     public static String dataString(Message msg) {
@@ -199,7 +217,7 @@ public abstract class Debug {
 
         int at = s.indexOf("io.nats.jetstream.api");
         if (at == -1) {
-            return s.length() > 27 ? s.substring(0, 27) + "..." : s;
+            return s.length() > MAX_DATA_DISPLAY ? s.substring(0, MAX_DATA_DISPLAY) + "..." : s;
         }
         int at2 = s.indexOf('"', at);
         return s.substring(at, at2) + SEP;
@@ -226,21 +244,43 @@ public abstract class Debug {
 
             String xtra = getString(extras[i]);
             while (xtra.contains("%s")) {
-                xtra = xtra.replaceFirst("\\Q%s\\E", getString(extras[++i]));
+                xtra = xtra.replaceFirst(REPLACE, getString(extras[++i]));
             }
             sb.append(xtra);
         }
 
-        return sb.isEmpty() ? null : sb.toString();
+        return sb.length() == 0 ? null : sb.toString();
     }
 
     public static String getString(Object o) {
         if (o == null) {
             return "null";
         }
-        if (o instanceof ConsumerInfo) {
-            o = ((ConsumerInfo)o).getConsumerConfiguration();
+        if (o instanceof Message) {
+            Message msg = (Message)o;
+            if (msg.getSubject() == null) {
+                return msg.toString();
+            }
+            return msgInfoString(msg) + dataString(msg) + replyToString(msg);
         }
+//        if (o instanceof ConsumerInfo) {
+//            o = ((ConsumerInfo)o).getConsumerConfiguration();
+//        }
+        if (o instanceof ConsumerInfo) {
+            return consumerInfoString((ConsumerInfo)o);
+        }
+        if (o instanceof SequenceInfo) {
+            return sequenceInfoString((SequenceInfo)o);
+        }
+        if (o instanceof NatsJetStreamMetaData) {
+            return metaDataString((NatsJetStreamMetaData)o);
+        }
+        if (o instanceof ZonedDateTime) {
+            return DateTimeUtils.toRfc3339((ZonedDateTime)o);
+        }
+//        if (o instanceof ZonedDateTime) {
+//            return zdtString((ZonedDateTime)o);
+//        }
         if (o instanceof ConsumerConfiguration) {
             return formatted((ConsumerConfiguration)o);
         }
@@ -298,7 +338,7 @@ public abstract class Debug {
 
     public static void consumer(JetStreamManagement jsm, String stream, String conName) throws IOException, JetStreamApiException {
         ConsumerInfo ci = jsm.getConsumerInfo(stream, conName);
-        DEBUG_PRINTER.println("Consumer numPending=" + ci.getNumPending() + " numWaiting=" + ci.getNumWaiting() + " numAckPending=" + ci.getNumAckPending());
+        DEBUG_PRINTER.println("Consumer pending=" + ci.getNumPending() + " waiting=" + ci.getNumWaiting() + " ackPending=" + ci.getNumAckPending());
     }
 
     public static void printStreamInfo(StreamInfo si) {
@@ -337,6 +377,10 @@ public abstract class Debug {
         return n < 10 ? "  " + n : (n < 100 ? " " + n : "" + n);
     }
 
+    public static String pad3z(int n) {
+        return n < 10 ? "00" + n : (n < 100 ? "0" + n : "" + n);
+    }
+
     public static String yn(boolean b) {
         return b ? "Yes" : "No ";
     }
@@ -354,5 +398,41 @@ public abstract class Debug {
 
     public static String formatted(String s) {
         return s.replace("{", FBN).replace(", ", "," + FN);
+    }
+
+    public static String consumerInfoString(ConsumerInfo ci) {
+        return ci == null ? "null" :
+            "Consumer{" +
+                "pending=" + ci.getNumPending() +
+                ", waiting=" + ci.getNumWaiting() +
+                ", ackPending=" + ci.getNumAckPending() +
+                ", redelivered=" + ci.getRedelivered() +
+                ", delivered=" + sequenceInfoString(ci.getDelivered()) +
+                ", ackFloor=" + sequenceInfoString(ci.getAckFloor()) +
+                "} ";
+    }
+
+    public static String sequenceInfoString(SequenceInfo si) {
+        return si == null ? "null" :
+            "{" +
+                "consumerSeq=" + si.getConsumerSequence() +
+                ", streamSeq=" + si.getStreamSequence() +
+                ", lastActive=" + zdtString(si.getLastActive()) +
+                '}';
+    }
+
+    public static String metaDataString(NatsJetStreamMetaData meta) {
+        return meta == null ? "null" :
+            "Meta{" +
+                "delivered=" + meta.deliveredCount() +
+                ", streamSeq=" + meta.streamSequence() +
+                ", consumerSeq=" + meta.consumerSequence() +
+                ", pending=" + meta.pendingCount() +
+                ", timestamp=" + zdtString(meta.timestamp()) +
+                '}';
+    }
+
+    public static String zdtString(ZonedDateTime zdt) {
+        return zdt == null ? "null" : zdt.toLocalTime().toString();
     }
 }

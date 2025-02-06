@@ -54,8 +54,8 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                 case "setup"   -> doSetup(nc);
                 case "create"  -> doCreateConsumers(nc);
                 case "list"    -> doList(nc);
-                case "publish" -> doWorker(PUBLISH_JOB, this::publishWorker);
-                case "consume" -> doWorker(CONSUME_JOB, this::consumeWorker);
+                case "publish" -> doWorker(PUBLISH_JOB, (runId, tix, groupCount, options) -> publishWorker(runId, tix, groupCount, options));
+                case "consume" -> doWorker(CONSUME_JOB, (runId, tix, groupCount, options) -> consumeWorker(runId, tix, groupCount, options));
                 case "gci"     -> doGetConsumerInfo();
                 case "watch"   -> doWatch(nc);
                 case "clear"   -> doClear(nc);
@@ -134,8 +134,8 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
         }
     }
 
-    private void printConnect(boolean background, Connection nc, String job, String runId, int tix) {
-        print(background, job, runId, tix, "connect", 0, nc.getServerInfo().getServerId());
+    private void printConnect(Connection nc, String job, String runId, int tix) {
+        print(job, runId, tix, "connect", 0, nc.getServerInfo().getServerId());
     }
 
     private static List<Integer> generateConsumerList() {
@@ -147,11 +147,11 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
-    private Runnable publishWorker(String runId, int tix, boolean background, AtomicLong groupCount, Options options) {
+    private Runnable publishWorker(String runId, int tix, AtomicLong groupCount, Options options) {
         return () -> {
             try (Connection nc = Nats.connect(options)) {
                 JetStream js = nc.jetStream();
-                printConnect(background, nc, PUBLISH_JOB, runId, tix);
+                printConnect(nc, PUBLISH_JOB, runId, tix);
                 List<Integer> consumers = generateConsumerList();
                 while (true) {
                     Collections.shuffle(consumers);
@@ -160,11 +160,11 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                             js.publish(toSubject(cx), null);
                             long count = groupCount.incrementAndGet();
                             if (count % INFO_FREQUENCY == 0) {
-                                logInfo(background, js, PUBLISH_JOB, runId, NO_TIX, count);
+                                logInfo(js, PUBLISH_JOB, runId, NO_TIX, count);
                             }
                         }
                         catch (IOException | JetStreamApiException e) {
-                            logException(background, js, PUBLISH_JOB, runId, e);
+                            logException(js, PUBLISH_JOB, runId, e);
                         }
                         jitter(PUBLISH_JITTER);
                     }
@@ -177,11 +177,11 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
-    private Runnable consumeWorker(String runId, int tix, boolean background, AtomicLong groupCount, Options options) {
+    private Runnable consumeWorker(String runId, int tix, AtomicLong groupCount, Options options) {
         return () -> {
             try (Connection nc = Nats.connect(options)) {
                 JetStream js = nc.jetStream();
-                printConnect(background, nc, CONSUME_JOB, runId, tix);
+                printConnect(nc, CONSUME_JOB, runId, tix);
                 List<Integer> consumers = generateConsumerList();
 
                 StreamContext sctx = nc.getStreamContext(DATA_STREAM_NAME);
@@ -197,7 +197,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                                 m.ack();
                                 long count = groupCount.incrementAndGet();
                                 if (count % INFO_FREQUENCY == 0) {
-                                    logInfo(background, js, CONSUME_JOB, runId, NO_TIX, count);
+                                    logInfo(js, CONSUME_JOB, runId, NO_TIX, count);
                                 }
                                 m = fc.nextMessage();
                             }
@@ -213,8 +213,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
     }
 
     private void doGetConsumerInfo() throws InterruptedException {
-        boolean background = isBackground();
-        startJob("Info", background);
+        startJob("Info");
         List<Options> options = roundRobinOptions(INFO_THREAD_COUNT);
         List<Thread> threads = new ArrayList<>(INFO_THREAD_COUNT);
         List<List<String>> cnLists = new ArrayList<>();
@@ -233,7 +232,7 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
 
         String runId = generateRunId();
         for (tix = 0; tix < INFO_THREAD_COUNT; tix++) {
-            Runnable infoWorker = infoWorker(runId, tix, background, options.get(tix), cnLists.get(tix));
+            Runnable infoWorker = infoWorker(runId, tix, options.get(tix), cnLists.get(tix));
             Thread t = new Thread(infoWorker);
             t.start();
             threads.add(t);
@@ -245,12 +244,12 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
-    private Runnable infoWorker(String runId, int tix, boolean background, Options options, List<String> consumerNames) {
+    private Runnable infoWorker(String runId, int tix, Options options, List<String> consumerNames) {
         return () -> {
             try (Connection nc = Nats.connect(options)) {
                 JetStreamManagement jsm = nc.jetStreamManagement();
                 JetStream js = nc.jetStream();
-                printConnect(background, nc, INFO_JOB, runId, tix);
+                printConnect(nc, INFO_JOB, runId, tix);
                 List<String> list = new ArrayList<>(consumerNames);
                 Collections.shuffle(list);
                 long count = 0;
@@ -259,11 +258,11 @@ public class ConsumerInfoSim extends AbstractSimWorkload {
                         try {
                             jsm.getConsumerInfo(DATA_STREAM_NAME, consumerName);
                             if (++count % INFO_FREQUENCY == 0) {
-                                logInfo(background, js, INFO_JOB, runId, tix, count);
+                                logInfo(js, INFO_JOB, runId, tix, count);
                             }
                         }
                         catch (IOException | JetStreamApiException e) {
-                            logException(background, js, INFO_JOB, runId, e);
+                            logException(js, INFO_JOB, runId, e);
                         }
                     }
                 }

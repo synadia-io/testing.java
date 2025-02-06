@@ -169,7 +169,7 @@ public abstract class AbstractSimWorkload extends Workload {
     // WORKER
     // ----------------------------------------------------------------------------------------------------
     protected interface Worker {
-        Runnable getWork(String runId, int tix, boolean background, AtomicLong groupCount, Options options);
+        Runnable getWork(String runId, int tix, AtomicLong groupCount, Options options);
     }
 
     protected void doWorker(String job, Worker worker) throws InterruptedException {
@@ -177,14 +177,13 @@ public abstract class AbstractSimWorkload extends Workload {
     }
 
     protected void doWorker(String job, int threadCount, Worker worker) throws InterruptedException {
-        boolean background = isBackground();
-        startJob(job, background);
+        startJob(job);
         List<Options> options = roundRobinOptions(threadCount);
         List<Thread> threads = new ArrayList<>(threadCount);
         AtomicLong groupCount = new AtomicLong();
         String runId = generateRunId();
         for (int tix = 0; tix < threadCount; tix++) {
-            Thread t = new Thread(worker.getWork(runId, tix, background, groupCount, options.get(tix)));
+            Thread t = new Thread(worker.getWork(runId, tix, groupCount, options.get(tix)));
             t.start();
             threads.add(t);
         }
@@ -198,14 +197,6 @@ public abstract class AbstractSimWorkload extends Workload {
     // ----------------------------------------------------------------------------------------------------
     protected String generateRunId() {
         return Long.toHexString(System.currentTimeMillis()).toLowerCase();
-    }
-
-    private Boolean _background;
-    protected boolean isBackground() {
-        if (_background == null) {
-            _background = containsFlag("background");
-        }
-        return _background;
     }
 
     // ----------------------------------------------------------------------------------------------------
@@ -276,28 +267,35 @@ public abstract class AbstractSimWorkload extends Workload {
 
         @Override
         public String toString() {
-            StringBuilder sb = new StringBuilder(pad(ident(), 39));
-            if (count > 0) {
-                sb.append(" | Count: ").append(pad(count, 11));
-            }
-            if (exceptionClass != null) {
-                if (count > 0) {
-                    sb.append(" | ");
-                }
-                else {
-                    sb.append(" ");
-                }
-                sb.append(exceptionClass).append(": ").append(exceptionMessage);
-            }
-            return sb.toString();
+            return toJson();
         }
 
-        public String ident() {
-            return "[" + time + "] " + segments("");
+        public Object[] extras(String... messages) {
+            List<Object> list = new ArrayList<>();
+            list.add(time);
+            if (count > 0) {
+                list.add("Count: " + count);
+            }
+            if (exceptionClass != null) {
+                list.add(exceptionClass + ": " + exceptionMessage);
+            }
+            list.add(time);
+            if (messages != null) {
+                for (String m : messages) {
+                    if (m != null) {
+                        list.add(m);
+                    }
+                }
+            }
+            return list.toArray();
         }
 
         public String subject() {
             return (exceptionClass == null  ? INFO_SUBJECT_PREFIX : EX_SUBJECT_PREFIX) + segments(DEFAULT_SEGMENT);
+        }
+
+        public String ident() {
+            return segments("");
         }
 
         private String segments(String missing) {
@@ -313,26 +311,21 @@ public abstract class AbstractSimWorkload extends Workload {
     // ----------------------------------------------------------------------------------------------------
     protected static final String WATCH_BREAK = "--------------------------------------------------------------------------------------------------------------";
 
-    protected void logInfo(boolean background, JetStream js, String job, String runId, int tix, long count) {
+    protected void logInfo(JetStream js, String job, String runId, int tix, long count) {
         Event event = new Event(job, runId, tix, null, count, null);
-//        if (!background) {
-            System.out.println(event);
-//        }
+        Debug.info(event.ident(), event.extras());
         publish(js, event);
     }
 
-    protected void logException(boolean background, JetStream js, String job, String runId, Exception exception) {
+    protected void logException(JetStream js, String job, String runId, Exception exception) {
         Event event = new Event(job, runId, NO_TIX, null, 0, exception);
-//        if (!background) {
-            System.out.println(event);
-//        }
+        Debug.info(event.ident(), event.extras());
         publish(js, event);
     }
 
-    protected void print(boolean background, String job, String runId, int tix, String qualifier, long count, String message) {
-//        if (!background) {
-            System.out.println(new Event(job, runId, tix, qualifier, count, null) + " | " + message);
-//        }
+    protected void print(String job, String runId, int tix, String qualifier, long count, String message) {
+        Event event = new Event(job, runId, tix, qualifier, count, null);
+        Debug.info(event.ident(), event.extras());
     }
 
     protected void publish(JetStream js, Event event) {
@@ -340,7 +333,7 @@ public abstract class AbstractSimWorkload extends Workload {
             js.publish(event.subject(), event.serialize());
         }
         catch (IOException | JetStreamApiException ee) {
-            System.err.println(event.ident() + " Event Publish Error | " + event.subject() + " | " + ee);
+            Debug.info("Event Publish Error", event.ident(), event.subject(), ee.getClass().getSimpleName(), ee.getMessage(), event.extras());
         }
     }
 
@@ -367,9 +360,5 @@ public abstract class AbstractSimWorkload extends Workload {
 
     protected void startJob(String job) {
         System.out.println(workLabel + " - " + job);
-    }
-
-    protected void startJob(String job, boolean background) {
-        System.out.println(workLabel + " - " + job + " (background=" + background + ")");
     }
 }
