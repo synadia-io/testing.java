@@ -315,24 +315,24 @@ public abstract class AbstractSimWorkload extends Workload {
 
     protected void logInfo(boolean background, JetStream js, String job, String runId, int tix, long count) {
         Event event = new Event(job, runId, tix, null, count, null);
-        if (!background) {
+//        if (!background) {
             System.out.println(event);
-        }
+//        }
         publish(js, event);
     }
 
     protected void logException(boolean background, JetStream js, String job, String runId, Exception exception) {
         Event event = new Event(job, runId, NO_TIX, null, 0, exception);
-        if (!background) {
+//        if (!background) {
             System.out.println(event);
-        }
+//        }
         publish(js, event);
     }
 
     protected void print(boolean background, String job, String runId, int tix, String qualifier, long count, String message) {
-        if (!background) {
+//        if (!background) {
             System.out.println(new Event(job, runId, tix, qualifier, count, null) + " | " + message);
-        }
+//        }
     }
 
     protected void publish(JetStream js, Event event) {
