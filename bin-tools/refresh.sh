@@ -10,8 +10,8 @@ cd testing.java
 
 cat > generator.json <<REOF
 {
-  "server_filter": "scottf-server-",
-  "client_filter": "scottf-client-"
+  "server_filter": "scottf-1-server-",
+  "client_filter": "scottf-1-client-"
 }
 REOF
 

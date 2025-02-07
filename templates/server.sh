@@ -9,8 +9,9 @@ alias cls='clear'
 # 1. INSTALL NATS
 curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@main | PREFIX=. sh
 sudo mv nats-server /usr/bin/
-nats-server -v
+ls -la /usr/bin/nats-server
 which nats-server
+nats-server -v
 
 # 2 create nats-server.service
 cat > nats-server.service <<EOF
@@ -40,9 +41,9 @@ sudo mv nats-server.service /etc/systemd/system/
 cat > nats.conf <<EOF
 port:4222
 http:8222
-server_name=scottf-<InstanceId>
+server_name=<InstancePrefix>-<InstanceId>
 cluster {
-  name: scottf-cluster
+  name: <InstancePrefix>-cluster
   listen: 0.0.0.0:7222
   routes: [
     nats-route://<PrivateIpRoute1>:7222

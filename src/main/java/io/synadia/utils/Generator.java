@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -25,7 +26,7 @@ public class Generator {
     public static final String INPUT_DIR = "templates";
     public static final String SCRIPT_OUTPUT_DIR = "gen";
     public static final String PARAMS_OUTPUT_DIR = "params";
-    public static final String SERVER_SETUP_OUTPUT_DIR = "bin-server";
+    public static final String SERVER_SETUP_OUTPUT_DIR = "gen-bin-server";
     public static final String DOT_JSON = ".json";
     public static final String SH_BAT_DOT_TXT = "-sh-bat.txt";
 
@@ -53,6 +54,7 @@ public class Generator {
     public static final String PROFILE_WATCH_WAIT_TIME = "<ProfileWatchWaitTime>";
     public static final String SAVE_STREAM_NAME = "<SaveStreamName>";
     public static final String SAVE_STREAM_SUBJECT = "<SaveStreamSubject>";
+    public static final String INSTANCE_PREFIX = "<InstancePrefix>";
 
     public static final String NA = "na";
 
@@ -61,8 +63,9 @@ public class Generator {
             args = new String[]{"full"};
         }
         Which which = Which.instance(GENERATOR, args[0]);
+        String generatorJsonVariant = args.length == 2 ? args[1] : "";
 
-        Config cfg = new Config();
+        Config cfg = new Config(generatorJsonVariant);
         if (which != Which.Show) {
             cfg.print();
             prepareOutputDirs();
@@ -107,12 +110,13 @@ public class Generator {
 
             if (which != Which.Local && cfg.doPublic) {
                 heading("server " + current.name + " [" + current.stateName + "] " + scriptName);
-                printSsh(current, cfg);
+                printSsh(current, true, cfg);
                 printNatsCli(current);
 
                 // SERVER SCRIPT
                 if (which == Which.Full) {
                     String template = readTemplate("server.sh", cfg)
+                        .replace("<InstancePrefix>", cfg.instancePrefix)
                         .replace("<InstanceId>", "" + x)
                         .replace("<PrivateIpRoute1>", calc.runningServers.get(1).privateIpAddr)
                         .replace("<PrivateIpRoute2>", calc.runningServers.get(2).privateIpAddr);
@@ -177,9 +181,12 @@ public class Generator {
         System.out.println("nats s list -a -s " + instance.publicIpAddr);
     }
 
-    private static String printSsh(Instance current, Config cfg) {
+    private static String printSsh(Instance current, boolean server, Config cfg) {
         if (!NA.equals(cfg.keyFile)) {
-            String cmd = "ssh -oStrictHostKeyChecking=no -i " + cfg.keyFile + " " + cfg.clientUser + "@" + current.publicDnsName;
+            String cmd = "ssh -oStrictHostKeyChecking=no -i "
+                + cfg.keyFile + " "
+                + (server ? cfg.serverUser : cfg.clientUser)
+                + "@" + current.publicDnsName;
             System.out.println(cmd);
             return cmd;
         }
@@ -248,7 +255,7 @@ public class Generator {
                         try {
                             heading("client " + instance.name + " [" + instance.stateName + "]");
                             if (instance.isRunning()) {
-                                String ssh = printSsh(instance, cfg);
+                                String ssh = printSsh(instance, false, cfg);
                                 if (ssh != null) {
                                     String repl = SSH_PREFIX + (++calc.clients) + TAG_END;
                                     calc.startSshTemplate = calc.startSshTemplate.replace(repl, ssh);
@@ -265,9 +272,10 @@ public class Generator {
                 }
             }
         }
+        Collections.sort(calc.runningServers);
     }
 
-    static class Instance {
+    static class Instance implements Comparable<Instance> {
         final String name;
         final String publicDnsName;
         final String privateIpAddr;
@@ -275,6 +283,11 @@ public class Generator {
         final Integer stateCode;
         final String stateName;
         final String port;
+
+        @Override
+        public int compareTo(Instance o) {
+            return name.compareTo(o.name);
+        }
 
         // aws
         public Instance(JsonValue jv, String port) {
@@ -360,6 +373,7 @@ public class Generator {
         public final String keyFile;
         public final String serverUser;
         public final String clientUser;
+        public final String instancePrefix;
         public final String serverFilter;
         public final String clientFilter;
         public final String natsProto;
@@ -377,8 +391,8 @@ public class Generator {
         public final String statsWatchWaitTime;
         public final String profileWatchWaitTime;
 
-        public Config() throws IOException {
-            JsonValue jv = loadConfig();
+        public Config(String generatorJsonVariant) throws IOException {
+            JsonValue jv = loadConfig(generatorJsonVariant);
             doPublic = jv.map.get("do_public") == null || jv.map.get("do_public").bool;
             os = readString(jv, "os", OS_UNIX).equals(OS_WIN) ? OS_WIN : OS_UNIX;
             serverCount = readInteger(jv, "server_count", 3);
@@ -389,6 +403,7 @@ public class Generator {
             keyFile = readString(jv, ("key_file"));
             serverUser = readString(jv, ("server_user"));
             clientUser = readString(jv, ("client_user"));
+            instancePrefix = readString(jv, ("instance_prefix"));
             serverFilter = readString(jv, ("server_filter"));
             clientFilter = readString(jv, ("client_filter"));
             natsProto = readString(jv, ("nats_proto"));
@@ -432,6 +447,7 @@ public class Generator {
             System.out.println("keyFile: " + keyFile);
             System.out.println("serverUser: " + serverUser);
             System.out.println("clientUser: " + clientUser);
+            System.out.println("instancePrefix: " + instancePrefix);
             System.out.println("serverFilter: " + serverFilter);
             System.out.println("clientFilter: " + clientFilter);
             System.out.println("natsProto: " + natsProto);
@@ -450,7 +466,7 @@ public class Generator {
             System.out.println("profileWatchWaitTime: " + profileWatchWaitTime);
         }
 
-        private JsonValue loadConfig() throws IOException {
+        private JsonValue loadConfig(String generatorJsonVariant) throws IOException {
             // set the defaults
             JsonValue jv = JsonValueUtils.mapBuilder()
                 .put("do_public", false)
@@ -459,6 +475,7 @@ public class Generator {
                 .put("key_file", NA)
                 .put("server_user", "ubuntu")
                 .put("client_user", "ec2-user")
+                .put("instance_prefix", "prefix-")
                 .put("server_filter", "-server-")
                 .put("client_filter", NA)
                 .put("nats_proto", "nats://")
@@ -478,7 +495,7 @@ public class Generator {
                 .toJsonValue();
 
             // override with custom settings
-            Path p = Paths.get("generator.json");
+            Path p = Paths.get("generator" + generatorJsonVariant + ".json");
             if (p.toFile().exists()) {
                 JsonValue jvCustom = JsonParser.parse(Files.readAllBytes(p));
                 jv.map.putAll(jvCustom.map);

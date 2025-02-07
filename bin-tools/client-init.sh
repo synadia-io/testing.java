@@ -6,10 +6,13 @@ alias l='ls -la'
 alias dir='ls -la'
 alias cls='clear'
 
-# 1. INSTALL NATS
+# 1. INSTALL SOFTWARE
 # java
 sudo yum -y install java-21-amazon-corretto-devel
 java -version
+
+# git
+sudo yum -y install git
 
 # gradle
 wget https://services.gradle.org/distributions/gradle-8.10-bin.zip -P /tmp
@@ -20,8 +23,36 @@ export GRADLE_HOME=/opt/gradle/gradle-8.10
 export PATH=${GRADLE_HOME}/bin:${PATH}
 gradle -version
 
-cat > ~/jstatd.all.policy <<EOF
-grant codebase "file:${java.home}/../lib/tools.jar" {
-   permission java.security.AllPermission;
-};
+#cat > ~/jstatd.all.policy <<EOF
+#grant codebase "file:${java.home}/../lib/tools.jar" {
+#   permission java.security.AllPermission;
+#};
+#EOF
+
+mkdir bin
+
+cat > ~/bin/f <<EOF
+ps -aux | grep ConsumerInfoSim
 EOF
+
+chmod +x ~/bin/f
+
+cat > ~/bin/r <<EOF
+cd ~
+rm -rf testing.java
+git clone https://github.com/synadia-io/testing.java
+cd testing.java
+
+cat > generator.json <<REOF
+{
+  "instance_prefix": "scottf-1",
+  "server_filter": "scottf-1-server-",
+  "client_filter": "scottf-1-client-"
+}
+REOF
+
+chmod +x bin/* && chmod -x bin/*.bat && bin/make && bin/get-aws && bin/gen && chmod +x gen/*
+cd ~/testing.java
+EOF
+
+chmod +x ~/bin/r
