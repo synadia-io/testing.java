@@ -13,7 +13,6 @@ import io.synadia.CommandLine;
 import io.synadia.utils.Debug;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
@@ -27,7 +26,6 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
     protected String queueStreamName;
     protected String queueSubjectPrefix;
     protected String queueStreamSubject;
-    private String consumerPrefix;
     private String infoJob;
     private String produceJob;
     private String consumeJob;
@@ -47,14 +45,13 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
     @Override
     public void init(CommandLine commandLine) {
         acwInit("Consumer Info Sim", true, commandLine);
-        dataStreamName = JsonValueUtils.readString(params.jv, "data_stream_name", "custom-data");
+        dataStreamName = JsonValueUtils.readString(params.jv, "data_stream_name", "data");
         dataSubjectPrefix = JsonValueUtils.readString(params.jv, "data_subject_prefix", "data.");
         dataStreamSubject = JsonValueUtils.readString(params.jv, "data_stream_subject", "data.>");
-        queueStreamName = JsonValueUtils.readString(params.jv, "queue_stream_name", "custom-queue");
+        queueStreamName = JsonValueUtils.readString(params.jv, "queue_stream_name", "queue");
         queueSubjectPrefix = JsonValueUtils.readString(params.jv, "queue_subject_prefix", "queue.");
         queueStreamSubject = JsonValueUtils.readString(params.jv, "queue_stream_subject", "queue.>");
-        consumerPrefix = JsonValueUtils.readString(params.jv, "consumer_prefix", "cis-con-");
-        infoJob = JsonValueUtils.readString(params.jv, "info_job", "ConInfo");
+        infoJob = JsonValueUtils.readString(params.jv, "info_job", "Info");
         produceJob = JsonValueUtils.readString(params.jv, "produce_job", "Produce");
         consumeJob = JsonValueUtils.readString(params.jv, "consume_job", "Consume");
         consumerCount = JsonValueUtils.readInteger(params.jv, "consumer_count", 10_000);
@@ -76,7 +73,6 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
         Debug.info(workLabel, "queueStreamName", queueStreamName);
         Debug.info(workLabel, "queueSubjectPrefix", queueSubjectPrefix);
         Debug.info(workLabel, "queueStreamSubject", queueStreamSubject);
-        Debug.info(workLabel, "consumerPrefix", consumerPrefix);
         Debug.info(workLabel, "infoJob", infoJob);
         Debug.info(workLabel, "produceJob", produceJob);
         Debug.info(workLabel, "consumeJob", consumeJob);
@@ -96,7 +92,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
 
     @Override
     protected String commands() {
-        return "'setup', 'create', 'list', 'produce', 'consume', 'coninfo', 'watch', 'stream', 'clear consumers|data|queue|log|ex', 'purge <job>'";
+        return "'setup', 'create', 'list', 'produce', 'consume', 'info', 'watch', 'stream', 'clear consumers|data|queue|log|ex', 'purge <job>'";
     }
 
     @Override
@@ -108,7 +104,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                 case "list"    -> doList(nc);
                 case "produce" -> doWorker(produceJob, this::produceWorker);
                 case "consume" -> doWorker(consumeJob, this::consumeWorker);
-                case "coninfo" -> doGetConsumerInfo();
+                case "info"    -> doWorker(infoJob, infoThreadCount, this::infoWorker);
                 case "watch"   -> doWatch(nc, dataStreamName, queueStreamName);
                 case "stream"  -> doStream(nc);
                 case "clear"   -> doClear(nc);
@@ -120,9 +116,8 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
 
     protected void doSetup(Connection nc) throws IOException, JetStreamApiException {
         JetStreamManagement jsm = nc.jetStreamManagement();
-        super.doSetup(jsm, maxMessages);
+        super.doSetup(jsm);
 
-        safeDeleteStream(jsm, dataStreamName);
         StreamInfo si = jsm.addStream(StreamConfiguration.builder()
             .name(dataStreamName)
             .subjects(dataStreamSubject)
@@ -131,7 +126,6 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
             .build());
         printFormatted(si.getJv());
 
-        safeDeleteStream(jsm, queueStreamName);
         si = jsm.addStream(StreamConfiguration.builder()
             .name(queueStreamName)
             .subjects(queueStreamSubject)
@@ -153,6 +147,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
         String option = getArgFromPosition(2);
         if (option == null || option.isEmpty()) {
             exit("Clear option not provided");
+            return;
         }
         switch (option) {
             case "consumers" -> {
@@ -202,14 +197,6 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
         print(job, workId, tix, "connect", 0, 0, nc.getServerInfo().getServerId());
     }
 
-    private List<Integer> generateConsumerList() {
-        List<Integer> consumers = new ArrayList<>();
-        for (int cx = 0; cx < consumerCount; cx++) {
-            consumers.add(cx);
-        }
-        return consumers;
-    }
-
     static class QueueData implements JsonSerializable {
         public final String consumerName;
         public final String dataSubject;
@@ -250,7 +237,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                     try {
                         StreamInfo si = jsm.getStreamInfo(dataStreamName);
                         if (si.getStreamState().getConsumerCount() < consumerCount) {
-                            String consumerName = new NUID().next();
+                            String consumerName = generateConsumerName();
                             String dataSubject = toDataSubject(consumerName);
                             int messageCount = ThreadLocalRandom.current().nextInt(produceMessageMin, produceMessageMax + 1);
 
@@ -333,23 +320,6 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
         return qStreamCtx.createOrUpdateConsumer(ConsumerConfiguration.builder().filterSubject(queueStreamSubject).build());
     }
 
-    private void doGetConsumerInfo() throws InterruptedException {
-        startJob("Info");
-        List<Options> options = roundRobinOptions(infoThreadCount);
-        List<Thread> threads = new ArrayList<>(infoThreadCount);
-        WorkState ws = new WorkState();
-        for (int tix = 0; tix < infoThreadCount; tix++) {
-            Runnable infoWorker = infoWorker(options.get(tix), tix, ws);
-            Thread t = new Thread(infoWorker);
-            t.start();
-            threads.add(t);
-        }
-
-        for (Thread t : threads) {
-            t.join();
-        }
-    }
-
     @SuppressWarnings("InfiniteLoopStatement")
     private Runnable infoWorker(Options options, int tix, WorkState ws) {
         return () -> {
@@ -397,7 +367,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
     }
 
     private String generateConsumerName() {
-        return consumerPrefix + new NUID().next() + "-" + Integer.toHexString(ThreadLocalRandom.current().nextInt()).toLowerCase();
+        return NUID.nextGlobalSequence() + "-" + Integer.toHexString(ThreadLocalRandom.current().nextInt()).toLowerCase();
     }
 
     @SuppressWarnings("InfiniteLoopStatement")

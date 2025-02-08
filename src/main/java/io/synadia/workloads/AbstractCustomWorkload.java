@@ -45,10 +45,10 @@ public abstract class AbstractCustomWorkload extends Workload {
             exit("Argument(s) Required");
         }
 
-        logStreamName = JsonValueUtils.readString(params.jv, "log_stream_name", "custom-log");
+        logStreamName = JsonValueUtils.readString(params.jv, "log_stream_name", "log");
         logSubjectPrefix = JsonValueUtils.readString(params.jv, "log_subject_prefix", "log.");
         logStreamSubject = JsonValueUtils.readString(params.jv, "log_stream_subject", "log.>");
-        exStreamName = JsonValueUtils.readString(params.jv, "ex_stream_name", "custom-exception");
+        exStreamName = JsonValueUtils.readString(params.jv, "ex_stream_name", "exception");
         exSubjectPrefix = JsonValueUtils.readString(params.jv, "ex_subject_prefix", "ex.");
         exStreamSubject = JsonValueUtils.readString(params.jv, "ex_stream_subject", "ex.>");
         defaultWorkerThreadCount = JsonValueUtils.readInteger(params.jv, "default_worker_thread_count", 3);
@@ -80,10 +80,13 @@ public abstract class AbstractCustomWorkload extends Workload {
     // COMMANDS
     // ----------------------------------------------------------------------------------------------------
     @SuppressWarnings("SameParameterValue")
-    protected void doSetup(JetStreamManagement jsm, long maxMessages) throws IOException, JetStreamApiException {
+    protected void doSetup(JetStreamManagement jsm) throws IOException, JetStreamApiException {
         startJob("Setup");
         startJob("Creating Streams");
-        safeDeleteStream(jsm, logStreamName);
+        List<String> streamNames = jsm.getStreamNames();
+        for (String streamName : streamNames) {
+            jsm.deleteStream(streamName);
+        }
         StreamInfo si = jsm.addStream(StreamConfiguration.builder()
             .name(logStreamName)
             .subjects(logStreamSubject)
@@ -91,7 +94,6 @@ public abstract class AbstractCustomWorkload extends Workload {
             .maxAge(Duration.ofMinutes(60))
             .build());
         printFormatted(si.getJv());
-        safeDeleteStream(jsm, exStreamName);
         si = jsm.addStream(StreamConfiguration.builder()
             .name(exStreamName)
             .subjects(exStreamSubject)
