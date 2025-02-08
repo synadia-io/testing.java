@@ -123,21 +123,14 @@ public abstract class AbstractCustomWorkload extends Workload {
                 System.out.println(WATCH_BREAK);
 
                 for (String stream : customStreams) {
-                    StreamInfo si = jsm.getStreamInfo(stream);
-                    StreamState ss = si.getStreamState();
-                    System.out.println("STREAM | " + pad(stream, 10) + " | Subjects: " + pad(ss.getSubjectCount(), 10) + " | Messages: " + pad(ss.getMsgCount(), 12));
+                    summarize(jsm, stream);
                 }
 
-                StreamInfo exSi = jsm.getStreamInfo(exStreamName, StreamInfoOptions.allSubjects());
-                StreamState exSs = exSi.getStreamState();
-                System.out.println("STREAM | " + pad(exStreamName, 10) + " | Subjects: " + pad(exSs.getSubjectCount(), 10) + " | Messages: " + pad(exSs.getMsgCount(), 12));
-
-                StreamInfo logSi = jsm.getStreamInfo(logStreamName, StreamInfoOptions.allSubjects());
-                StreamState logSs = logSi.getStreamState();
-                System.out.println("STREAM | " + pad(logStreamName, 10) + " | Subjects: " + pad(logSs.getSubjectCount(), 10) + " | Messages: " + pad(logSs.getMsgCount(), 12));
-
+                StreamState exSs = summarize(jsm, exStreamName);
+                StreamState logSs = summarize(jsm, logStreamName);
                 System.out.println(WATCH_BREAK);
-                boolean hadAnyMessages = watchStream(jsm, watchMap, exStreamName, logSs, "EX     | ");
+
+                boolean hadAnyMessages = watchStream(jsm, watchMap, exStreamName, exSs, "EX     | ");
 
                 if (hadAnyMessages) { System.out.println(WATCH_BREAK); }
                 watchStream(jsm, watchMap, logStreamName, logSs, "LOG    | ");
@@ -149,6 +142,21 @@ public abstract class AbstractCustomWorkload extends Workload {
                 throw new RuntimeException(e);
             }
         }
+    }
+
+    private static StreamState summarize(JetStreamManagement jsm, String stream) throws IOException, JetStreamApiException {
+        StreamState logSs;
+        StreamInfo si = jsm.getStreamInfo(stream, StreamInfoOptions.allSubjects());
+        StreamState ss = si.getStreamState();
+        long first = si.getStreamState().getFirstSequence();
+        long last = si.getStreamState().getLastSequence();
+        System.out.println("STREAM | " + pad(stream, 10)
+            + " | Subjects: " + pad(ss.getSubjectCount(), 10)
+            + " | Messages: " + pad(ss.getMsgCount(), 12)
+            + " | First/Last Seq: " + first + "/" + last
+        );
+        logSs = ss;
+        return logSs;
     }
 
     private boolean watchStream(JetStreamManagement jsm, Map<String, Event> watchMap, String streamName, StreamState ss, String lineStart) {

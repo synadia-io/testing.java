@@ -144,7 +144,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
     }
 
     private void doClear(Connection nc) throws IOException, JetStreamApiException {
-        String option = getArgFromPosition(2);
+        String option = getStringArgFromPosition(2);
         if (option == null || option.isEmpty()) {
             exit("Clear option not provided");
             return;
@@ -181,7 +181,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
     }
 
     private void doPurge(Connection nc) throws IOException, JetStreamApiException {
-        String code = getArgFromPosition(2);
+        String code = getStringArgFromPosition(2);
         if (code == null || code.isEmpty()) {
             exit("Purge option not provided");
         }
@@ -373,13 +373,14 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
     @SuppressWarnings("InfiniteLoopStatement")
     protected void doStream(Connection nc) throws Exception {
         startJob("Stream");
-        String streamName = getArgFromPosition(2);
+        String streamName = getStringArgFromPosition(2);
         if (streamName == null || streamName.isEmpty()) {
             exit("Stream not provided");
         }
         JetStreamManagement jsm = nc.jetStreamManagement();
         StreamInfo si = jsm.getStreamInfo(streamName);
         long seq = si.getStreamState().getFirstSequence();
+        seq = getLongArgFromPosition(3, seq);
         long last = si.getStreamState().getLastSequence();
         int tracker = 0;
         while (true) {
@@ -393,13 +394,17 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                 }
             }
             try {
-                MessageInfo mi = jsm.getMessage(streamName, seq++);
+                MessageInfo mi = jsm.getNextMessage(streamName, seq, ">");
+                seq = mi.getSeq() + 1;
                 byte[] data = mi.getData();
                 String sdata = "<no data>";
                 if (data != null && data.length > 0) {
                     sdata = new String(data);
                 }
-                System.out.println("\n" + mi.getSeq() + " " + mi.getSubject() + " " + sdata);
+                if (tracker > 0) {
+                    System.out.println();
+                }
+                System.out.println(mi.getSeq() + " | " + mi.getSubject() + " | " + sdata);
                 tracker = 0;
             }
             catch (JetStreamApiException e) {

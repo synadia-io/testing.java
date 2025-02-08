@@ -57,13 +57,24 @@ public abstract class Workload {
         return commandLine.args.contains(name);
     }
 
-    protected String getArgFromPosition(int pos) {
-        String option = null;
+    protected String getStringArgFromPosition(int pos) {
+        String arg = null;
         if (commandLine.args.size() >= pos) {
-            option = commandLine.args.get(pos - 1);
+            arg = commandLine.args.get(pos - 1);
         }
-        return option;
+        return arg;
     }
+
+    protected int getIntArgFromPosition(int pos, int dflt) {
+        String arg = getStringArgFromPosition(pos);
+        return arg == null ? dflt : Integer.parseInt(arg);
+    }
+
+    protected long getLongArgFromPosition(int pos, long dflt) {
+        String arg = getStringArgFromPosition(pos);
+        return arg == null ? dflt : Long.parseLong(arg);
+    }
+
     protected Options getAdminOptions() {
         return getOptions(params.adminServer);
     }
