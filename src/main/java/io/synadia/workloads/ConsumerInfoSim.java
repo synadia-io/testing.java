@@ -236,19 +236,15 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                 JetStream js = nc.jetStream();
                 printConnect(nc, produceJob, ws.workId, tix);
                 jitter(produceJitter / 10);
-                int full = 0;
                 while (true) {
                     try {
                         StreamInfo si = jsm.getStreamInfo(dataStreamName);
                         long siCount = si.getStreamState().getConsumerCount();
                         if (siCount >= consumerCount) {
                             print(produceJob, ws.workId, tix, null, 0, ws.elapse(), "System is full. " + siCount + "/" + consumerCount);
-                            if (++full > 10) {
-                                full = 1;
-                            }
+                            jitter(produceFullJitter);
                         }
                         else {
-                            full = 0;
                             String consumerName = generateConsumerName();
                             String dataSubject = toDataSubject(consumerName);
                             int messageCount = ThreadLocalRandom.current().nextInt(produceMessageMin, produceMessageMax + 1);
@@ -275,11 +271,6 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                     }
                     catch (IOException | JetStreamApiException e) {
                         log(js, produceJob, ws.workId, ws.elapse(), e);
-                    }
-                    if (full > 0) {
-                        for (int r = 0; r < full; r++) {
-                            jitter(produceFullJitter);
-                        }
                     }
                 }
             }
