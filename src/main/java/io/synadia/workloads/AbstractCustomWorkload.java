@@ -49,8 +49,8 @@ public abstract class AbstractCustomWorkload extends Workload {
         }
 
         dataStreamName = JsonValueUtils.readString(params.jv, "data_stream_name", "custom-data");
-        infoStreamName = JsonValueUtils.readString(params.jv, "data_stream_name", "custom-info");
-        exStreamName = JsonValueUtils.readString(params.jv, "data_stream_name", "custom-exception");
+        infoStreamName = JsonValueUtils.readString(params.jv, "info_stream_name", "custom-info");
+        exStreamName = JsonValueUtils.readString(params.jv, "ex_stream_name", "custom-exception");
         dataSubjectPrefix = JsonValueUtils.readString(params.jv, "data_stream_name", "data.");
         infoSubjectPrefix = JsonValueUtils.readString(params.jv, "data_stream_name", "info.");
         exSubjectPrefix = JsonValueUtils.readString(params.jv, "data_stream_name", "ex.");
