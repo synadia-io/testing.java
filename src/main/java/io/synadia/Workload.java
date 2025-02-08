@@ -3,7 +3,6 @@ package io.synadia;
 import io.nats.client.*;
 import io.nats.client.api.KeyValueConfiguration;
 import io.nats.client.api.StreamConfiguration;
-import io.nats.client.impl.NatsJetStreamMetaData;
 import io.synadia.utils.Debug;
 
 import java.util.ArrayList;
@@ -136,11 +135,6 @@ public abstract class Workload {
     public static final String PADDING = "                                        ";
     public static String pad(Object s, int width) {
         return (s + PADDING).substring(0, width);
-    }
-
-    public static String stringify(Message msg) {
-        NatsJetStreamMetaData meta = msg.metaData();
-        return "SS: " + meta.streamSequence() + " CS: " + meta.consumerSequence();
     }
 
     public List<Options> roundRobinOptions(int numConnections) {

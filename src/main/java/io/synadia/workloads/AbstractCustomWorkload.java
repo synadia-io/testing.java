@@ -28,14 +28,11 @@ public abstract class AbstractCustomWorkload extends Workload {
     protected static final String DEFAULT_SEGMENT = "._";
     protected static final String DOT = ".";
 
-    protected String dataStreamName;
-    protected String infoStreamName;
+    protected String logStreamName;
+    protected String logSubjectPrefix;
+    protected String logStreamSubject;
     protected String exStreamName;
-    protected String dataSubjectPrefix;
-    protected String infoSubjectPrefix;
     protected String exSubjectPrefix;
-    protected String dataStreamSubject;
-    protected String infoStreamSubject;
     protected String exStreamSubject;
     protected int defaultWorkerThreadCount;
     protected long watchFrequency;
@@ -48,28 +45,22 @@ public abstract class AbstractCustomWorkload extends Workload {
             exit("Argument(s) Required");
         }
 
-        dataStreamName = JsonValueUtils.readString(params.jv, "data_stream_name", "custom-data");
-        infoStreamName = JsonValueUtils.readString(params.jv, "info_stream_name", "custom-info");
+        logStreamName = JsonValueUtils.readString(params.jv, "log_stream_name", "custom-log");
+        logSubjectPrefix = JsonValueUtils.readString(params.jv, "log_subject_prefix", "log.");
+        logStreamSubject = JsonValueUtils.readString(params.jv, "log_stream_subject", "log.>");
         exStreamName = JsonValueUtils.readString(params.jv, "ex_stream_name", "custom-exception");
-        dataSubjectPrefix = JsonValueUtils.readString(params.jv, "data_subject_prefix", "data.");
-        infoSubjectPrefix = JsonValueUtils.readString(params.jv, "info_subject_prefix", "info.");
         exSubjectPrefix = JsonValueUtils.readString(params.jv, "ex_subject_prefix", "ex.");
-        dataStreamSubject = JsonValueUtils.readString(params.jv, "data_stream_subject", "data.>");
-        infoStreamSubject = JsonValueUtils.readString(params.jv, "info_stream_subject", "info.>");
         exStreamSubject = JsonValueUtils.readString(params.jv, "ex_stream_subject", "ex.>");
         defaultWorkerThreadCount = JsonValueUtils.readInteger(params.jv, "default_worker_thread_count", 3);
         watchFrequency = JsonValueUtils.readLong(params.jv, "watch_frequency", 5000);
         progressFrequency = JsonValueUtils.readInteger(params.jv, "progress_frequency", 100);
         watchDateFormat = JsonValueUtils.readString(params.jv, "watch_date_format", "HH:mm:ss.SSS");
 
-        Debug.info(workLabel, "dataStreamName", dataStreamName);
-        Debug.info(workLabel, "infoStreamName", infoStreamName);
+        Debug.info(workLabel, "logStreamName", logStreamName);
         Debug.info(workLabel, "exStreamName", exStreamName);
-        Debug.info(workLabel, "dataSubjectPrefix", dataSubjectPrefix);
-        Debug.info(workLabel, "infoSubjectPrefix", infoSubjectPrefix);
+        Debug.info(workLabel, "logSubjectPrefix", logSubjectPrefix);
         Debug.info(workLabel, "exSubjectPrefix", exSubjectPrefix);
-        Debug.info(workLabel, "dataStreamSubject", dataStreamSubject);
-        Debug.info(workLabel, "infoStreamSubject", infoStreamSubject);
+        Debug.info(workLabel, "logStreamSubject", logStreamSubject);
         Debug.info(workLabel, "exStreamSubject", exStreamSubject);
         Debug.info(workLabel, "defaultWorkerThreadCount", defaultWorkerThreadCount);
         Debug.info(workLabel, "watchFrequency", watchFrequency);
@@ -89,22 +80,13 @@ public abstract class AbstractCustomWorkload extends Workload {
     // COMMANDS
     // ----------------------------------------------------------------------------------------------------
     @SuppressWarnings("SameParameterValue")
-    protected void doSetup(Connection nc, long maxMessages) throws IOException, JetStreamApiException {
+    protected void doSetup(JetStreamManagement jsm, long maxMessages) throws IOException, JetStreamApiException {
         startJob("Setup");
         startJob("Creating Streams");
-        JetStreamManagement jsm = nc.jetStreamManagement();
-        safeDeleteStream(jsm, dataStreamName);
+        safeDeleteStream(jsm, logStreamName);
         StreamInfo si = jsm.addStream(StreamConfiguration.builder()
-            .name(dataStreamName)
-            .subjects(dataStreamSubject)
-            .retentionPolicy(RetentionPolicy.WorkQueue)
-            .maxMessages(maxMessages)
-            .build());
-        printFormatted(si.getJv());
-        safeDeleteStream(jsm, infoStreamName);
-        si = jsm.addStream(StreamConfiguration.builder()
-            .name(infoStreamName)
-            .subjects(infoStreamSubject)
+            .name(logStreamName)
+            .subjects(logStreamSubject)
             .retentionPolicy(RetentionPolicy.Limits)
             .maxAge(Duration.ofMinutes(60))
             .build());
@@ -117,14 +99,9 @@ public abstract class AbstractCustomWorkload extends Workload {
         printFormatted(si.getJv());
     }
 
-    protected void doClearData(Connection nc) throws IOException, JetStreamApiException {
-        startJob("Clear Data");
-        nc.jetStreamManagement().purgeStream(dataStreamName);
-    }
-
-    protected void doClearInfo(Connection nc) throws IOException, JetStreamApiException {
-        startJob("Clear Info");
-        nc.jetStreamManagement().purgeStream(infoStreamName);
+    protected void doClearLog(Connection nc) throws IOException, JetStreamApiException {
+        startJob("Clear Log");
+        nc.jetStreamManagement().purgeStream(logStreamName);
     }
 
     protected void doClearExceptions(Connection nc) throws IOException, JetStreamApiException {
@@ -133,7 +110,7 @@ public abstract class AbstractCustomWorkload extends Workload {
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
-    protected void doWatch(Connection nc) throws IOException {
+    protected void doWatch(Connection nc, String... customStreams) throws IOException {
         startJob("Watch");
         JetStreamManagement jsm = nc.jetStreamManagement();
         Map<String, Event> watchMap = new HashMap<>();
@@ -142,23 +119,26 @@ public abstract class AbstractCustomWorkload extends Workload {
                 System.out.println();
                 System.out.println();
                 System.out.println(WATCH_BREAK);
-                StreamInfo dataSi = jsm.getStreamInfo(dataStreamName);
-                StreamState dataSs = dataSi.getStreamState();
-                System.out.println("STREAM | " + pad(dataStreamName, 10) + " | Subjects: " + pad(dataSs.getSubjectCount(), 10) + " | Messages: " + pad(dataSs.getMsgCount(), 12));
+
+                for (String stream : customStreams) {
+                    StreamInfo si = jsm.getStreamInfo(stream);
+                    StreamState ss = si.getStreamState();
+                    System.out.println("STREAM | " + pad(stream, 10) + " | Subjects: " + pad(ss.getSubjectCount(), 10) + " | Messages: " + pad(ss.getMsgCount(), 12));
+                }
 
                 StreamInfo exSi = jsm.getStreamInfo(exStreamName, StreamInfoOptions.allSubjects());
                 StreamState exSs = exSi.getStreamState();
                 System.out.println("STREAM | " + pad(exStreamName, 10) + " | Subjects: " + pad(exSs.getSubjectCount(), 10) + " | Messages: " + pad(exSs.getMsgCount(), 12));
 
-                StreamInfo infoSi = jsm.getStreamInfo(infoStreamName, StreamInfoOptions.allSubjects());
-                StreamState infoSs = infoSi.getStreamState();
-                System.out.println("STREAM | " + pad(infoStreamName, 10) + " | Subjects: " + pad(infoSs.getSubjectCount(), 10) + " | Messages: " + pad(infoSs.getMsgCount(), 12));
+                StreamInfo logSi = jsm.getStreamInfo(logStreamName, StreamInfoOptions.allSubjects());
+                StreamState logSs = logSi.getStreamState();
+                System.out.println("STREAM | " + pad(logStreamName, 10) + " | Subjects: " + pad(logSs.getSubjectCount(), 10) + " | Messages: " + pad(logSs.getMsgCount(), 12));
 
                 System.out.println(WATCH_BREAK);
-                boolean hadAnyMessages = watchStream(jsm, watchMap, exStreamName, infoSs, "EX     | ");
+                boolean hadAnyMessages = watchStream(jsm, watchMap, exStreamName, logSs, "EX     | ");
 
                 if (hadAnyMessages) { System.out.println(WATCH_BREAK); }
-                watchStream(jsm, watchMap, infoStreamName, infoSs, "INFO   | ");
+                watchStream(jsm, watchMap, logStreamName, logSs, "LOG    | ");
 
                 System.out.println(WATCH_BREAK);
                 sleep(watchFrequency);
@@ -385,7 +365,7 @@ public abstract class AbstractCustomWorkload extends Workload {
         }
 
         public String subject() {
-            return (exceptionClass == null  ? infoSubjectPrefix : exSubjectPrefix)
+            return (exceptionClass == null  ? logSubjectPrefix : exSubjectPrefix)
                 + segments(DEFAULT_SEGMENT);
         }
 
@@ -430,13 +410,13 @@ public abstract class AbstractCustomWorkload extends Workload {
     // ----------------------------------------------------------------------------------------------------
     protected static final String WATCH_BREAK = "--------------------------------------------------------------------------------------------------------------";
 
-    protected void logInfo(JetStream js, String job, String workId, int tix, long count, long elapsed) {
+    protected void log(JetStream js, String job, String workId, int tix, long count, long elapsed) {
         Event event = new Event(job, workId, tix, null, count, elapsed, null);
         Debug.info(event.ident(), event.extras());
         publish(js, event);
     }
 
-    protected void logException(JetStream js, String job, String workId, long elapsed, Exception exception) {
+    protected void log(JetStream js, String job, String workId, long elapsed, Exception exception) {
         Event event = new Event(job, workId, NO_TIX, null, 0, elapsed, exception);
         Debug.info(event.ident(), event.extras());
         publish(js, event);
