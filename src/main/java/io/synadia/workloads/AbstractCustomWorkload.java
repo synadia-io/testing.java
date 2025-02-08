@@ -52,11 +52,11 @@ public abstract class AbstractCustomWorkload extends Workload {
         infoStreamName = JsonValueUtils.readString(params.jv, "info_stream_name", "custom-info");
         exStreamName = JsonValueUtils.readString(params.jv, "ex_stream_name", "custom-exception");
         dataSubjectPrefix = JsonValueUtils.readString(params.jv, "data_stream_name", "data.");
-        infoSubjectPrefix = JsonValueUtils.readString(params.jv, "data_stream_name", "info.");
-        exSubjectPrefix = JsonValueUtils.readString(params.jv, "data_stream_name", "ex.");
+        infoSubjectPrefix = JsonValueUtils.readString(params.jv, "info_stream_name", "info.");
+        exSubjectPrefix = JsonValueUtils.readString(params.jv, "ex_stream_name", "ex.");
         dataStreamSubject = JsonValueUtils.readString(params.jv, "data_stream_name", "data.>");
-        infoStreamSubject = JsonValueUtils.readString(params.jv, "data_stream_name", "info.>");
-        exStreamSubject = JsonValueUtils.readString(params.jv, "data_stream_name", "ex.>");
+        infoStreamSubject = JsonValueUtils.readString(params.jv, "info_stream_name", "info.>");
+        exStreamSubject = JsonValueUtils.readString(params.jv, "ex_stream_name", "ex.>");
         defaultWorkerThreadCount = JsonValueUtils.readInteger(params.jv, "default_worker_thread_count", 3);
         watchFrequency = JsonValueUtils.readLong(params.jv, "watch_frequency", 5000);
         progressFrequency = JsonValueUtils.readInteger(params.jv, "progress_frequency", 100);
