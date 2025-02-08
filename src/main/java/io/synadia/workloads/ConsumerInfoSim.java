@@ -62,7 +62,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
         consumeReportFrequency = JsonValueUtils.readLong(params.jv, "consume_report_frequency", 100);
         infoReportFrequency = JsonValueUtils.readLong(params.jv, "info_report_frequency", 1000);
         produceJitter = JsonValueUtils.readLong(params.jv, "produce_jitter", 50);
-        produceFullJitter = JsonValueUtils.readLong(params.jv, "produce_jitter", 1000);
+        produceFullJitter = JsonValueUtils.readLong(params.jv, "produce_full_jitter", 1000);
         consumeJitter = JsonValueUtils.readLong(params.jv, "consume_jitter", 250);
         infoJitter = JsonValueUtils.readLong(params.jv, "info_jitter", 10_000);
         produceMessageMin = JsonValueUtils.readInteger(params.jv, "produce_message_min", 10);
@@ -236,15 +236,19 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                 JetStream js = nc.jetStream();
                 printConnect(nc, produceJob, ws.workId, tix);
                 jitter(produceJitter / 10);
+                int full = 5;
                 while (true) {
                     try {
                         StreamInfo si = jsm.getStreamInfo(dataStreamName);
                         long siCount = si.getStreamState().getConsumerCount();
                         if (siCount >= consumerCount) {
-                            print(produceJob, ws.workId, tix, null, 0, ws.elapse(), "System is full. " + siCount + "/" + consumerCount);
-                            jitter(produceFullJitter);
+                            print(produceJob, ws.workId, tix, null, 0, ws.elapse(), "* System is full. " + siCount + "/" + consumerCount);
+                            if (++full > 15) {
+                                full = 1;
+                            }
                         }
                         else {
+                            full = 0;
                             String consumerName = generateConsumerName();
                             String dataSubject = toDataSubject(consumerName);
                             int messageCount = ThreadLocalRandom.current().nextInt(produceMessageMin, produceMessageMax + 1);
@@ -271,6 +275,14 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                     }
                     catch (IOException | JetStreamApiException e) {
                         log(js, produceJob, ws.workId, ws.elapse(), e);
+                    }
+                    if (full > 0) {
+                        for (int r = 0; r < full; r++) {
+                            jitter(produceFullJitter);
+                        }
+                    }
+                    else {
+                        jitter(produceJitter);
                     }
                 }
             }
