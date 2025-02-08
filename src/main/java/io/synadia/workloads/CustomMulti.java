@@ -12,6 +12,7 @@ import io.synadia.CommandLine;
 import io.synadia.TestingApplication;
 import io.synadia.Workload;
 
+import static io.nats.client.support.JsonValueUtils.readString;
 import static io.nats.jsmulti.shared.Utils.report;
 import static io.nats.jsmulti.shared.Utils.reportAndTrackMaybe;
 
@@ -32,9 +33,9 @@ public class CustomMulti extends Workload {
         STREAM = params.testingStreamName;
         SUBJECT = params.testingStreamSubject;
 
-        if ("consumers".equals(params.customString("which"))) {
+        if ("consumers".equals(readString(params.jv, "which"))) {
             a.customAction(CustomActionRunner.class);
-            PREFIX = params.customString("prefix");
+            PREFIX = readString(params.jv, "prefix");
         }
 
         for (int i = 0; i < a.args.size(); i++) {

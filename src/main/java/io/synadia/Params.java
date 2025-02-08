@@ -4,6 +4,7 @@ import io.nats.client.Options;
 import io.nats.client.api.StreamConfiguration;
 import io.nats.client.support.JsonParseException;
 import io.nats.client.support.JsonParser;
+import io.nats.client.support.JsonSerializable;
 import io.nats.client.support.JsonValue;
 import io.synadia.utils.Debug;
 
@@ -16,7 +17,7 @@ import static io.nats.client.support.JsonValueUtils.*;
 import static io.synadia.utils.Constants.OS_UNIX;
 import static io.synadia.utils.Constants.OS_WIN;
 
-public class Params {
+public class Params implements JsonSerializable {
     private static final String PARAMS = "Params";
 
     public final JsonValue jv;
@@ -70,34 +71,7 @@ public class Params {
         trackProfile = readBoolean(jv, "track_profile", false);
     }
 
-    public String customString(String key) {
-        return readString(jv, key);
-    }
-
-    public String customString(String key, String dflt) {
-        return readString(jv, key, dflt);
-    }
-
-    public int customInt(String key) {
-        return readInteger(jv, key, -1);
-    }
-
-    public int customInt(String key, int dflt) {
-        return readInteger(jv, key, dflt);
-    }
-
-    public long customLong(String key) {
-        return readLong(jv, key, -1);
-    }
-
-    public long customLong(String key, long dflt) {
-        return readLong(jv, key, dflt);
-    }
-
-    public boolean customBoolean(String key) {
-        return readBoolean(jv, key, false);
-    }
-
+    @Override
     public String toJson() {
         return jv.toJson();
     }

@@ -2,6 +2,7 @@ package io.synadia.workloads;
 
 import io.nats.client.*;
 import io.nats.client.api.ObjectStoreConfiguration;
+import io.nats.client.support.JsonValueUtils;
 import io.nats.jsmulti.JsMulti;
 import io.nats.jsmulti.settings.Arguments;
 import io.nats.jsmulti.settings.Context;
@@ -34,9 +35,9 @@ public class ObjectStoreMulti extends Workload {
         // hack to get custom config to the runner itself
         // store the state in static variables since the class
         // is initiated by a factory
-        OsActionRunner.COMPRESSION = params.customBoolean("compression");
-        OsActionRunner.GZIP = params.customBoolean("gzip");
-        OsActionRunner.CLEANUP = params.customInt("cleanup", 100);
+        OsActionRunner.COMPRESSION = JsonValueUtils.readBoolean(params.jv, "compression");
+        OsActionRunner.GZIP = JsonValueUtils.readBoolean(params.jv, "gzip");
+        OsActionRunner.CLEANUP = JsonValueUtils.readInteger(params.jv, "cleanup", 100);
 
         a.customAction(OsActionRunner.class);
         for (int i = 0; i < a.args.size(); i++) {

@@ -14,7 +14,6 @@ import io.synadia.Workload;
 import io.synadia.utils.Debug;
 
 import java.io.IOException;
-import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.locks.ReentrantLock;
@@ -24,33 +23,58 @@ import static io.nats.jsmulti.shared.Stats.humanTime;
 import static io.nats.jsmulti.shared.Utils.sleep;
 
 @SuppressWarnings("SameParameterValue")
-public abstract class AbstractSimWorkload extends Workload {
-    protected static final String DATA_STREAM_NAME = "sim-data";
-    protected static final String INFO_STREAM_NAME = "sim-info";
-    protected static final String EX_STREAM_NAME = "sim-exception";
-    protected static final String DATA_SUBJECT_PREFIX = "data.";
-    protected static final String INFO_SUBJECT_PREFIX = "info.";
-    protected static final String EX_SUBJECT_PREFIX = "ex.";
-    protected static final String DATA_STREAM_SUBJECT = DATA_SUBJECT_PREFIX + ">";
-    protected static final String INFO_STREAM_SUBJECT = INFO_SUBJECT_PREFIX + ">";
-    protected static final String EX_STREAM_SUBJECT = EX_SUBJECT_PREFIX + ">";
-    protected static final int DEFAULT_WORKER_THREAD_COUNT = 3;
+public abstract class AbstractCustomWorkload extends Workload {
     protected static final int NO_TIX = Integer.MIN_VALUE;
     protected static final String DEFAULT_SEGMENT = "._";
     protected static final String DOT = ".";
-    protected static final long WATCH_FREQUENCY = 5000;
 
-    protected final int progressFrequency;
+    protected String dataStreamName;
+    protected String infoStreamName;
+    protected String exStreamName;
+    protected String dataSubjectPrefix;
+    protected String infoSubjectPrefix;
+    protected String exSubjectPrefix;
+    protected String dataStreamSubject;
+    protected String infoStreamSubject;
+    protected String exStreamSubject;
+    protected int defaultWorkerThreadCount;
+    protected long watchFrequency;
+    protected int progressFrequency;
+    protected String watchDateFormat;
 
-    protected AbstractSimWorkload(int progressFrequency) {
-        this.progressFrequency = progressFrequency;
-    }
-
-    public void aswInit(String defaultLabel, boolean requiresArguments, CommandLine commandLine) {
+    public void acwInit(String defaultLabel, boolean requiresArguments, CommandLine commandLine) {
         init(defaultLabel, commandLine);
         if (requiresArguments && commandLine.args.isEmpty()) {
             exit("Argument(s) Required");
         }
+
+        dataStreamName = JsonValueUtils.readString(params.jv, "data_stream_name", "custom-data");
+        infoStreamName = JsonValueUtils.readString(params.jv, "data_stream_name", "custom-info");
+        exStreamName = JsonValueUtils.readString(params.jv, "data_stream_name", "custom-exception");
+        dataSubjectPrefix = JsonValueUtils.readString(params.jv, "data_stream_name", "data.");
+        infoSubjectPrefix = JsonValueUtils.readString(params.jv, "data_stream_name", "info.");
+        exSubjectPrefix = JsonValueUtils.readString(params.jv, "data_stream_name", "ex.");
+        dataStreamSubject = JsonValueUtils.readString(params.jv, "data_stream_name", "data.>");
+        infoStreamSubject = JsonValueUtils.readString(params.jv, "data_stream_name", "info.>");
+        exStreamSubject = JsonValueUtils.readString(params.jv, "data_stream_name", "ex.>");
+        defaultWorkerThreadCount = JsonValueUtils.readInteger(params.jv, "default_worker_thread_count", 3);
+        watchFrequency = JsonValueUtils.readLong(params.jv, "watch_frequency", 5000);
+        progressFrequency = JsonValueUtils.readInteger(params.jv, "progress_frequency", 100);
+        watchDateFormat = JsonValueUtils.readString(params.jv, "watch_date_format", "HH:mm:ss.SSS");
+
+        Debug.info(workLabel, "dataStreamName", dataStreamName);
+        Debug.info(workLabel, "infoStreamName", infoStreamName);
+        Debug.info(workLabel, "exStreamName", exStreamName);
+        Debug.info(workLabel, "dataSubjectPrefix", dataSubjectPrefix);
+        Debug.info(workLabel, "infoSubjectPrefix", infoSubjectPrefix);
+        Debug.info(workLabel, "exSubjectPrefix", exSubjectPrefix);
+        Debug.info(workLabel, "dataStreamSubject", dataStreamSubject);
+        Debug.info(workLabel, "infoStreamSubject", infoStreamSubject);
+        Debug.info(workLabel, "exStreamSubject", exStreamSubject);
+        Debug.info(workLabel, "defaultWorkerThreadCount", defaultWorkerThreadCount);
+        Debug.info(workLabel, "watchFrequency", watchFrequency);
+        Debug.info(workLabel, "progressFrequency", progressFrequency);
+        Debug.info(workLabel, "watchDateFormat", watchDateFormat);
     }
 
     protected void exit(String reason) {
@@ -69,43 +93,43 @@ public abstract class AbstractSimWorkload extends Workload {
         startJob("Setup");
         startJob("Creating Streams");
         JetStreamManagement jsm = nc.jetStreamManagement();
-        safeDeleteStream(jsm, DATA_STREAM_NAME);
+        safeDeleteStream(jsm, dataStreamName);
         StreamInfo si = jsm.addStream(StreamConfiguration.builder()
-            .name(DATA_STREAM_NAME)
-            .subjects(DATA_STREAM_SUBJECT)
+            .name(dataStreamName)
+            .subjects(dataStreamSubject)
             .retentionPolicy(RetentionPolicy.WorkQueue)
             .maxMessages(maxMessages)
             .build());
         printFormatted(si.getJv());
-        safeDeleteStream(jsm, INFO_STREAM_NAME);
+        safeDeleteStream(jsm, infoStreamName);
         si = jsm.addStream(StreamConfiguration.builder()
-            .name(INFO_STREAM_NAME)
-            .subjects(INFO_STREAM_SUBJECT)
+            .name(infoStreamName)
+            .subjects(infoStreamSubject)
             .retentionPolicy(RetentionPolicy.Limits)
             .maxAge(Duration.ofMinutes(60))
             .build());
         printFormatted(si.getJv());
-        safeDeleteStream(jsm, EX_STREAM_NAME);
+        safeDeleteStream(jsm, exStreamName);
         si = jsm.addStream(StreamConfiguration.builder()
-            .name(EX_STREAM_NAME)
-            .subjects(EX_STREAM_SUBJECT)
+            .name(exStreamName)
+            .subjects(exStreamSubject)
             .build());
         printFormatted(si.getJv());
     }
 
     protected void doClearData(Connection nc) throws IOException, JetStreamApiException {
         startJob("Clear Data");
-        nc.jetStreamManagement().purgeStream(DATA_STREAM_NAME);
+        nc.jetStreamManagement().purgeStream(dataStreamName);
     }
 
     protected void doClearInfo(Connection nc) throws IOException, JetStreamApiException {
         startJob("Clear Info");
-        nc.jetStreamManagement().purgeStream(INFO_STREAM_NAME);
+        nc.jetStreamManagement().purgeStream(infoStreamName);
     }
 
     protected void doClearExceptions(Connection nc) throws IOException, JetStreamApiException {
         startJob("Clear Exception");
-        nc.jetStreamManagement().purgeStream(EX_STREAM_NAME);
+        nc.jetStreamManagement().purgeStream(exStreamName);
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
@@ -118,26 +142,26 @@ public abstract class AbstractSimWorkload extends Workload {
                 System.out.println();
                 System.out.println();
                 System.out.println(WATCH_BREAK);
-                StreamInfo dataSi = jsm.getStreamInfo(DATA_STREAM_NAME);
+                StreamInfo dataSi = jsm.getStreamInfo(dataStreamName);
                 StreamState dataSs = dataSi.getStreamState();
-                System.out.println("STREAM | " + pad(DATA_STREAM_NAME, 10) + " | Subjects: " + pad(dataSs.getSubjectCount(), 10) + " | Messages: " + pad(dataSs.getMsgCount(), 12));
+                System.out.println("STREAM | " + pad(dataStreamName, 10) + " | Subjects: " + pad(dataSs.getSubjectCount(), 10) + " | Messages: " + pad(dataSs.getMsgCount(), 12));
 
-                StreamInfo exSi = jsm.getStreamInfo(EX_STREAM_NAME, StreamInfoOptions.allSubjects());
+                StreamInfo exSi = jsm.getStreamInfo(exStreamName, StreamInfoOptions.allSubjects());
                 StreamState exSs = exSi.getStreamState();
-                System.out.println("STREAM | " + pad(EX_STREAM_NAME, 10) + " | Subjects: " + pad(exSs.getSubjectCount(), 10) + " | Messages: " + pad(exSs.getMsgCount(), 12));
+                System.out.println("STREAM | " + pad(exStreamName, 10) + " | Subjects: " + pad(exSs.getSubjectCount(), 10) + " | Messages: " + pad(exSs.getMsgCount(), 12));
 
-                StreamInfo infoSi = jsm.getStreamInfo(INFO_STREAM_NAME, StreamInfoOptions.allSubjects());
+                StreamInfo infoSi = jsm.getStreamInfo(infoStreamName, StreamInfoOptions.allSubjects());
                 StreamState infoSs = infoSi.getStreamState();
-                System.out.println("STREAM | " + pad(INFO_STREAM_NAME, 10) + " | Subjects: " + pad(infoSs.getSubjectCount(), 10) + " | Messages: " + pad(infoSs.getMsgCount(), 12));
+                System.out.println("STREAM | " + pad(infoStreamName, 10) + " | Subjects: " + pad(infoSs.getSubjectCount(), 10) + " | Messages: " + pad(infoSs.getMsgCount(), 12));
 
                 System.out.println(WATCH_BREAK);
-                boolean hadAnyMessages = watchStream(jsm, watchMap, EX_STREAM_NAME, infoSs, "EX     | ");
+                boolean hadAnyMessages = watchStream(jsm, watchMap, exStreamName, infoSs, "EX     | ");
 
                 if (hadAnyMessages) { System.out.println(WATCH_BREAK); }
-                watchStream(jsm, watchMap, INFO_STREAM_NAME, infoSs, "INFO   | ");
+                watchStream(jsm, watchMap, infoStreamName, infoSs, "INFO   | ");
 
                 System.out.println(WATCH_BREAK);
-                sleep(WATCH_FREQUENCY);
+                sleep(watchFrequency);
             }
             catch (Exception e) {
                 throw new RuntimeException(e);
@@ -145,9 +169,7 @@ public abstract class AbstractSimWorkload extends Workload {
         }
     }
 
-    private static final SimpleDateFormat WATCH_DATE_FORMAT = new SimpleDateFormat("HH:mm:ss.SSS");
-
-    private static boolean watchStream(JetStreamManagement jsm, Map<String, Event> watchMap, String streamName, StreamState ss, String lineStart) {
+    private boolean watchStream(JetStreamManagement jsm, Map<String, Event> watchMap, String streamName, StreamState ss, String lineStart) {
         List<String> allSubjects = new ArrayList<>();
         for (Subject subject : ss.getSubjects()) {
             allSubjects.add(subject.getName());
@@ -246,7 +268,7 @@ public abstract class AbstractSimWorkload extends Workload {
     }
 
     protected void doWorker(String job, Worker worker) throws InterruptedException {
-        doWorker(job, DEFAULT_WORKER_THREAD_COUNT, worker);
+        doWorker(job, defaultWorkerThreadCount, worker);
     }
 
     protected void doWorker(String job, int threadCount, Worker worker) throws InterruptedException {
@@ -274,7 +296,7 @@ public abstract class AbstractSimWorkload extends Workload {
     // ----------------------------------------------------------------------------------------------------
     // EVENT
     // ----------------------------------------------------------------------------------------------------
-    protected static class Event implements JsonSerializable {
+    protected class Event implements JsonSerializable {
         public final String job;
         public final String workId;
         public final int tix;
@@ -363,7 +385,7 @@ public abstract class AbstractSimWorkload extends Workload {
         }
 
         public String subject() {
-            return (exceptionClass == null  ? INFO_SUBJECT_PREFIX : EX_SUBJECT_PREFIX)
+            return (exceptionClass == null  ? infoSubjectPrefix : exSubjectPrefix)
                 + segments(DEFAULT_SEGMENT);
         }
 
