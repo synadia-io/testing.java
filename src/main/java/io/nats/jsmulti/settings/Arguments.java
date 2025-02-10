@@ -117,8 +117,7 @@ public class Arguments {
         return add("ca", customActionClassName);
     }
 
-    @SuppressWarnings("rawtypes")
-    public Arguments customAction(Class clazz) {
+    public Arguments customAction(Class<?> clazz) {
         return add("ca", clazz.getTypeName());
     }
 

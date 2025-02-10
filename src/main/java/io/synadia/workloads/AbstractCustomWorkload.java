@@ -39,7 +39,7 @@ public abstract class AbstractCustomWorkload extends Workload {
     protected int progressFrequency;
     protected String watchDateFormat;
 
-    public void acwInit(String defaultLabel, boolean requiresArguments, CommandLine commandLine) {
+    public void customWorkloadInit(String defaultLabel, boolean requiresArguments, CommandLine commandLine) {
         init(defaultLabel, commandLine);
         if (requiresArguments && commandLine.args.isEmpty()) {
             exit("Argument(s) Required");
@@ -70,11 +70,11 @@ public abstract class AbstractCustomWorkload extends Workload {
 
     protected void exit(String reason) {
         Debug.info(workLabel, reason);
-        Debug.info(workLabel, "Commands: " + commands());
+        Debug.info(workLabel, "Commands", commands());
         System.exit(0);
     }
 
-    protected abstract String commands();
+    protected abstract String[] commands();
 
     // ----------------------------------------------------------------------------------------------------
     // COMMANDS

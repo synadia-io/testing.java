@@ -26,6 +26,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
     protected String queueStreamName;
     protected String queueSubjectPrefix;
     protected String queueStreamSubject;
+    protected String queueConsumerName;
     private String infoJob;
     private String produceJob;
     private String consumeJob;
@@ -45,13 +46,15 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
 
     @Override
     public void init(CommandLine commandLine) {
-        acwInit("Consumer Info Sim", true, commandLine);
+        customWorkloadInit("Consumer Info Sim", true, commandLine);
+
         dataStreamName = JsonValueUtils.readString(params.jv, "data_stream_name", "data");
         dataSubjectPrefix = JsonValueUtils.readString(params.jv, "data_subject_prefix", "data.");
         dataStreamSubject = JsonValueUtils.readString(params.jv, "data_stream_subject", "data.>");
         queueStreamName = JsonValueUtils.readString(params.jv, "queue_stream_name", "queue");
         queueSubjectPrefix = JsonValueUtils.readString(params.jv, "queue_subject_prefix", "queue.");
         queueStreamSubject = JsonValueUtils.readString(params.jv, "queue_stream_subject", "queue.>");
+        queueConsumerName = JsonValueUtils.readString(params.jv, "queue_consumer_name", "qcon");
         infoJob = JsonValueUtils.readString(params.jv, "info_job", "Info");
         produceJob = JsonValueUtils.readString(params.jv, "produce_job", "Produce");
         consumeJob = JsonValueUtils.readString(params.jv, "consume_job", "Consume");
@@ -75,6 +78,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
         Debug.info(workLabel, "queueStreamName", queueStreamName);
         Debug.info(workLabel, "queueSubjectPrefix", queueSubjectPrefix);
         Debug.info(workLabel, "queueStreamSubject", queueStreamSubject);
+        Debug.info(workLabel, "queueConsumerName", queueConsumerName);
         Debug.info(workLabel, "infoJob", infoJob);
         Debug.info(workLabel, "produceJob", produceJob);
         Debug.info(workLabel, "consumeJob", consumeJob);
@@ -94,8 +98,8 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
     }
 
     @Override
-    protected String commands() {
-        return "'setup', 'create', 'list', 'produce', 'consume', 'info', 'watch', 'stream', 'clear consumers|data|queue|log|ex', 'purge <job>'";
+    protected String[] commands() {
+        return new String[] {"setup", "list", "produce", "consume", "info", "watch", "stream", "clear consumers|data|queue|log|ex", "purge <job>"};
     }
 
     @Override
@@ -136,6 +140,8 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
             .maxMessages(maxMessages)
             .build());
         printFormatted(si.getJv());
+
+        jsm.createConsumer(queueStreamName, ConsumerConfiguration.builder().durable(queueConsumerName).filterSubject(queueStreamSubject).build());
     }
 
     private void doList(Connection nc) throws IOException, JetStreamApiException {
@@ -299,7 +305,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                 JetStream js = nc.jetStream();
                 printConnect(nc, consumeJob, ws.workId, tix);
                 jitter(consumeJitter / 10);
-                ConsumerContext qConsumerCtx = getQueueConsumerContext(nc);
+                ConsumerContext qConsumerCtx = nc.getConsumerContext(queueStreamName, queueConsumerName);
                 while (true) {
                     try {
                         QueueData qd = queueNext(qConsumerCtx);
@@ -332,11 +338,6 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
     private QueueData queueNext(ConsumerContext qConsumerCtx) throws JetStreamApiException, IOException, InterruptedException, JetStreamStatusCheckedException {
         Message qm = qConsumerCtx.next(consumeJitter);
         return qm == null ? null : new QueueData(qm.getData());
-    }
-
-    private ConsumerContext getQueueConsumerContext(Connection nc) throws IOException, JetStreamApiException {
-        StreamContext qStreamCtx = nc.getStreamContext(queueStreamName);
-        return qStreamCtx.createOrUpdateConsumer(ConsumerConfiguration.builder().filterSubject(queueStreamSubject).build());
     }
 
     @SuppressWarnings("InfiniteLoopStatement")

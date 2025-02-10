@@ -76,12 +76,7 @@ public abstract class Utils {
     }
 
     public static long parseLong(String val) {
-        String vl = val
-            .trim()
-            .toLowerCase()
-            .replaceAll("_", "")
-            .replaceAll(",", "")
-            .replaceAll("\\.", "");
+        String vl = prepareParseLong(val);
 
         long factor = 1;
         int fl = 1;
@@ -110,5 +105,14 @@ public abstract class Utils {
             vl = vl.substring(0, vl.length() - fl);
         }
         return Long.parseLong(vl) * factor;
+    }
+
+    public static String prepareParseLong(String val) {
+        return val
+            .trim()
+            .toLowerCase()
+            .replaceAll("_", "")
+            .replaceAll(",", "")
+            .replaceAll("\\.", "");
     }
 }
