@@ -24,8 +24,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
     protected String dataSubjectPrefix;
     protected String dataStreamSubject;
     protected String queueStreamName;
-    protected String queueSubjectPrefix;
-    protected String queueStreamSubject;
+    protected String queueSubject;
     protected String queueConsumerName;
     private String infoJob;
     private String produceJob;
@@ -52,8 +51,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
         dataSubjectPrefix = JsonValueUtils.readString(params.jv, "data_subject_prefix", "data.");
         dataStreamSubject = JsonValueUtils.readString(params.jv, "data_stream_subject", "data.>");
         queueStreamName = JsonValueUtils.readString(params.jv, "queue_stream_name", "queue");
-        queueSubjectPrefix = JsonValueUtils.readString(params.jv, "queue_subject_prefix", "queue.");
-        queueStreamSubject = JsonValueUtils.readString(params.jv, "queue_stream_subject", "queue.>");
+        queueSubject = JsonValueUtils.readString(params.jv, "queue_subject", "qsub");
         queueConsumerName = JsonValueUtils.readString(params.jv, "queue_consumer_name", "qcon");
         infoJob = JsonValueUtils.readString(params.jv, "info_job", "Info");
         produceJob = JsonValueUtils.readString(params.jv, "produce_job", "Produce");
@@ -76,8 +74,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
         Debug.info(workLabel, "dataSubjectPrefix", dataSubjectPrefix);
         Debug.info(workLabel, "dataStreamSubject", dataStreamSubject);
         Debug.info(workLabel, "queueStreamName", queueStreamName);
-        Debug.info(workLabel, "queueSubjectPrefix", queueSubjectPrefix);
-        Debug.info(workLabel, "queueStreamSubject", queueStreamSubject);
+        Debug.info(workLabel, "queueSubject", queueSubject);
         Debug.info(workLabel, "queueConsumerName", queueConsumerName);
         Debug.info(workLabel, "infoJob", infoJob);
         Debug.info(workLabel, "produceJob", produceJob);
@@ -135,13 +132,13 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
 
         si = jsm.addStream(StreamConfiguration.builder()
             .name(queueStreamName)
-            .subjects(queueStreamSubject)
+            .subjects(queueSubject)
             .retentionPolicy(RetentionPolicy.WorkQueue)
             .maxMessages(maxMessages)
             .build());
         printFormatted(si.getJv());
 
-        jsm.createConsumer(queueStreamName, ConsumerConfiguration.builder().durable(queueConsumerName).filterSubject(queueStreamSubject).build());
+        jsm.createConsumer(queueStreamName, ConsumerConfiguration.builder().durable(queueConsumerName).filterSubject(queueSubject).build());
     }
 
     private void doList(Connection nc) throws IOException, JetStreamApiException {
@@ -280,7 +277,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                             }
 
                             // 3. put a record in the queue last so it's not used until messages are published
-                            js.publish(toQueueSubject(consumerName), new QueueData(consumerName, dataSubject, messageCount).serialize());
+                            js.publish(queueSubject, new QueueData(consumerName, dataSubject, messageCount).serialize());
                             
                             long count = ws.increment();
                             if (count % produceReportFrequency == 0) {
@@ -389,10 +386,6 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
 
     private String toDataSubject(String consumerName) {
         return dataSubjectPrefix + consumerName;
-    }
-
-    private String toQueueSubject(String consumerName) {
-        return queueSubjectPrefix + consumerName;
     }
 
     private String generateConsumerName() {
