@@ -343,7 +343,11 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
 
     private QueueData queueNext(ConsumerContext qConsumerCtx) throws JetStreamApiException, IOException, InterruptedException, JetStreamStatusCheckedException {
         Message qm = qConsumerCtx.next(1000);
-        return qm == null ? null : new QueueData(qm.getData());
+        if (qm != null) {
+            qm.ack();
+            return new QueueData(qm.getData());
+        }
+        return null;
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
