@@ -338,6 +338,10 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                                     jsm.deleteConsumer(dataStreamName, qd.consumerName);
                                 }
                                 catch (Exception ignore) {}
+                                try {
+                                    jsm.purgeStream(dataStreamName, PurgeOptions.subject(qd.dataSubject));
+                                }
+                                catch (Exception ignore) {}
                             }
                         }
                     }
