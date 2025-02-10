@@ -151,9 +151,10 @@ public abstract class AbstractCustomWorkload extends Workload {
         long first = si.getStreamState().getFirstSequence();
         long last = si.getStreamState().getLastSequence();
         System.out.println("STREAM | " + pad(stream, 10)
-            + " | Subjects: " + pad(ss.getSubjectCount(), 10)
-            + " | Messages: " + pad(ss.getMsgCount(), 12)
-            + " | First/Last Seq: " + first + "/" + last
+            + " | Msgs: " + pad(ss.getMsgCount(), 10)
+            + " Subjects: " + pad(ss.getSubjectCount(), 6)
+            + " Cons: " + pad(ss.getConsumerCount(), 6)
+            + " F/L Seq: " + pad(first + "/" + last, 20)
         );
         logSs = ss;
         return logSs;

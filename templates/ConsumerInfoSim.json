@@ -36,7 +36,7 @@
   "consume_report_frequency": 100,
   "log_report_frequency": 1000,
   "produce_jitter": 50,
-  "consume_jitter": 150,
+  "consume_jitter": 250,
   "info_jitter": 10000,
   "produce_message_min": 10,
   "produce_message_max": 100,

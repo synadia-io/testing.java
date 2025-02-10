@@ -308,6 +308,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
     private Runnable consumeWorker(Options options, int tix, WorkState ws) {
         return () -> {
             try (Connection nc = Nats.connect(options)) {
+                JetStreamManagement jsm = nc.jetStreamManagement();
                 JetStream js = nc.jetStream();
                 printConnect(nc, consumeJob, ws.workId, tix);
                 jitter(consumeJitter / 10);
@@ -324,10 +325,19 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                                     m.ack();
                                     m = fc.nextMessage();
                                 }
+                                long count = ws.increment();
+                                if (count % consumeReportFrequency == 0) {
+                                    log(js, consumeJob, ws.workId, NO_TIX, count, ws.elapse());
+                                }
                             }
-                            long count = ws.increment();
-                            if (count % consumeReportFrequency == 0) {
-                                log(js, consumeJob, ws.workId, NO_TIX, count, ws.elapse());
+                            catch (IOException | JetStreamApiException e) {
+                                log(js, consumeJob, ws.workId, ws.elapse(), e);
+                            }
+                            finally {
+                                try {
+                                    jsm.deleteConsumer(dataStreamName, qd.consumerName);
+                                }
+                                catch (Exception ignore) {}
                             }
                         }
                     }
