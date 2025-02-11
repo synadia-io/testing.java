@@ -249,6 +249,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                 printConnect(nc, produceJob, ws.workId, tix);
                 jitter(produceJitter / 10);
                 int full = 5;
+                boolean doJitter = true;
                 while (true) {
                     try {
                         StreamInfo si = jsm.getStreamInfo(dataStreamName);
@@ -260,6 +261,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                             }
                         }
                         else {
+                            doJitter = siCount > (consumerCount / 2);
                             full = 0;
                             String consumerName = generateConsumerName();
                             String dataSubject = toDataSubject(consumerName);
@@ -293,7 +295,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                             jitter(produceFullJitter);
                         }
                     }
-                    else {
+                    else if (doJitter) {
                         jitter(produceJitter);
                     }
                 }
