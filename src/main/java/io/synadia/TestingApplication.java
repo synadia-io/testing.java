@@ -11,14 +11,12 @@ import io.nats.jsmulti.shared.Stats;
 import io.synadia.utils.Debug;
 
 import java.nio.charset.StandardCharsets;
-import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Map;
 
 import static io.synadia.utils.Constants.*;
 
 public class TestingApplication implements Application, AutoCloseable {
-    public static final SimpleDateFormat FORMATTER = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
 
     private Context ctx;
     private Connection nc;
@@ -67,7 +65,7 @@ public class TestingApplication implements Application, AutoCloseable {
     @Override
     public void track(Stats stats, boolean statsAreFinal) {
         Date d = new Date();
-        JsonValue sTime = new JsonValue(FORMATTER.format(d));
+        JsonValue sTime = new JsonValue(FULL_DATE_FORMATTER.format(d));
         JsonValue jvTime = new JsonValue(d.getTime());
         String key = stats.key;
         Map<String, JsonValue> map = stats.toJsonValueMap();

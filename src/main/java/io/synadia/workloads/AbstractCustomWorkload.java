@@ -21,6 +21,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import static io.nats.client.support.JsonUtils.printFormatted;
 import static io.nats.jsmulti.shared.Stats.humanTime;
 import static io.nats.jsmulti.shared.Utils.sleep;
+import static io.synadia.utils.Constants.FULL_DATE_NO_TZ_FORMATTER;
 
 @SuppressWarnings("SameParameterValue")
 public abstract class AbstractCustomWorkload extends Workload {
@@ -111,6 +112,24 @@ public abstract class AbstractCustomWorkload extends Workload {
         nc.jetStreamManagement().purgeStream(exStreamName);
     }
 
+    public static final String SUMMARY_TOP_LINE    = "├──────────────┬────────────┼────────────┬────────────┬────────────┬────────────┐";
+    public static final String SUMMARY_LINE_HEADER = "│ Stream       │   Messages │   Subjects │  Consumers │ First Seq  │   Last Seq │";
+    public static final String SUMMARY_SEP_LINE    = "├──────────────┼────────────┼────────────┼────────────┼────────────┼────────────┤";
+    public static final String SUMMARY_FOOT_LINE   = "└──────────────┴────────────┴────────────┴────────────┴────────────┴────────────┘";
+    public static final String SUMMARY_LINE_FORMAT = "│ %-12s │ %10d │ %10d │ %10d │ %10d │ %10d │\n";
+
+    public static final String DETAIL_TOP_LINE    = "├────────────────┬────────────────┼───────────────────────────────────────────────────────────────────────────────────────────┐";
+    public static final String DETAIL_LINE_HEADER = "│ ? Job (Thread) │ Elapsed        │ Details                                                                                   │";
+    public static final String DETAIL_SEP_LINE    = "├────────────────┼────────────────┼───────────────────────────────────────────────────────────────────────────────────────────┤";
+    public static final String DETAIL_FOOT_LINE   = "└────────────────┴────────────────┴───────────────────────────────────────────────────────────────────────────────────────────┘";
+    public static final String DETAIL_LINE_FORMAT = "│ %-14s │ %-14s │ %60s │\n";
+
+    public static final String NON_DETAIL_TOP_LINE    = "├────────────────┬────────────────┬───────────────┤";
+    public static final String NON_DETAIL_LINE_HEADER = "│ ? Job (Thread) │ Count          │ Elapsed       │";
+    public static final String NON_DETAIL_SEP_LINE    = "├────────────────┼────────────────┼───────────────┤";
+    public static final String NON_DETAIL_FOOT_LINE   = "└────────────────┴────────────────┴───────────────┘";
+    public static final String NON_DETAIL_LINE_FORMAT = "│ %-14s │ %-14s │ %-13s │\n";
+
     @SuppressWarnings("InfiniteLoopStatement")
     protected void doWatch(Connection nc, String... customStreams) throws IOException {
         startJob("Watch");
@@ -120,95 +139,98 @@ public abstract class AbstractCustomWorkload extends Workload {
             try {
                 System.out.println();
                 System.out.println();
-                System.out.println(WATCH_BREAK);
+                System.out.println("┌───────────────────────────┐");
+                System.out.println("│ " + FULL_DATE_NO_TZ_FORMATTER.format(new Date()) + "   │");
 
+                // STREAM SUMMARIES
+                System.out.println(SUMMARY_TOP_LINE);
+                System.out.println(SUMMARY_LINE_HEADER);
+                System.out.println(SUMMARY_SEP_LINE);
                 for (String stream : customStreams) {
                     summarize(jsm, stream);
                 }
-
                 StreamState exSs = summarize(jsm, exStreamName);
                 StreamState logSs = summarize(jsm, logStreamName);
-                System.out.println(WATCH_BREAK);
+                System.out.println(SUMMARY_FOOT_LINE);
 
-                boolean hadAnyMessages = watchStream(jsm, watchMap, exStreamName, exSs, "EX     | ");
+                watchStream(jsm, watchMap, true, exStreamName, exSs, v -> {
+                    System.out.println("┌─────────────────────────────────┐");
+                    System.out.println("│ Exceptions                      │");
+                });
 
-                if (hadAnyMessages) { System.out.println(WATCH_BREAK); }
-                watchStream(jsm, watchMap, logStreamName, logSs, "LOG    | ");
-
-                System.out.println(WATCH_BREAK);
-                sleep(watchFrequency);
+                watchStream(jsm, watchMap, false, logStreamName, logSs, v -> {
+                    System.out.println("┌─────────────────────────────────────────────────┐");
+                    System.out.println("│ Log                                             │");
+                });
             }
-            catch (Exception e) {
-                throw new RuntimeException(e);
-            }
+            catch (Exception ignore) {}
+            sleep(watchFrequency);
         }
     }
 
     private static StreamState summarize(JetStreamManagement jsm, String stream) throws IOException, JetStreamApiException {
-        StreamState logSs;
         StreamInfo si = jsm.getStreamInfo(stream, StreamInfoOptions.allSubjects());
         StreamState ss = si.getStreamState();
-        long first = si.getStreamState().getFirstSequence();
-        long last = si.getStreamState().getLastSequence();
-        System.out.println("STREAM | " + pad(stream, 10)
-            + " | Msgs: " + pad(ss.getMsgCount(), 10)
-            + " Subjects: " + pad(ss.getSubjectCount(), 6)
-            + " Cons: " + pad(ss.getConsumerCount(), 6)
-            + " F/L Seq: " + pad(first + "/" + last, 20)
-        );
-        logSs = ss;
-        return logSs;
+        long fseq = si.getStreamState().getFirstSequence();
+        long lseq = si.getStreamState().getLastSequence();
+        System.out.printf(SUMMARY_LINE_FORMAT, stream, ss.getMsgCount(), ss.getSubjectCount(), ss.getConsumerCount(), fseq, lseq);
+        return ss;
     }
 
-    private boolean watchStream(JetStreamManagement jsm, Map<String, Event> watchMap, String streamName, StreamState ss, String lineStart) {
+    private void watchStream(JetStreamManagement jsm, Map<String, Event> watchMap, boolean detail, String streamName, StreamState ss, java.util.function.Consumer<Void> beforeFirst) {
         List<String> allSubjects = new ArrayList<>();
         for (Subject subject : ss.getSubjects()) {
             allSubjects.add(subject.getName());
         }
         Collections.sort(allSubjects);
 
-        boolean hadAnyMessages = false;
         boolean first = true;
         for (String subject : allSubjects) {
             try {
                 MessageInfo mi = jsm.getLastMessage(streamName, subject);
                 if (mi != null) {
-                    hadAnyMessages = true;
                     if (first) {
                         first = false;
-                        System.out.println("       | ? Job (Thread)  | Count       | Elapsed        | Details");
-                        System.out.println("       | --------------- | ----------- | -------------- | ----------------------------------------------------");
+                        beforeFirst.accept(null);
+                        if (detail) {
+                            System.out.println(DETAIL_TOP_LINE);
+                            System.out.println(DETAIL_LINE_HEADER);
+                            System.out.println(DETAIL_SEP_LINE);
+                        }
+                        else {
+                            System.out.println(NON_DETAIL_TOP_LINE);
+                            System.out.println(NON_DETAIL_LINE_HEADER);
+                            System.out.println(NON_DETAIL_SEP_LINE);
+                        }
                     }
                     Event prev = watchMap.get(subject);
                     Event event = new Event(mi.getData());
                     watchMap.put(subject, event);
-                    StringBuilder sb = new StringBuilder(lineStart);
-                    sb.append(prev == null || !prev.equals(event) ? "* " : "  ");
-                    String temp = event.job;
+                    String job = (prev == null || !prev.equals(event) ? "* " : "  ") + event.job;
                     if (event.tix != NO_TIX) {
-                        temp = temp + " (" + event.tix + ")";
+                        job = job + " (" + event.tix + ")";
                     }
-                    sb.append(pad(temp, 13)).append(" | ");
-                    temp = "";
-                    if (event.count > 0) {
-                        temp = String.format("%,d", event.count);
-                    }
-                    sb.append(pad(temp, 11))
-                        .append(" | ")
-                        .append(pad(humanTime(event.elapsed), 14));
 
-                    if (event.exceptionClass == null) {
-                        sb.append(" |");
+                    String ht = humanTime(event.elapsed);
+
+                    if (detail) {
+                        String deets = event.exceptionClass == null ? "" : event.exceptionClass + ": " + event.exceptionMessage.trim() + "                    ";
+                        System.out.printf(DETAIL_LINE_FORMAT, job, ht, deets);
                     }
                     else {
-                        sb.append(" | ").append(event.exceptionClass).append(": ").append(event.exceptionMessage);
+                        String cnt = "";
+                        if (event.count > 0) {
+                            cnt = String.format("%,d", event.count);
+                        }
+                        System.out.printf(NON_DETAIL_LINE_FORMAT, job, cnt, ht);
                     }
-                    System.out.println(sb);
                 }
             }
-            catch (IOException | JetStreamApiException ignore) {}
+            catch (IOException | JetStreamApiException ignore) {
+            }
         }
-        return hadAnyMessages;
+
+        System.out.println(detail ? DETAIL_FOOT_LINE : NON_DETAIL_FOOT_LINE);
     }
 
     // ----------------------------------------------------------------------------------------------------
@@ -419,7 +441,6 @@ public abstract class AbstractCustomWorkload extends Workload {
     // ----------------------------------------------------------------------------------------------------
     // EVENT HELPERS
     // ----------------------------------------------------------------------------------------------------
-    protected static final String WATCH_BREAK = "--------------------------------------------------------------------------------------------------------------";
 
     protected void log(JetStream js, String job, String workId, int tix, long count, long elapsed) {
         Event event = new Event(job, workId, tix, null, count, elapsed, null);

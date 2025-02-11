@@ -143,7 +143,7 @@ public abstract class Workload {
 
     }
 
-    public static final String PADDING = "                                        ";
+    public static final String PADDING = "                                                                                                                                                                ";
     public static String pad(Object s, int width) {
         return (s + PADDING).substring(0, width);
     }
