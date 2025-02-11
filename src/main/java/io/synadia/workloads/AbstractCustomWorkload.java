@@ -40,6 +40,8 @@ public abstract class AbstractCustomWorkload extends Workload {
     protected String watchDateFormat;
 
     public void customWorkloadInit(String defaultLabel, boolean requiresArguments, CommandLine commandLine) {
+        Debug.PRINT_TIME = false;
+
         init(defaultLabel, commandLine);
         if (requiresArguments && commandLine.args.isEmpty()) {
             exit("Argument(s) Required");
@@ -285,7 +287,7 @@ public abstract class AbstractCustomWorkload extends Workload {
         WorkState ws = new WorkState();
         for (int tix = 0; tix < threadCount; tix++) {
             Thread t = new Thread(worker.getWork(options.get(tix), tix, ws));
-            t.setName("Thread-" + job.charAt(0) + "-" + tix);
+            t.setName("" + job.charAt(0) + tix);
             t.start();
             threads.add(t);
         }
