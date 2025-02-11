@@ -285,7 +285,7 @@ public abstract class AbstractCustomWorkload extends Workload {
         WorkState ws = new WorkState();
         for (int tix = 0; tix < threadCount; tix++) {
             Thread t = new Thread(worker.getWork(options.get(tix), tix, ws));
-            t.setName("Thread " + tix + " ");
+            t.setName(job + "(" + tix + ") ");
             t.start();
             threads.add(t);
         }
