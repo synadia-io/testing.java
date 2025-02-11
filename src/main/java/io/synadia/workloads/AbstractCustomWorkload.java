@@ -35,7 +35,6 @@ public abstract class AbstractCustomWorkload extends Workload {
     protected String exStreamName;
     protected String exSubjectPrefix;
     protected String exStreamSubject;
-    protected int defaultWorkerThreadCount;
     protected long watchFrequency;
     protected int progressFrequency;
     protected String watchDateFormat;
@@ -52,7 +51,6 @@ public abstract class AbstractCustomWorkload extends Workload {
         exStreamName = JsonValueUtils.readString(params.jv, "ex_stream_name", "exception");
         exSubjectPrefix = JsonValueUtils.readString(params.jv, "ex_subject_prefix", "ex.");
         exStreamSubject = JsonValueUtils.readString(params.jv, "ex_stream_subject", "ex.>");
-        defaultWorkerThreadCount = JsonValueUtils.readInteger(params.jv, "default_worker_thread_count", 3);
         watchFrequency = JsonValueUtils.readLong(params.jv, "watch_frequency", 5000);
         progressFrequency = JsonValueUtils.readInteger(params.jv, "progress_frequency", 100);
         watchDateFormat = JsonValueUtils.readString(params.jv, "watch_date_format", "HH:mm:ss.SSS");
@@ -63,7 +61,6 @@ public abstract class AbstractCustomWorkload extends Workload {
         Debug.info(workLabel, "exSubjectPrefix", exSubjectPrefix);
         Debug.info(workLabel, "logStreamSubject", logStreamSubject);
         Debug.info(workLabel, "exStreamSubject", exStreamSubject);
-        Debug.info(workLabel, "defaultWorkerThreadCount", defaultWorkerThreadCount);
         Debug.info(workLabel, "watchFrequency", watchFrequency);
         Debug.info(workLabel, "progressFrequency", progressFrequency);
         Debug.info(workLabel, "watchDateFormat", watchDateFormat);
@@ -226,11 +223,12 @@ public abstract class AbstractCustomWorkload extends Workload {
                     }
                 }
             }
-            catch (IOException | JetStreamApiException ignore) {
-            }
+            catch (IOException | JetStreamApiException ignore) {}
         }
 
-        System.out.println(detail ? DETAIL_FOOT_LINE : NON_DETAIL_FOOT_LINE);
+        if (!first) {
+            System.out.println(detail ? DETAIL_FOOT_LINE : NON_DETAIL_FOOT_LINE);
+        }
     }
 
     // ----------------------------------------------------------------------------------------------------
@@ -280,10 +278,6 @@ public abstract class AbstractCustomWorkload extends Workload {
         Runnable getWork(Options options, int tix, WorkState workState);
     }
 
-    protected void doWorker(String job, Worker worker) throws InterruptedException {
-        doWorker(job, defaultWorkerThreadCount, worker);
-    }
-
     protected void doWorker(String job, int threadCount, Worker worker) throws InterruptedException {
         startJob(job);
         List<Options> options = roundRobinOptions(threadCount);
@@ -291,6 +285,7 @@ public abstract class AbstractCustomWorkload extends Workload {
         WorkState ws = new WorkState();
         for (int tix = 0; tix < threadCount; tix++) {
             Thread t = new Thread(worker.getWork(options.get(tix), tix, ws));
+            t.setName("Thread-" + job.charAt(0) + "-" + tix);
             t.start();
             threads.add(t);
         }

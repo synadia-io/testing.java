@@ -23,25 +23,32 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
     protected String dataStreamName;
     protected String dataSubjectPrefix;
     protected String dataStreamSubject;
+    protected long dataMaxMessages;
+
     protected String queueStreamName;
     protected String queueSubject;
     protected String queueConsumerName;
-    private String infoJob;
+    protected long queueMaxMessages;
+
     private String produceJob;
-    private String consumeJob;
-    private int consumerCount;
-    private int consumeBatch;
-    private int infoThreadCount;
+    private int produceThreadCount;
     private long produceReportFrequency;
-    private long consumeReportFrequency;
-    private long infoReportFrequency;
     private long produceJitter;
     private long produceFullJitter;
-    private long consumeJitter;
-    private long infoJitter;
     private int produceMessageMin;
     private int produceMessageMax;
-    private long maxMessages;
+
+    private String consumeJob;
+    private int consumeThreadCount;
+    private int consumeMaxConsumers;
+    private int consumeBatch;
+    private long consumeReportFrequency;
+    private long consumeJitter;
+
+    private String infoJob;
+    private int infoThreadCount;
+    private long infoReportFrequency;
+    private long infoJitter;
 
     @Override
     public void init(CommandLine commandLine) {
@@ -50,48 +57,62 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
         dataStreamName = JsonValueUtils.readString(params.jv, "data_stream_name", "data");
         dataSubjectPrefix = JsonValueUtils.readString(params.jv, "data_subject_prefix", "data.");
         dataStreamSubject = JsonValueUtils.readString(params.jv, "data_stream_subject", "data.>");
+        dataMaxMessages = JsonValueUtils.readLong(params.jv, "data_max_messages", 1_000_000);
+
         queueStreamName = JsonValueUtils.readString(params.jv, "queue_stream_name", "queue");
         queueSubject = JsonValueUtils.readString(params.jv, "queue_subject", "qsub");
         queueConsumerName = JsonValueUtils.readString(params.jv, "queue_consumer_name", "qcon");
-        infoJob = JsonValueUtils.readString(params.jv, "info_job", "Info");
+        queueMaxMessages = JsonValueUtils.readLong(params.jv, "queue_max_messages", 1_000_000);
+
         produceJob = JsonValueUtils.readString(params.jv, "produce_job", "Produce");
-        consumeJob = JsonValueUtils.readString(params.jv, "consume_job", "Consume");
-        consumerCount = JsonValueUtils.readInteger(params.jv, "consumer_count", 10_000);
-        consumeBatch = JsonValueUtils.readInteger(params.jv, "consume_batch", 10);
-        infoThreadCount = JsonValueUtils.readInteger(params.jv, "info_thread_count", 8);
+        produceThreadCount = JsonValueUtils.readInteger(params.jv, "produce_thread_count", 3);
         produceReportFrequency = JsonValueUtils.readLong(params.jv, "produce_report_frequency", 100);
-        consumeReportFrequency = JsonValueUtils.readLong(params.jv, "consume_report_frequency", 100);
-        infoReportFrequency = JsonValueUtils.readLong(params.jv, "info_report_frequency", 1000);
         produceJitter = JsonValueUtils.readLong(params.jv, "produce_jitter", 50);
         produceFullJitter = JsonValueUtils.readLong(params.jv, "produce_full_jitter", 1000);
-        consumeJitter = JsonValueUtils.readLong(params.jv, "consume_jitter", 250);
-        infoJitter = JsonValueUtils.readLong(params.jv, "info_jitter", 10_000);
         produceMessageMin = JsonValueUtils.readInteger(params.jv, "produce_message_min", 10);
         produceMessageMax = JsonValueUtils.readInteger(params.jv, "produce_message_max", 100);
-        maxMessages = JsonValueUtils.readLong(params.jv, "max_messages", 1_000_000);
+
+        consumeJob = JsonValueUtils.readString(params.jv, "consume_job", "Consume");
+        consumeThreadCount = JsonValueUtils.readInteger(params.jv, "consume_thread_count", 3);
+        consumeMaxConsumers = JsonValueUtils.readInteger(params.jv, "consume_max_consumers", 10_000);
+        consumeBatch = JsonValueUtils.readInteger(params.jv, "consume_batch", 10);
+        consumeJitter = JsonValueUtils.readLong(params.jv, "consume_jitter", 250);
+        consumeReportFrequency = JsonValueUtils.readLong(params.jv, "consume_report_frequency", 100);
+
+        infoJob = JsonValueUtils.readString(params.jv, "info_job", "Info");
+        infoThreadCount = JsonValueUtils.readInteger(params.jv, "info_thread_count", 8);
+        infoReportFrequency = JsonValueUtils.readLong(params.jv, "info_report_frequency", 1000);
+        infoJitter = JsonValueUtils.readLong(params.jv, "info_jitter", 10_000);
 
         Debug.info(workLabel, "dataStreamName", dataStreamName);
         Debug.info(workLabel, "dataSubjectPrefix", dataSubjectPrefix);
         Debug.info(workLabel, "dataStreamSubject", dataStreamSubject);
+        Debug.info(workLabel, "dataMaxMessages", dataMaxMessages);
+
         Debug.info(workLabel, "queueStreamName", queueStreamName);
         Debug.info(workLabel, "queueSubject", queueSubject);
         Debug.info(workLabel, "queueConsumerName", queueConsumerName);
-        Debug.info(workLabel, "infoJob", infoJob);
+        Debug.info(workLabel, "queueMaxMessages", queueMaxMessages);
+
         Debug.info(workLabel, "produceJob", produceJob);
-        Debug.info(workLabel, "consumeJob", consumeJob);
-        Debug.info(workLabel, "consumerCount", consumerCount);
-        Debug.info(workLabel, "consumeBatch", consumeBatch);
-        Debug.info(workLabel, "infoThreadCount", infoThreadCount);
+        Debug.info(workLabel, "produceThreadCount", produceThreadCount);
         Debug.info(workLabel, "produceReportFrequency", produceReportFrequency);
-        Debug.info(workLabel, "consumeReportFrequency", consumeReportFrequency);
-        Debug.info(workLabel, "infoReportFrequency", infoReportFrequency);
         Debug.info(workLabel, "produceJitter", produceJitter);
-        Debug.info(workLabel, "produceJitter", produceFullJitter);
-        Debug.info(workLabel, "consumeJitter", consumeJitter);
-        Debug.info(workLabel, "infoJitter", infoJitter);
+        Debug.info(workLabel, "produceFullJitter", produceFullJitter);
         Debug.info(workLabel, "produceMessageMin", produceMessageMin);
         Debug.info(workLabel, "produceMessageMax", produceMessageMax);
-        Debug.info(workLabel, "maxMessages", maxMessages);
+
+        Debug.info(workLabel, "consumeJob", consumeJob);
+        Debug.info(workLabel, "consumeThreadCount", consumeThreadCount);
+        Debug.info(workLabel, "consumeMaxConsumers", consumeMaxConsumers);
+        Debug.info(workLabel, "consumeBatch", consumeBatch);
+        Debug.info(workLabel, "consumeReportFrequency", consumeReportFrequency);
+        Debug.info(workLabel, "consumeJitter", consumeJitter);
+
+        Debug.info(workLabel, "infoJob", infoJob);
+        Debug.info(workLabel, "infoThreadCount", infoThreadCount);
+        Debug.info(workLabel, "infoReportFrequency", infoReportFrequency);
+        Debug.info(workLabel, "infoJitter", infoJitter);
     }
 
     @Override
@@ -106,8 +127,8 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
             switch (arg) {
                 case "setup"   -> doSetup(nc);
                 case "list"    -> doList(nc);
-                case "produce" -> doWorker(produceJob, this::produceWorker);
-                case "consume" -> doWorker(consumeJob, this::consumeWorker);
+                case "produce" -> doWorker(produceJob, produceThreadCount, this::produceWorker);
+                case "consume" -> doWorker(consumeJob, consumeThreadCount, this::consumeWorker);
                 case "info"    -> doWorker(infoJob, infoThreadCount, this::infoWorker);
                 case "watch"   -> doWatch(nc, dataStreamName, queueStreamName);
                 case "stream"  -> doStream(nc);
@@ -126,7 +147,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
             .name(dataStreamName)
             .subjects(dataStreamSubject)
             .retentionPolicy(RetentionPolicy.WorkQueue)
-            .maxMessages(maxMessages)
+            .maxMessages(dataMaxMessages)
             .build());
         printFormatted(si.getJv());
 
@@ -134,7 +155,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
             .name(queueStreamName)
             .subjects(queueSubject)
             .retentionPolicy(RetentionPolicy.WorkQueue)
-            .maxMessages(maxMessages)
+            .maxMessages(queueMaxMessages)
             .build());
         printFormatted(si.getJv());
 
@@ -249,19 +270,17 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                 printConnect(nc, produceJob, ws.workId, tix);
                 jitter(produceJitter / 10);
                 int full = 5;
-                boolean doJitter = true;
                 while (true) {
                     try {
                         StreamInfo si = jsm.getStreamInfo(dataStreamName);
                         long siCount = si.getStreamState().getConsumerCount();
-                        if (siCount >= consumerCount) {
-                            print(produceJob, ws.workId, tix, null, 0, ws.elapse(), "* System is full. " + siCount + "/" + consumerCount);
-                            if (++full > 15) {
-                                full = 1;
+                        if (siCount >= consumeMaxConsumers) {
+                            print(produceJob, ws.workId, tix, null, 0, ws.elapse(), "* System is full. " + siCount + "/" + consumeMaxConsumers);
+                            if (++full > 10) { // escalates the number of jitters
+                                full = 1;      // restarts the escalation
                             }
                         }
                         else {
-                            doJitter = siCount > (consumerCount / 2);
                             full = 0;
                             String consumerName = generateConsumerName();
                             String dataSubject = toDataSubject(consumerName);
@@ -295,7 +314,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                             jitter(produceFullJitter);
                         }
                     }
-                    else if (doJitter) {
+                    else {
                         jitter(produceJitter);
                     }
                 }
