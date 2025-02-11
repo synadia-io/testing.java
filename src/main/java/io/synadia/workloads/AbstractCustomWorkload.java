@@ -21,7 +21,8 @@ import java.util.concurrent.locks.ReentrantLock;
 import static io.nats.client.support.JsonUtils.printFormatted;
 import static io.nats.jsmulti.shared.Stats.humanTime;
 import static io.nats.jsmulti.shared.Utils.sleep;
-import static io.synadia.utils.Constants.FULL_DATE_NO_TZ_FORMATTER;
+import static io.synadia.utils.Constants.FULL_DATE_FORMATTER_ALT;
+import static io.synadia.utils.Constants.TIME_FORMATTER;
 
 @SuppressWarnings("SameParameterValue")
 public abstract class AbstractCustomWorkload extends Workload {
@@ -109,23 +110,23 @@ public abstract class AbstractCustomWorkload extends Workload {
         nc.jetStreamManagement().purgeStream(exStreamName);
     }
 
-    public static final String SUMMARY_TOP_LINE    = "├──────────────┬────────────┼────────────┬────────────┬────────────┬────────────┐";
+    public static final String SUMMARY_TOP_LINE    = "├──────────────┬────────────┬────────────┬────────────┬────────────┬────────────┤";
     public static final String SUMMARY_LINE_HEADER = "│ Stream       │   Messages │   Subjects │  Consumers │ First Seq  │   Last Seq │";
     public static final String SUMMARY_SEP_LINE    = "├──────────────┼────────────┼────────────┼────────────┼────────────┼────────────┤";
     public static final String SUMMARY_FOOT_LINE   = "└──────────────┴────────────┴────────────┴────────────┴────────────┴────────────┘";
     public static final String SUMMARY_LINE_FORMAT = "│ %-12s │ %10d │ %10d │ %10d │ %10d │ %10d │\n";
 
-    public static final String DETAIL_TOP_LINE    = "├────────────────┬────────────────┼───────────────────────────────────────────────────────────────────────────────────────────┐";
-    public static final String DETAIL_LINE_HEADER = "│ ? Job (Thread) │ Elapsed        │ Details                                                                                   │";
-    public static final String DETAIL_SEP_LINE    = "├────────────────┼────────────────┼───────────────────────────────────────────────────────────────────────────────────────────┤";
-    public static final String DETAIL_FOOT_LINE   = "└────────────────┴────────────────┴───────────────────────────────────────────────────────────────────────────────────────────┘";
-    public static final String DETAIL_LINE_FORMAT = "│ %-14s │ %-14s │ %60s │\n";
+    public static final String EX_TOP_LINE    = "├────────────────┬───────────────────┬────────────────┬────────────────────────────────────────────────────────────────────────────────────────────┤";
+    public static final String EX_LINE_HEADER = "│ ? Job (Thread) │ Message Time      │ Elapsed        │ Details                                                                                    │";
+    public static final String EX_SEP_LINE    = "├────────────────┼───────────────────┼────────────────┼────────────────────────────────────────────────────────────────────────────────────────────┤";
+    public static final String EX_FOOT_LINE   = "└────────────────┴───────────────────┴────────────────┴────────────────────────────────────────────────────────────────────────────────────────────┘";
+    public static final String EX_LINE_FORMAT = "│ %-14s │ %-17s │ %-14s │ %90s │\n";
 
-    public static final String NON_DETAIL_TOP_LINE    = "├────────────────┬────────────────┬───────────────┤";
-    public static final String NON_DETAIL_LINE_HEADER = "│ ? Job (Thread) │ Count          │ Elapsed       │";
-    public static final String NON_DETAIL_SEP_LINE    = "├────────────────┼────────────────┼───────────────┤";
-    public static final String NON_DETAIL_FOOT_LINE   = "└────────────────┴────────────────┴───────────────┘";
-    public static final String NON_DETAIL_LINE_FORMAT = "│ %-14s │ %-14s │ %-13s │\n";
+    public static final String TOP_LINE    = "├────────────────┬────────────────┬───────────────┤";
+    public static final String LINE_HEADER = "│ ? Job (Thread) │ Count          │ Elapsed       │";
+    public static final String SEP_LINE    = "├────────────────┼────────────────┼───────────────┤";
+    public static final String FOOT_LINE   = "└────────────────┴────────────────┴───────────────┘";
+    public static final String LINE_FORMAT = "│ %-14s │ %-14s │ %-13s │\n";
 
     @SuppressWarnings("InfiniteLoopStatement")
     protected void doWatch(Connection nc, String... customStreams) throws IOException {
@@ -136,8 +137,9 @@ public abstract class AbstractCustomWorkload extends Workload {
             try {
                 System.out.println();
                 System.out.println();
-                System.out.println("┌───────────────────────────┐");
-                System.out.println("│ " + FULL_DATE_NO_TZ_FORMATTER.format(new Date()) + "   │");
+                System.out.println();
+                System.out.println("┌───────────────────────────────────────────────────────────────────────────────┐");
+                System.out.println("│ Stream Information                               " + FULL_DATE_FORMATTER_ALT.format(new Date()) + " │");
 
                 // STREAM SUMMARIES
                 System.out.println(SUMMARY_TOP_LINE);
@@ -151,8 +153,8 @@ public abstract class AbstractCustomWorkload extends Workload {
                 System.out.println(SUMMARY_FOOT_LINE);
 
                 watchStream(jsm, watchMap, true, exStreamName, exSs, v -> {
-                    System.out.println("┌─────────────────────────────────┐");
-                    System.out.println("│ Exceptions                      │");
+                    System.out.println("┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐");
+                    System.out.println("│ Exceptions                                                                                                                                       │");
                 });
 
                 watchStream(jsm, watchMap, false, logStreamName, logSs, v -> {
@@ -174,7 +176,7 @@ public abstract class AbstractCustomWorkload extends Workload {
         return ss;
     }
 
-    private void watchStream(JetStreamManagement jsm, Map<String, Event> watchMap, boolean detail, String streamName, StreamState ss, java.util.function.Consumer<Void> beforeFirst) {
+    private void watchStream(JetStreamManagement jsm, Map<String, Event> watchMap, boolean isEx, String streamName, StreamState ss, java.util.function.Consumer<Void> beforeFirst) {
         List<String> allSubjects = new ArrayList<>();
         for (Subject subject : ss.getSubjects()) {
             allSubjects.add(subject.getName());
@@ -189,15 +191,15 @@ public abstract class AbstractCustomWorkload extends Workload {
                     if (first) {
                         first = false;
                         beforeFirst.accept(null);
-                        if (detail) {
-                            System.out.println(DETAIL_TOP_LINE);
-                            System.out.println(DETAIL_LINE_HEADER);
-                            System.out.println(DETAIL_SEP_LINE);
+                        if (isEx) {
+                            System.out.println(EX_TOP_LINE);
+                            System.out.println(EX_LINE_HEADER);
+                            System.out.println(EX_SEP_LINE);
                         }
                         else {
-                            System.out.println(NON_DETAIL_TOP_LINE);
-                            System.out.println(NON_DETAIL_LINE_HEADER);
-                            System.out.println(NON_DETAIL_SEP_LINE);
+                            System.out.println(TOP_LINE);
+                            System.out.println(LINE_HEADER);
+                            System.out.println(SEP_LINE);
                         }
                     }
                     Event prev = watchMap.get(subject);
@@ -210,24 +212,27 @@ public abstract class AbstractCustomWorkload extends Workload {
 
                     String ht = humanTime(event.elapsed);
 
-                    if (detail) {
-                        String deets = event.exceptionClass == null ? "" : event.exceptionClass + ": " + event.exceptionMessage.trim() + "                    ";
-                        System.out.printf(DETAIL_LINE_FORMAT, job, ht, deets);
+                    if (isEx) {
+                        String time = TIME_FORMATTER.format(Date.from(mi.getTime().toInstant()));
+                        String deets = event.exceptionClass == null ? "" : event.exceptionClass + ": " + event.exceptionMessage + "                    ";
+                        System.out.printf(EX_LINE_FORMAT, job, time, ht, deets);
                     }
                     else {
                         String cnt = "";
                         if (event.count > 0) {
                             cnt = String.format("%,d", event.count);
                         }
-                        System.out.printf(NON_DETAIL_LINE_FORMAT, job, cnt, ht);
+                        System.out.printf(LINE_FORMAT, job, cnt, ht);
                     }
                 }
             }
-            catch (IOException | JetStreamApiException ignore) {}
+            catch (Exception e) {
+                System.out.println("INTERNAL ERROR: " + e);
+            }
         }
 
         if (!first) {
-            System.out.println(detail ? DETAIL_FOOT_LINE : NON_DETAIL_FOOT_LINE);
+            System.out.println(isEx ? EX_FOOT_LINE : FOOT_LINE);
         }
     }
 
