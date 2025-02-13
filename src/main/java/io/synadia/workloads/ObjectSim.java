@@ -1,7 +1,10 @@
 package io.synadia.workloads;
 
 import io.nats.client.*;
+import io.nats.client.api.ConsumerConfiguration;
 import io.nats.client.api.ObjectStoreConfiguration;
+import io.nats.client.api.RetentionPolicy;
+import io.nats.client.api.StreamConfiguration;
 import io.nats.client.support.JsonValueUtils;
 import io.synadia.CommandLine;
 import io.synadia.utils.Debug;
@@ -89,6 +92,7 @@ public class ObjectSim extends AbstractCustomWorkload {
         switch (arg) {
             case "put"     -> doWorker(putJob, putThreadCount, this::putWorker);
             case "get"     -> doWorker(getJob, getThreadCount, this::getWorker);
+            case "watch"   -> doWatch(queueStreamName);
             default        -> { return false; }
         }
         return true;
@@ -106,6 +110,15 @@ public class ObjectSim extends AbstractCustomWorkload {
             .name(bucketName)
             .compression(bucketCompression)
             .build());
+
+        addStream(jsm, StreamConfiguration.builder()
+            .name(queueStreamName)
+            .subjects(queueSubject)
+            .retentionPolicy(RetentionPolicy.WorkQueue)
+            .maxMessages(queueMaxMessages)
+            .build());
+
+        jsm.createConsumer(queueStreamName, ConsumerConfiguration.builder().durable(queueConsumerName).filterSubject(queueSubject).build());
     }
 
     @SuppressWarnings("InfiniteLoopStatement")

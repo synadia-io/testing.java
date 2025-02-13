@@ -116,21 +116,24 @@ public abstract class AbstractCustomWorkload extends Workload {
             for (String streamName : streamNames) {
                 jsm.deleteStream(streamName);
             }
-            StreamInfo si = jsm.addStream(StreamConfiguration.builder()
+            addStream(jsm, StreamConfiguration.builder()
                 .name(logStreamName)
                 .subjects(logStreamSubject)
                 .retentionPolicy(RetentionPolicy.Limits)
                 .maxAge(Duration.ofMinutes(60))
                 .build());
-            printFormatted(si.getJv());
-            si = jsm.addStream(StreamConfiguration.builder()
+            addStream(jsm, StreamConfiguration.builder()
                 .name(exStreamName)
                 .subjects(exStreamSubject)
                 .build());
-            printFormatted(si.getJv());
 
             subDoSetup(nc, jsm);
         });
+    }
+
+    protected static void addStream(JetStreamManagement jsm, StreamConfiguration sc) throws IOException, JetStreamApiException {
+        StreamInfo si = jsm.addStream(sc);
+        printFormatted(si.getJv());
     }
 
     protected void subDoSetup(Connection nc, JetStreamManagement jsm) throws IOException, JetStreamApiException, InterruptedException {}

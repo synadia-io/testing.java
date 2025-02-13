@@ -17,7 +17,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
-import static io.nats.client.support.JsonUtils.printFormatted;
 import static io.nats.jsmulti.shared.Utils.sleep;
 
 public class ConsumerInfoSim extends AbstractCustomWorkload {
@@ -140,21 +139,19 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
 
     @Override
     protected void subDoSetup(Connection nc, JetStreamManagement jsm) throws IOException, JetStreamApiException, InterruptedException {
-        StreamInfo si = jsm.addStream(StreamConfiguration.builder()
+        addStream(jsm, StreamConfiguration.builder()
             .name(dataStreamName)
             .subjects(dataStreamSubject)
             .retentionPolicy(RetentionPolicy.WorkQueue)
             .maxMessages(dataMaxMessages)
             .build());
-        printFormatted(si.getJv());
 
-        si = jsm.addStream(StreamConfiguration.builder()
+        addStream(jsm, StreamConfiguration.builder()
             .name(queueStreamName)
             .subjects(queueSubject)
             .retentionPolicy(RetentionPolicy.WorkQueue)
             .maxMessages(queueMaxMessages)
             .build());
-        printFormatted(si.getJv());
 
         jsm.createConsumer(queueStreamName, ConsumerConfiguration.builder().durable(queueConsumerName).filterSubject(queueSubject).build());
     }
