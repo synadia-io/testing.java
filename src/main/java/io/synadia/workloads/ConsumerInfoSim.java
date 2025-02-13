@@ -30,6 +30,8 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
     protected String queueConsumerName;
     protected long queueMaxMessages;
 
+    private int maxConsumers;
+
     private String produceJob;
     private int produceThreadCount;
     private long produceReportFrequency;
@@ -40,7 +42,6 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
 
     private String consumeJob;
     private int consumeThreadCount;
-    private int consumeMaxConsumers;
     private int consumeBatch;
     private long consumeReportFrequency;
     private long consumeJitter;
@@ -64,6 +65,8 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
         queueConsumerName = JsonValueUtils.readString(params.jv, "queue_consumer_name", "qcon");
         queueMaxMessages = JsonValueUtils.readLong(params.jv, "queue_max_messages", 1_000_000);
 
+        maxConsumers = JsonValueUtils.readInteger(params.jv, "max_consumers", 10_000);
+
         produceJob = JsonValueUtils.readString(params.jv, "produce_job", "Produce");
         produceThreadCount = JsonValueUtils.readInteger(params.jv, "produce_thread_count", 3);
         produceReportFrequency = JsonValueUtils.readLong(params.jv, "produce_report_frequency", 100);
@@ -74,7 +77,6 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
 
         consumeJob = JsonValueUtils.readString(params.jv, "consume_job", "Consume");
         consumeThreadCount = JsonValueUtils.readInteger(params.jv, "consume_thread_count", 3);
-        consumeMaxConsumers = JsonValueUtils.readInteger(params.jv, "consume_max_consumers", 10_000);
         consumeBatch = JsonValueUtils.readInteger(params.jv, "consume_batch", 10);
         consumeJitter = JsonValueUtils.readLong(params.jv, "consume_jitter", 250);
         consumeReportFrequency = JsonValueUtils.readLong(params.jv, "consume_report_frequency", 100);
@@ -94,6 +96,8 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
         Debug.info(workLabel, "queueConsumerName", queueConsumerName);
         Debug.info(workLabel, "queueMaxMessages", queueMaxMessages);
 
+        Debug.info(workLabel, "maxConsumers", maxConsumers);
+
         Debug.info(workLabel, "produceJob", produceJob);
         Debug.info(workLabel, "produceThreadCount", produceThreadCount);
         Debug.info(workLabel, "produceReportFrequency", produceReportFrequency);
@@ -104,7 +108,6 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
 
         Debug.info(workLabel, "consumeJob", consumeJob);
         Debug.info(workLabel, "consumeThreadCount", consumeThreadCount);
-        Debug.info(workLabel, "consumeMaxConsumers", consumeMaxConsumers);
         Debug.info(workLabel, "consumeBatch", consumeBatch);
         Debug.info(workLabel, "consumeReportFrequency", consumeReportFrequency);
         Debug.info(workLabel, "consumeJitter", consumeJitter);
@@ -269,19 +272,19 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                 JetStream js = nc.jetStream();
                 printConnect(nc, produceJob, ws.workId, tix);
                 jitter(produceJitter / 10);
-                int full = 5;
+                int cutoff = maxConsumers;
                 while (true) {
                     try {
                         StreamInfo si = jsm.getStreamInfo(dataStreamName);
                         long siCount = si.getStreamState().getConsumerCount();
-                        if (siCount >= consumeMaxConsumers) {
-                            print(produceJob, ws.workId, tix, null, 0, ws.elapse(), "* System is full. " + siCount + "/" + consumeMaxConsumers);
-                            if (++full > 10) { // escalates the number of jitters
-                                full = 1;      // restarts the escalation
+                        if (siCount >= cutoff) {
+                            if (cutoff == maxConsumers) {
+                                cutoff = maxConsumers * 10 / 100; // 10 percent
+                                print(produceJob, ws.workId, tix, null, 0, ws.elapse(), "* System is full. " + siCount + "/" + maxConsumers);
                             }
                         }
                         else {
-                            full = 0;
+                            cutoff = maxConsumers;
                             String consumerName = generateConsumerName();
                             String dataSubject = toDataSubject(consumerName);
                             int messageCount = ThreadLocalRandom.current().nextInt(produceMessageMin, produceMessageMax + 1);
@@ -309,14 +312,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                     catch (IOException | JetStreamApiException e) {
                         log(js, produceJob, ws.workId, ws.elapse(), e);
                     }
-                    if (full > 0) {
-                        for (int r = 0; r < full; r++) {
-                            jitter(produceFullJitter);
-                        }
-                    }
-                    else {
-                        jitter(produceJitter);
-                    }
+                    jitter(produceFullJitter);
                 }
             }
             catch (InterruptedException | IOException e) {
