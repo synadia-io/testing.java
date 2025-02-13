@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static io.nats.client.support.JsonUtils.printFormatted;
+import static io.nats.jsmulti.shared.Utils.sleep;
 
 public class ConsumerInfoSim extends AbstractCustomWorkload {
     protected String dataStreamName;
@@ -124,28 +125,21 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
     }
 
     @Override
-    public void runWorkload() throws Exception {
-        try (Connection nc = Nats.connect(getAdminOptions())) {
-            String arg = commandLine.args.getFirst();
-            switch (arg) {
-                case "setup"   -> doSetup(nc);
-                case "list"    -> doList(nc);
-                case "produce" -> doWorker(produceJob, produceThreadCount, this::produceWorker);
-                case "consume" -> doWorker(consumeJob, consumeThreadCount, this::consumeWorker);
-                case "info"    -> doWorker(infoJob, infoThreadCount, this::infoWorker);
-                case "watch"   -> doWatch(nc, dataStreamName, queueStreamName);
-                case "stream"  -> doStream(nc);
-                case "clear"   -> doClear(nc);
-                case "purge"   -> doPurge(nc);
-                default        -> exit("Unknown custom workload");
-            }
+    protected boolean subRunWorkload(String arg) throws Exception {
+        switch (arg) {
+            case "list"    -> doList();
+            case "produce" -> doWorker(produceJob, produceThreadCount, this::produceWorker);
+            case "consume" -> doWorker(consumeJob, consumeThreadCount, this::consumeWorker);
+            case "info"    -> doWorker(infoJob, infoThreadCount, this::infoWorker);
+            case "watch"   -> doWatch(dataStreamName, queueStreamName);
+            case "stream"  -> doStream();
+            default        -> { return false; }
         }
+        return true;
     }
 
-    protected void doSetup(Connection nc) throws IOException, JetStreamApiException {
-        JetStreamManagement jsm = nc.jetStreamManagement();
-        super.doSetup(jsm);
-
+    @Override
+    protected void subDoSetup(Connection nc, JetStreamManagement jsm) throws IOException, JetStreamApiException, InterruptedException {
         StreamInfo si = jsm.addStream(StreamConfiguration.builder()
             .name(dataStreamName)
             .subjects(dataStreamSubject)
@@ -165,66 +159,52 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
         jsm.createConsumer(queueStreamName, ConsumerConfiguration.builder().durable(queueConsumerName).filterSubject(queueSubject).build());
     }
 
-    private void doList(Connection nc) throws IOException, JetStreamApiException {
-        startProgressJob("List Consumers");
-        JetStreamManagement jsm = nc.jetStreamManagement();
-        List<String> consumerNames = jsm.getConsumerNames(dataStreamName);
-        consumerNames.forEach(cn -> System.out.println("Consumer: " + cn));
-        System.out.println("Total: " + consumerNames.size());
+    private void doList() throws IOException, JetStreamApiException, InterruptedException {
+        runAdminCommand((nc, jsm) -> {
+            startProgressJob("List Consumers");
+            List<String> consumerNames = jsm.getConsumerNames(dataStreamName);
+            consumerNames.forEach(cn -> System.out.println("Consumer: " + cn));
+            System.out.println("Total: " + consumerNames.size());
+        });
     }
 
-    private void doClear(Connection nc) throws IOException, JetStreamApiException {
-        String option = getStringArgFromPosition(2);
-        if (option == null || option.isEmpty()) {
-            exit("Clear option not provided");
-            return;
-        }
+    @Override
+    protected boolean subDoClear(String option) throws IOException, JetStreamApiException, InterruptedException {
         switch (option) {
-            case "consumers" -> {
-                startProgressJob("Clear Consumers");
-                JetStreamManagement jsm = nc.jetStreamManagement();
-                List<String> list = jsm.getConsumerNames(dataStreamName);
-                int index = 0;
-                while (index < list.size()) {
-                    String cn = list.get(index);
-                    jsm.deleteConsumer(dataStreamName, cn);
-                    showProgressMaybe(++index, "Clear Consumers");
-                }
-                endProgress(index);
+            case "consumers" -> doClearConsumers();
+            case "data"      -> doClearData();
+            case "queue"     -> doClearQueue();
+            default          -> { return false; } // unknown option returns false, others fall through to return true
+        }
+        return true;
+    }
+
+    private void doClearConsumers() throws IOException, JetStreamApiException, InterruptedException {
+        runAdminCommand((nc, jsm) -> {
+            startProgressJob("Clear Consumers");
+            List<String> list = jsm.getConsumerNames(dataStreamName);
+            int index = 0;
+            while (index < list.size()) {
+                String cn = list.get(index);
+                jsm.deleteConsumer(dataStreamName, cn);
+                showProgressMaybe(++index, "Clear Consumers");
             }
-            case "data" -> doClearData(nc);
-            case "queue" -> doClearQueue(nc);
-            case "log" -> doClearLog(nc);
-            case "ex" -> doClearExceptions(nc);
-            default -> exit("Unknown clear option: '" + option + "'");
-        }
+            endProgress(index);
+        });
     }
 
-    protected void doClearData(Connection nc) throws IOException, JetStreamApiException {
-        startJob("Clear Data");
-        nc.jetStreamManagement().purgeStream(dataStreamName);
+    private void doClearData() throws IOException, JetStreamApiException, InterruptedException {
+        runAdminCommand((nc, jsm) -> {
+            startJob("Clear Data");
+            nc.jetStreamManagement().purgeStream(dataStreamName);
+        });
     }
 
-    protected void doClearQueue(Connection nc) throws IOException, JetStreamApiException {
-        startJob("Clear Queue");
-        nc.jetStreamManagement().purgeStream(dataStreamName);
-    }
-
-    private void doPurge(Connection nc) throws IOException, JetStreamApiException {
-        String code = getStringArgFromPosition(2);
-        if (code == null || code.isEmpty()) {
-            exit("Purge option not provided");
-        }
-        else {
-            JetStreamManagement jsm = nc.jetStreamManagement();
-            String purge = logSubjectPrefix + code + ".>";
-            startProgressJob("Purge: " + code + "(" + purge + ")");
-            jsm.purgeStream(logStreamName, PurgeOptions.builder().subject(purge).build());
-        }
-    }
-
-    private void printConnect(Connection nc, String job, String workId, int tix) {
-        print(job, workId, tix, "connect", 0, 0, nc.getServerInfo().getServerId());
+    private void doClearQueue() throws IOException, JetStreamApiException, InterruptedException {
+        runAdminCommand((nc, jsm) -> {
+            startJob("Clear Queue");
+            nc.jetStreamManagement().purgeStream(dataStreamName);
+        });
     }
 
     static class QueueData implements JsonSerializable {
@@ -428,55 +408,56 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
-    protected void doStream(Connection nc) throws Exception {
-        startJob("Stream");
-        String streamName = getStringArgFromPosition(2);
-        if (streamName == null || streamName.isEmpty()) {
-            exit("Stream not provided");
-        }
-        JetStreamManagement jsm = nc.jetStreamManagement();
-        StreamInfo si = jsm.getStreamInfo(streamName);
-        long seq = si.getStreamState().getFirstSequence();
-        seq = getLongArgFromPosition(3, seq);
-        long last = si.getStreamState().getLastSequence();
-        int tracker = 0;
-        while (true) {
-            if (seq > last) {
-                si = jsm.getStreamInfo(streamName);
-                long currentLast = si.getStreamState().getLastSequence();
-                last = si.getStreamState().getLastSequence();
-                if (currentLast <= last) {
-                    Thread.sleep(1000);
-                    continue;
-                }
+    protected void doStream() throws Exception {
+        runAdminCommand((nc, jsm) -> {
+            startJob("Stream");
+            String streamName = getStringArgFromPosition(2);
+            if (streamName == null || streamName.isEmpty()) {
+                exit("Stream not provided");
             }
-            try {
-                MessageInfo mi = jsm.getNextMessage(streamName, seq, ">");
-                seq = mi.getSeq() + 1;
-                byte[] data = mi.getData();
-                String sdata = "<no data>";
-                if (data != null && data.length > 0) {
-                    sdata = new String(data);
+            StreamInfo si = jsm.getStreamInfo(streamName);
+            long seq = si.getStreamState().getFirstSequence();
+            seq = getLongArgFromPosition(3, seq);
+            long last = si.getStreamState().getLastSequence();
+            int tracker = 0;
+            while (true) {
+                if (seq > last) {
+                    si = jsm.getStreamInfo(streamName);
+                    long currentLast = si.getStreamState().getLastSequence();
+                    last = si.getStreamState().getLastSequence();
+                    if (currentLast <= last) {
+                        sleep(1000);
+                        continue;
+                    }
                 }
-                if (tracker > 0) {
-                    System.out.println();
-                }
-                System.out.println(mi.getSeq() + " | " + mi.getSubject() + " | " + sdata);
-                tracker = 0;
-            }
-            catch (JetStreamApiException e) {
-                if (e.getMessage().contains("10037")) { // it's fine the message is gone
-                    if (++tracker % progressFrequency == 0) {
+                try {
+                    MessageInfo mi = jsm.getNextMessage(streamName, seq, ">");
+                    seq = mi.getSeq() + 1;
+                    byte[] data = mi.getData();
+                    String sdata = "<no data>";
+                    if (data != null && data.length > 0) {
+                        sdata = new String(data);
+                    }
+                    if (tracker > 0) {
                         System.out.println();
                     }
+                    System.out.println(mi.getSeq() + " | " + mi.getSubject() + " | " + sdata);
+                    tracker = 0;
+                }
+                catch (JetStreamApiException e) {
+                    if (e.getMessage().contains("10037")) { // it's fine the message is gone
+                        if (++tracker % progressFrequency == 0) {
+                            System.out.println();
+                        }
+                        else {
+                            System.out.print('x');
+                        }
+                    }
                     else {
-                        System.out.print('x');
+                        throw e;
                     }
                 }
-                else {
-                    throw e;
-                }
             }
-        }
+        });
     }
 }

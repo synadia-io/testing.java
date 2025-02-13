@@ -40,7 +40,7 @@ public abstract class AbstractCustomWorkload extends Workload {
     protected int progressFrequency;
     protected String watchDateFormat;
 
-    public void customWorkloadInit(String defaultLabel, boolean requiresArguments, CommandLine commandLine) {
+    protected void customWorkloadInit(String defaultLabel, boolean requiresArguments, CommandLine commandLine) {
         init(defaultLabel, commandLine);
         if (requiresArguments && commandLine.args.isEmpty()) {
             exit("Argument(s) Required");
@@ -73,41 +73,115 @@ public abstract class AbstractCustomWorkload extends Workload {
         System.exit(0);
     }
 
-    protected abstract String[] commands();
+    @Override
+    public void runWorkload() throws Exception {
+        String arg = commandLine.args.getFirst();
+        switch (arg) {
+            case "setup"   -> doSetup();
+            case "clear"   -> doClear();
+            case "purge"   -> doPurge();
+            default -> {
+                if (!subRunWorkload(arg)) {
+                    exit("Unknown custom workload command: '" + arg + "'");
+                }
+            }
+        }
+    }
+
+    protected boolean subRunWorkload(String arg) throws Exception {
+        return false;
+    }
 
     // ----------------------------------------------------------------------------------------------------
     // COMMANDS
     // ----------------------------------------------------------------------------------------------------
-    @SuppressWarnings("SameParameterValue")
-    protected void doSetup(JetStreamManagement jsm) throws IOException, JetStreamApiException {
-        startJob("Setup");
-        startJob("Creating Streams");
-        List<String> streamNames = jsm.getStreamNames();
-        for (String streamName : streamNames) {
-            jsm.deleteStream(streamName);
+    protected abstract String[] commands();
+
+    protected interface AdminCommand {
+        void run(Connection nc, JetStreamManagement jsm) throws IOException, JetStreamApiException, InterruptedException;
+    }
+
+    protected void runAdminCommand(AdminCommand cmd) throws IOException, JetStreamApiException, InterruptedException {
+        try (Connection nc = Nats.connect(getAdminOptions())) {
+            cmd.run(nc, nc.jetStreamManagement());
         }
-        StreamInfo si = jsm.addStream(StreamConfiguration.builder()
-            .name(logStreamName)
-            .subjects(logStreamSubject)
-            .retentionPolicy(RetentionPolicy.Limits)
-            .maxAge(Duration.ofMinutes(60))
-            .build());
-        printFormatted(si.getJv());
-        si = jsm.addStream(StreamConfiguration.builder()
-            .name(exStreamName)
-            .subjects(exStreamSubject)
-            .build());
-        printFormatted(si.getJv());
     }
 
-    protected void doClearLog(Connection nc) throws IOException, JetStreamApiException {
-        startJob("Clear Log");
-        nc.jetStreamManagement().purgeStream(logStreamName);
+    @SuppressWarnings("SameParameterValue")
+    protected void doSetup() throws IOException, JetStreamApiException, InterruptedException {
+        runAdminCommand((nc, jsm) -> {
+            startJob("Setup");
+            startJob("Creating Streams");
+            List<String> streamNames = jsm.getStreamNames();
+            for (String streamName : streamNames) {
+                jsm.deleteStream(streamName);
+            }
+            StreamInfo si = jsm.addStream(StreamConfiguration.builder()
+                .name(logStreamName)
+                .subjects(logStreamSubject)
+                .retentionPolicy(RetentionPolicy.Limits)
+                .maxAge(Duration.ofMinutes(60))
+                .build());
+            printFormatted(si.getJv());
+            si = jsm.addStream(StreamConfiguration.builder()
+                .name(exStreamName)
+                .subjects(exStreamSubject)
+                .build());
+            printFormatted(si.getJv());
+
+            subDoSetup(nc, jsm);
+        });
     }
 
-    protected void doClearExceptions(Connection nc) throws IOException, JetStreamApiException {
-        startJob("Clear Exception");
-        nc.jetStreamManagement().purgeStream(exStreamName);
+    protected void subDoSetup(Connection nc, JetStreamManagement jsm) throws IOException, JetStreamApiException, InterruptedException {}
+
+    protected void doClear() throws IOException, JetStreamApiException, InterruptedException {
+        String option = getStringArgFromPosition(2);
+        if (option == null || option.isEmpty()) {
+            exit("Clear option not provided");
+            return;
+        }
+        switch (option) {
+            case "log" -> doClearLog();
+            case "ex" -> doClearExceptions();
+            default -> {
+                if (!subDoClear(option)) {
+                    exit("Unknown clear option: '" + option + "'");
+                }
+            }
+        }
+    }
+
+    protected boolean subDoClear(String option) throws IOException, JetStreamApiException, InterruptedException {
+        return false;
+    }
+
+    protected void doClearLog() throws IOException, JetStreamApiException, InterruptedException {
+        runAdminCommand((nc, jsm) -> {
+            startJob("Clear Log");
+            nc.jetStreamManagement().purgeStream(logStreamName);
+        });
+    }
+
+    protected void doClearExceptions() throws IOException, JetStreamApiException, InterruptedException {
+        runAdminCommand((nc, jsm) -> {
+            startJob("Clear Exception");
+            nc.jetStreamManagement().purgeStream(exStreamName);
+        });
+    }
+
+    protected void doPurge() throws IOException, JetStreamApiException, InterruptedException {
+        runAdminCommand((nc, jsm) -> {
+            String code = getStringArgFromPosition(2);
+            if (code == null || code.isEmpty()) {
+                exit("Purge option not provided");
+            }
+            else {
+                String purge = logSubjectPrefix + code + ".>";
+                startProgressJob("Purge: " + code + "(" + purge + ")");
+                jsm.purgeStream(logStreamName, PurgeOptions.builder().subject(purge).build());
+            }
+        });
     }
 
     public static final String SUMMARY_TOP_LINE    = "├──────────────┬────────────┬────────────┬────────────┬────────────┬────────────┤";
@@ -129,45 +203,47 @@ public abstract class AbstractCustomWorkload extends Workload {
     public static final String LINE_FORMAT = "│ %-14s │ %-14s │ %-13s │\n";
 
     @SuppressWarnings("InfiniteLoopStatement")
-    protected void doWatch(Connection nc, String... customStreams) throws IOException {
-        startJob("Watch");
-        JetStreamManagement jsm = nc.jetStreamManagement();
-        Map<String, Event> watchMap = new HashMap<>();
-        while (true) {
-            try {
-                System.out.println();
-                System.out.println();
-                System.out.println();
-                System.out.println("┌───────────────────────────────────────────────────────────────────────────────┐");
-                System.out.println("│ Stream Information                               " + FULL_DATE_FORMATTER_ALT.format(new Date()) + " │");
+    protected void doWatch(String... customStreams) throws IOException, JetStreamApiException, InterruptedException {
+        runAdminCommand((nc, jsm) -> {
+            startJob("Watch");
+            Map<String, Event> watchMap = new HashMap<>();
+            while (true) {
+                try {
+                    System.out.println();
+                    System.out.println();
+                    System.out.println();
+                    System.out.println("┌───────────────────────────────────────────────────────────────────────────────┐");
+                    System.out.println("│ Stream Information                               " + FULL_DATE_FORMATTER_ALT.format(new Date()) + " │");
 
-                // STREAM SUMMARIES
-                System.out.println(SUMMARY_TOP_LINE);
-                System.out.println(SUMMARY_LINE_HEADER);
-                System.out.println(SUMMARY_SEP_LINE);
-                for (String stream : customStreams) {
-                    summarize(jsm, stream);
+                    // STREAM SUMMARIES
+                    System.out.println(SUMMARY_TOP_LINE);
+                    System.out.println(SUMMARY_LINE_HEADER);
+                    System.out.println(SUMMARY_SEP_LINE);
+                    for (String stream : customStreams) {
+                        summarize(jsm, stream);
+                    }
+                    StreamState exSs = summarize(jsm, exStreamName);
+                    StreamState logSs = summarize(jsm, logStreamName);
+                    System.out.println(SUMMARY_FOOT_LINE);
+
+                    watchStream(jsm, watchMap, true, exStreamName, exSs, v -> {
+                        System.out.println("┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐");
+                        System.out.println("│ Exceptions                                                                                                                                       │");
+                    });
+
+                    watchStream(jsm, watchMap, false, logStreamName, logSs, v -> {
+                        System.out.println("┌─────────────────────────────────────────────────┐");
+                        System.out.println("│ Log                                             │");
+                    });
                 }
-                StreamState exSs = summarize(jsm, exStreamName);
-                StreamState logSs = summarize(jsm, logStreamName);
-                System.out.println(SUMMARY_FOOT_LINE);
-
-                watchStream(jsm, watchMap, true, exStreamName, exSs, v -> {
-                    System.out.println("┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐");
-                    System.out.println("│ Exceptions                                                                                                                                       │");
-                });
-
-                watchStream(jsm, watchMap, false, logStreamName, logSs, v -> {
-                    System.out.println("┌─────────────────────────────────────────────────┐");
-                    System.out.println("│ Log                                             │");
-                });
+                catch (Exception ignore) {
+                }
+                sleep(watchFrequency);
             }
-            catch (Exception ignore) {}
-            sleep(watchFrequency);
-        }
+        });
     }
 
-    private static StreamState summarize(JetStreamManagement jsm, String stream) throws IOException, JetStreamApiException {
+    protected static StreamState summarize(JetStreamManagement jsm, String stream) throws IOException, JetStreamApiException {
         StreamInfo si = jsm.getStreamInfo(stream, StreamInfoOptions.allSubjects());
         StreamState ss = si.getStreamState();
         long fseq = si.getStreamState().getFirstSequence();
@@ -176,7 +252,7 @@ public abstract class AbstractCustomWorkload extends Workload {
         return ss;
     }
 
-    private void watchStream(JetStreamManagement jsm, Map<String, Event> watchMap, boolean isEx, String streamName, StreamState ss, java.util.function.Consumer<Void> beforeFirst) {
+    protected void watchStream(JetStreamManagement jsm, Map<String, Event> watchMap, boolean isEx, String streamName, StreamState ss, java.util.function.Consumer<Void> beforeFirst) {
         List<String> allSubjects = new ArrayList<>();
         for (Subject subject : ss.getSubjects()) {
             allSubjects.add(subject.getName());
@@ -457,6 +533,10 @@ public abstract class AbstractCustomWorkload extends Workload {
     protected void print(String job, String workId, int tix, String qualifier, long count, long elapsed, String message) {
         Event event = new Event(job, workId, tix, qualifier, count, elapsed, null);
         Debug.info(event.ident(), event.extras(message));
+    }
+
+    protected void printConnect(Connection nc, String job, String workId, int tix) {
+        print(job, workId, tix, "connect", 0, 0, nc.getServerInfo().getServerId());
     }
 
     protected void publish(JetStream js, Event event) {
