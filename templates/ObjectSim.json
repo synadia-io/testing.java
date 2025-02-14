@@ -27,7 +27,7 @@
   "progress_frequency": 100,
   "max_objects": 25,
   "cleanup_job": "Cleanup",
-  "cleanup_frequency": 300000,
+  "cleanup_frequency": 100000,
   "put_job": "Put",
   "put_thread_count": 3,
   "put_report_frequency": 1,

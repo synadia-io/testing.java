@@ -63,7 +63,7 @@ public class ObjectSim extends AbstractCustomWorkload {
         maxObjects = JsonValueUtils.readInteger(params.jv, "max_objects", 10_000);
 
         cleanupJob = JsonValueUtils.readString(params.jv, "cleanup_job", "Cleanup");
-        cleanupFrequency = JsonValueUtils.readLong(params.jv, "cleanup_frequency", 60000);
+        cleanupFrequency = JsonValueUtils.readLong(params.jv, "cleanup_frequency", 10000);
 
         putJob = JsonValueUtils.readString(params.jv, "put_job", "Put");
         putThreadCount = JsonValueUtils.readInteger(params.jv, "put_thread_count", 3);
@@ -133,22 +133,22 @@ public class ObjectSim extends AbstractCustomWorkload {
             while (true) {
                 OrderedConsumerContext occ = ctx.createOrderedConsumer(
                     new OrderedConsumerConfiguration().filterSubject(filter));
-                List<String> deletes = new ArrayList<>();
+                List<String> subjectsToDelete = new ArrayList<>();
                 try (IterableConsumer it = occ.iterate()) {
                     Message m = it.nextMessage(1000);
                     while (m != null) {
                         ObjectInfo oi = new ObjectInfo(m);
                         if (oi.isDeleted()) {
-                            deletes.add(m.getSubject());
+                            subjectsToDelete.add(m.getSubject());
                         }
                         m = it.nextMessage(1000);
                     }
                 }
                 catch (Exception ignore) {}
 
-                print(cleanupJob, ws.workId, NO_TIX, null, 0, ws.elapse(), "Cleaning up " + deletes.size() + " deleted objects.");
+                print(cleanupJob, ws.workId, NO_TIX, null, 0, ws.elapse(), "Cleaning up " + subjectsToDelete.size() + " deleted objects.");
 
-                for (String subject : deletes) {
+                for (String subject : subjectsToDelete) {
                     try {
                         jsm.purgeStream(bucketStreamName, PurgeOptions.subject(subject));
                     }
@@ -248,7 +248,8 @@ public class ObjectSim extends AbstractCustomWorkload {
                 }
             }
             catch (InterruptedException | IOException e) {
-                throw new RuntimeException(e);
+                print(putJob, ws.workId, tix, null, 0, ws.elapse(), e.getMessage());
+                System.exit(-1);
             }
         };
     }
@@ -310,7 +311,8 @@ public class ObjectSim extends AbstractCustomWorkload {
                 }
             }
             catch (IOException | InterruptedException | JetStreamApiException e) {
-                throw new RuntimeException(e);
+                print(getJob, ws.workId, tix, null, 0, ws.elapse(), e.getMessage());
+                System.exit(-1);
             }
         };
     }

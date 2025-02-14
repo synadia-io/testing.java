@@ -192,11 +192,11 @@ public abstract class AbstractCustomWorkload extends Workload {
     public static final String SUMMARY_FOOT_LINE   = "└──────────────┴────────────┴────────────┴────────────┴────────────┴────────────┘";
     public static final String SUMMARY_LINE_FORMAT = "│ %-12s │ %10d │ %10d │ %10d │ %10d │ %10d │\n";
 
-    public static final String OSMMRY_TOP_LINE    = "├──────────────┬────────────┬────────────┬────────────┤";
-    public static final String OSMMRY_LINE_HEADER = "│ Bucket       │       Live │    Deleted │     Chunks │";
-    public static final String OSMMRY_SEP_LINE    = "├──────────────┼────────────┼────────────┼────────────┤";
-    public static final String OSMMRY_FOOT_LINE   = "└──────────────┴────────────┴────────────┴────────────┘";
-    public static final String OSMMRY_LINE_FORMAT = "│ %-12s │ %10d │ %10d │ %10d │\n";
+    public static final String OSMMRY_TOP_LINE    = "├──────────────┬────────────┬────────────┤";
+    public static final String OSMMRY_LINE_HEADER = "│ Bucket       │    Objects │     Chunks │";
+    public static final String OSMMRY_SEP_LINE    = "├──────────────┼────────────┼────────────┤";
+    public static final String OSMMRY_FOOT_LINE   = "└──────────────┴────────────┴────────────┘";
+    public static final String OSMMRY_LINE_FORMAT = "│ %-12s │ %10d │ %10d │\n";
 
     public static final String EX_TOP_LINE    = "├────────────────┬───────────────────┬────────────────┬────────────────────────────────────────────────────────────────────────────────────────────┤";
     public static final String EX_LINE_HEADER = "│ ? Job (Thread) │ Message Time      │ Elapsed        │ Details                                                                                    │";
@@ -215,14 +215,10 @@ public abstract class AbstractCustomWorkload extends Workload {
         runAdminCommand((nc, jsm) -> {
             startJob("Watch");
             Map<String, Event> watchMap = new HashMap<>();
-            List<String> regularStreams = new ArrayList<>();
             List<String> objectStreams = new ArrayList<>();
             for (String stream : customStreams) {
                 if (isOsStream(stream)) {
                     objectStreams.add(stream);
-                }
-                else {
-                    regularStreams.add(stream);
                 }
             }
             boolean hasObjectStreams = !objectStreams.isEmpty();
@@ -239,7 +235,7 @@ public abstract class AbstractCustomWorkload extends Workload {
                     System.out.println(SUMMARY_TOP_LINE);
                     System.out.println(SUMMARY_LINE_HEADER);
                     System.out.println(SUMMARY_SEP_LINE);
-                    for (String stream : regularStreams) {
+                    for (String stream : customStreams) {
                         summarize(jsm, stream);
                     }
                     StreamState exSs = summarize(jsm, exStreamName);
@@ -247,8 +243,8 @@ public abstract class AbstractCustomWorkload extends Workload {
                     System.out.println(SUMMARY_FOOT_LINE);
 
                     if (hasObjectStreams) {
-                        System.out.println("┌─────────────────────────────────────────────────────┐");
-                        System.out.println("│ Object Stores                                       │");
+                        System.out.println("┌────────────────────────────────────────┐");
+                        System.out.println("│ Object Stores                          │");
 
                         // OBJECT SUMMARIES
                         System.out.println(OSMMRY_TOP_LINE);
@@ -294,18 +290,14 @@ public abstract class AbstractCustomWorkload extends Workload {
             new OrderedConsumerConfiguration().filterSubject(filter));
 
         long chunks = 0;
-        long live = 0;
-        long deleted = 0;
+        long items = 0;
         try (IterableConsumer it = occ.iterate()) {
             Message m = it.nextMessage(1000);
             while (m != null) {
                 ObjectInfo oi = new ObjectInfo(m);
-                chunks += oi.getChunks();
-                if (oi.isDeleted()) {
-                    deleted++;
-                }
-                else {
-                    live++;
+                if (!oi.isDeleted()) {
+                    items++;
+                    chunks += oi.getChunks();
                 }
                 m = it.nextMessage(1000);
             }
@@ -313,7 +305,7 @@ public abstract class AbstractCustomWorkload extends Workload {
         catch (Exception e) {
             throw new RuntimeException(e);
         }
-        System.out.printf(OSMMRY_LINE_FORMAT, bucketName, live, deleted, chunks);
+        System.out.printf(OSMMRY_LINE_FORMAT, bucketName, items, chunks);
     }
 
     protected void watchStream(JetStreamManagement jsm, Map<String, Event> watchMap, boolean isEx, String streamName, StreamState ss, java.util.function.Consumer<Void> beforeFirst) {
