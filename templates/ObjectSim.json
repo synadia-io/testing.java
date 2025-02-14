@@ -23,7 +23,7 @@
   "queue_subject": "qsub",
   "queue_consumer_name": "qcon",
   "queue_max_messages": 1000000,
-  "watch_frequency": 5000,
+  "watch_frequency": 10000,
   "progress_frequency": 100,
   "max_objects": 50,
   "cleanup_job": "Cleanup",

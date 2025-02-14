@@ -267,8 +267,7 @@ public abstract class AbstractCustomWorkload extends Workload {
                         System.out.println("│ Log                                             │");
                     });
                 }
-                catch (Exception ignore) {
-                }
+                catch (Exception ignore) {}
                 sleep(watchFrequency);
             }
         });
@@ -293,7 +292,7 @@ public abstract class AbstractCustomWorkload extends Workload {
         long chunks = 0;
         long items = 0;
         try (IterableConsumer it = occ.iterate()) {
-            Message m = it.nextMessage(1000);
+            Message m = it.nextMessage(5000);
             while (m != null) {
                 ObjectInfo oi = new ObjectInfo(m);
                 if (!oi.isDeleted()) {
@@ -302,11 +301,11 @@ public abstract class AbstractCustomWorkload extends Workload {
                 }
                 m = it.nextMessage(1000);
             }
+            System.out.printf(OSMMRY_LINE_FORMAT, bucketName, items, chunks);
         }
-        catch (Exception e) {
-            throw new RuntimeException(e);
+        catch (Exception ignore) {
+            System.out.printf(OSMMRY_LINE_FORMAT, bucketName, -1, -1);
         }
-        System.out.printf(OSMMRY_LINE_FORMAT, bucketName, items, chunks);
     }
 
     protected void watchStream(JetStreamManagement jsm, Map<String, Event> watchMap, boolean isEx, String streamName, StreamState ss, java.util.function.Consumer<Void> beforeFirst) {

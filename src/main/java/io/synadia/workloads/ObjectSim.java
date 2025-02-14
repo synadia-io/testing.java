@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.locks.ReentrantLock;
 
 import static io.nats.client.support.JsonUtils.printFormatted;
 import static io.nats.jsmulti.shared.Utils.sleep;
@@ -193,14 +194,23 @@ public class ObjectSim extends AbstractCustomWorkload {
         return true;
     }
 
+    private final ReentrantLock powLock = new ReentrantLock();
     @SuppressWarnings("InfiniteLoopStatement")
     private Runnable putObjectWorker(Options options, int tix, WorkState ws) {
+        powLock.lock(); // all threads need the file. tix 0 is the first instance created
         try {
-            generateObject();
+            if (tix == 0) {
+                try {
+                    generateObject();
+                }
+                catch (IOException e) {
+                    print(putJob, ws.workId, tix, null, 0, ws.elapse(), e.getMessage());
+                    System.exit(-1);
+                }
+            }
         }
-        catch (IOException e) {
-            print(putJob, ws.workId, tix, null, 0, ws.elapse(), e.getMessage());
-            System.exit(-1);
+        finally {
+            powLock.unlock();
         }
 
         return () -> {
