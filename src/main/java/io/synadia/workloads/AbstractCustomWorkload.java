@@ -5,10 +5,7 @@ package io.synadia.workloads;
 
 import io.nats.client.*;
 import io.nats.client.api.*;
-import io.nats.client.support.JsonParser;
-import io.nats.client.support.JsonSerializable;
-import io.nats.client.support.JsonValue;
-import io.nats.client.support.JsonValueUtils;
+import io.nats.client.support.*;
 import io.synadia.CommandLine;
 import io.synadia.Workload;
 import io.synadia.utils.Debug;
@@ -16,9 +13,11 @@ import io.synadia.utils.Debug;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.ReentrantLock;
 
 import static io.nats.client.support.JsonUtils.printFormatted;
+import static io.nats.client.support.NatsObjectStoreUtil.OBJ_STREAM_PREFIX;
 import static io.nats.jsmulti.shared.Stats.humanTime;
 import static io.nats.jsmulti.shared.Utils.sleep;
 import static io.synadia.utils.Constants.FULL_DATE_FORMATTER_ALT;
@@ -145,7 +144,7 @@ public abstract class AbstractCustomWorkload extends Workload {
             return;
         }
         switch (option) {
-            case "log" -> doClearLog();
+            case "log" -> doClear("Log", logStreamName);
             case "ex" -> doClearExceptions();
             default -> {
                 if (!subDoClear(option)) {
@@ -159,10 +158,10 @@ public abstract class AbstractCustomWorkload extends Workload {
         return false;
     }
 
-    protected void doClearLog() throws IOException, JetStreamApiException, InterruptedException {
+    protected void doClear(String label, String streamName) throws IOException, JetStreamApiException, InterruptedException {
         runAdminCommand((nc, jsm) -> {
-            startJob("Clear Log");
-            nc.jetStreamManagement().purgeStream(logStreamName);
+            startJob("Clear " + label);
+            nc.jetStreamManagement().purgeStream(streamName);
         });
     }
 
@@ -193,6 +192,12 @@ public abstract class AbstractCustomWorkload extends Workload {
     public static final String SUMMARY_FOOT_LINE   = "└──────────────┴────────────┴────────────┴────────────┴────────────┴────────────┘";
     public static final String SUMMARY_LINE_FORMAT = "│ %-12s │ %10d │ %10d │ %10d │ %10d │ %10d │\n";
 
+    public static final String OSMMRY_TOP_LINE    = "├──────────────┬────────────┬────────────┬────────────┤";
+    public static final String OSMMRY_LINE_HEADER = "│ Bucket       │       Live │    Deleted │     Chunks │";
+    public static final String OSMMRY_SEP_LINE    = "├──────────────┼────────────┼────────────┼────────────┤";
+    public static final String OSMMRY_FOOT_LINE   = "└──────────────┴────────────┴────────────┴────────────┘";
+    public static final String OSMMRY_LINE_FORMAT = "│ %-12s │ %10d │ %10d │ %10d │\n";
+
     public static final String EX_TOP_LINE    = "├────────────────┬───────────────────┬────────────────┬────────────────────────────────────────────────────────────────────────────────────────────┤";
     public static final String EX_LINE_HEADER = "│ ? Job (Thread) │ Message Time      │ Elapsed        │ Details                                                                                    │";
     public static final String EX_SEP_LINE    = "├────────────────┼───────────────────┼────────────────┼────────────────────────────────────────────────────────────────────────────────────────────┤";
@@ -210,6 +215,18 @@ public abstract class AbstractCustomWorkload extends Workload {
         runAdminCommand((nc, jsm) -> {
             startJob("Watch");
             Map<String, Event> watchMap = new HashMap<>();
+            List<String> regularStreams = new ArrayList<>();
+            List<String> objectStreams = new ArrayList<>();
+            for (String stream : customStreams) {
+                if (isOsStream(stream)) {
+                    objectStreams.add(stream);
+                }
+                else {
+                    regularStreams.add(stream);
+                }
+            }
+            boolean hasObjectStreams = !objectStreams.isEmpty();
+
             while (true) {
                 try {
                     System.out.println();
@@ -222,12 +239,26 @@ public abstract class AbstractCustomWorkload extends Workload {
                     System.out.println(SUMMARY_TOP_LINE);
                     System.out.println(SUMMARY_LINE_HEADER);
                     System.out.println(SUMMARY_SEP_LINE);
-                    for (String stream : customStreams) {
+                    for (String stream : regularStreams) {
                         summarize(jsm, stream);
                     }
                     StreamState exSs = summarize(jsm, exStreamName);
                     StreamState logSs = summarize(jsm, logStreamName);
                     System.out.println(SUMMARY_FOOT_LINE);
+
+                    if (hasObjectStreams) {
+                        System.out.println("┌─────────────────────────────────────────────────────┐");
+                        System.out.println("│ Object Stores                                       │");
+
+                        // OBJECT SUMMARIES
+                        System.out.println(OSMMRY_TOP_LINE);
+                        System.out.println(OSMMRY_LINE_HEADER);
+                        System.out.println(OSMMRY_SEP_LINE);
+                        for (String stream : objectStreams) {
+                            summarizeObjectStream(nc, stream);
+                        }
+                        System.out.println(OSMMRY_FOOT_LINE);
+                    }
 
                     watchStream(jsm, watchMap, true, exStreamName, exSs, v -> {
                         System.out.println("┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐");
@@ -253,6 +284,36 @@ public abstract class AbstractCustomWorkload extends Workload {
         long lseq = si.getStreamState().getLastSequence();
         System.out.printf(SUMMARY_LINE_FORMAT, stream, ss.getMsgCount(), ss.getSubjectCount(), ss.getConsumerCount(), fseq, lseq);
         return ss;
+    }
+
+    protected static void summarizeObjectStream(Connection nc, String bucketStreamName) throws IOException, JetStreamApiException {
+        String bucketName = NatsObjectStoreUtil.extractBucketName(bucketStreamName);
+        StreamContext ctx = nc.getStreamContext(bucketStreamName);
+        String filter = NatsObjectStoreUtil.toMetaStreamSubject(bucketName);
+        OrderedConsumerContext occ = ctx.createOrderedConsumer(
+            new OrderedConsumerConfiguration().filterSubject(filter));
+
+        long chunks = 0;
+        long live = 0;
+        long deleted = 0;
+        try (IterableConsumer it = occ.iterate()) {
+            Message m = it.nextMessage(1000);
+            while (m != null) {
+                ObjectInfo oi = new ObjectInfo(m);
+                chunks += oi.getChunks();
+                if (oi.isDeleted()) {
+                    deleted++;
+                }
+                else {
+                    live++;
+                }
+                m = it.nextMessage(1000);
+            }
+        }
+        catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        System.out.printf(OSMMRY_LINE_FORMAT, bucketName, live, deleted, chunks);
     }
 
     protected void watchStream(JetStreamManagement jsm, Map<String, Event> watchMap, boolean isEx, String streamName, StreamState ss, java.util.function.Consumer<Void> beforeFirst) {
@@ -383,6 +444,14 @@ public abstract class AbstractCustomWorkload extends Workload {
     // ----------------------------------------------------------------------------------------------------
     protected String generateWorkId() {
         return Long.toHexString(System.currentTimeMillis()).toLowerCase() + NUID.nextGlobalSequence();
+    }
+
+    protected String generateName() {
+        return NUID.nextGlobalSequence() + "-" + Integer.toHexString(ThreadLocalRandom.current().nextInt()).toLowerCase();
+    }
+
+    protected boolean isOsStream(String streamName) {
+        return streamName.startsWith(OBJ_STREAM_PREFIX);
     }
 
     // ----------------------------------------------------------------------------------------------------
