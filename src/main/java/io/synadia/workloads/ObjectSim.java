@@ -181,20 +181,6 @@ public class ObjectSim extends AbstractCustomWorkload {
 
         ConsumerInfo ci = jsm.createConsumer(queueStreamName, ConsumerConfiguration.builder().durable(queueConsumerName).filterSubject(queueSubject).build());
         printFormatted(ci.getJv());
-
-        File f = new File(putFileName);
-        if (putFileIsText) {
-            DataGenerator.generateTextFile(f, putFileSize);
-        }
-        else {
-            DataGenerator.generateBinaryFile(f, putFileSize);
-        }
-        if (f.exists()) {
-            System.out.println(f.getAbsolutePath() + " -> " + f.length() + " bytes");
-        }
-        else {
-            throw new IOException("File not found: " + f.getAbsolutePath());
-        }
     }
 
     @Override
@@ -209,6 +195,14 @@ public class ObjectSim extends AbstractCustomWorkload {
 
     @SuppressWarnings("InfiniteLoopStatement")
     private Runnable putObjectWorker(Options options, int tix, WorkState ws) {
+        try {
+            generateObject();
+        }
+        catch (IOException e) {
+            print(putJob, ws.workId, tix, null, 0, ws.elapse(), e.getMessage());
+            System.exit(-1);
+        }
+
         return () -> {
             try (Connection nc = Nats.connect(options)) {
                 printConnect(nc, putJob, ws.workId, tix);
@@ -252,6 +246,22 @@ public class ObjectSim extends AbstractCustomWorkload {
                 System.exit(-1);
             }
         };
+    }
+
+    private void generateObject() throws IOException {
+        File f = new File(putFileName);
+        if (putFileIsText) {
+            DataGenerator.generateTextFile(f, putFileSize);
+        }
+        else {
+            DataGenerator.generateBinaryFile(f, putFileSize);
+        }
+        if (f.exists()) {
+            System.out.println(f.getAbsolutePath() + " -> " + f.length() + " bytes");
+        }
+        else {
+            throw new IOException("File not found: " + f.getAbsolutePath());
+        }
     }
 
     private long getQueueSize(JetStreamManagement jsm) throws IOException, JetStreamApiException {
