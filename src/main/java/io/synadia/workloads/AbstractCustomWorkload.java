@@ -18,6 +18,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static io.nats.client.support.JsonUtils.printFormatted;
 import static io.nats.client.support.NatsObjectStoreUtil.OBJ_STREAM_PREFIX;
+import static io.nats.jsmulti.shared.Stats.humanBytes;
 import static io.nats.jsmulti.shared.Stats.humanTime;
 import static io.nats.jsmulti.shared.Utils.sleep;
 import static io.synadia.utils.Constants.FULL_DATE_FORMATTER_ALT;
@@ -186,11 +187,11 @@ public abstract class AbstractCustomWorkload extends Workload {
         });
     }
 
-    public static final String SUMMARY_TOP_LINE    = "├──────────────┬────────────┬────────────┬────────────┬────────────┬────────────┤";
-    public static final String SUMMARY_LINE_HEADER = "│ Stream       │   Messages │   Subjects │  Consumers │ First Seq  │   Last Seq │";
-    public static final String SUMMARY_SEP_LINE    = "├──────────────┼────────────┼────────────┼────────────┼────────────┼────────────┤";
-    public static final String SUMMARY_FOOT_LINE   = "└──────────────┴────────────┴────────────┴────────────┴────────────┴────────────┘";
-    public static final String SUMMARY_LINE_FORMAT = "│ %-12s │ %10d │ %10d │ %10d │ %10d │ %10d │\n";
+    public static final String SUMMARY_TOP_LINE    = "├──────────────┬────────────┬────────────┬────────────┬────────────┬────────────┬────────────┤";
+    public static final String SUMMARY_LINE_HEADER = "│ Stream       │   Messages │   Subjects │  Consumers │  First Seq │   Last Seq │      Bytes │";
+    public static final String SUMMARY_SEP_LINE    = "├──────────────┼────────────┼────────────┼────────────┼────────────┼────────────┼────────────┤";
+    public static final String SUMMARY_FOOT_LINE   = "└──────────────┴────────────┴────────────┴────────────┴────────────┴────────────┴────────────┘";
+    public static final String SUMMARY_LINE_FORMAT = "│ %-12s │ %10d │ %10d │ %10d │ %10d │ %10d │ %10s │\n";
 
     public static final String OSMMRY_TOP_LINE    = "├──────────────┬────────────┬────────────┤";
     public static final String OSMMRY_LINE_HEADER = "│ Bucket       │    Objects │     Chunks │";
@@ -198,10 +199,10 @@ public abstract class AbstractCustomWorkload extends Workload {
     public static final String OSMMRY_FOOT_LINE   = "└──────────────┴────────────┴────────────┘";
     public static final String OSMMRY_LINE_FORMAT = "│ %-12s │ %10d │ %10d │\n";
 
-    public static final String EX_TOP_LINE    = "├────────────────┬───────────────────┬────────────────┬────────────────────────────────────────────────────────────────────────────────────────────┤";
-    public static final String EX_LINE_HEADER = "│ ? Job (Thread) │ Message Time      │ Elapsed        │ Details                                                                                    │";
-    public static final String EX_SEP_LINE    = "├────────────────┼───────────────────┼────────────────┼────────────────────────────────────────────────────────────────────────────────────────────┤";
-    public static final String EX_FOOT_LINE   = "└────────────────┴───────────────────┴────────────────┴────────────────────────────────────────────────────────────────────────────────────────────┘";
+    public static final String EX_TOP_LINE    = "├────────────────┬───────────────────┬────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────────┤";
+    public static final String EX_LINE_HEADER = "│ ? Job (Thread) │ Message Time      │ Elapsed        │ Details                                                                                         │";
+    public static final String EX_SEP_LINE    = "├────────────────┼───────────────────┼────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────┤";
+    public static final String EX_FOOT_LINE   = "└────────────────┴───────────────────┴────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────┘";
     public static final String EX_LINE_FORMAT = "│ %-14s │ %-17s │ %-14s │ %90s │\n";
 
     public static final String TOP_LINE    = "├────────────────┬────────────────┬───────────────┤";
@@ -228,8 +229,8 @@ public abstract class AbstractCustomWorkload extends Workload {
                     System.out.println();
                     System.out.println();
                     System.out.println();
-                    System.out.println("┌───────────────────────────────────────────────────────────────────────────────┐");
-                    System.out.println("│ Stream Information                               " + FULL_DATE_FORMATTER_ALT.format(new Date()) + " │");
+                    System.out.println("┌────────────────────────────────────────────────────────────────────────────────────────────┐");
+                    System.out.println("│ Stream Information                                            " + FULL_DATE_FORMATTER_ALT.format(new Date()) + " │");
 
                     // STREAM SUMMARIES
                     System.out.println(SUMMARY_TOP_LINE);
@@ -257,8 +258,8 @@ public abstract class AbstractCustomWorkload extends Workload {
                     }
 
                     watchStream(jsm, watchMap, true, exStreamName, exSs, v -> {
-                        System.out.println("┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐");
-                        System.out.println("│ Exceptions                                                                                                                                       │");
+                        System.out.println("┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐");
+                        System.out.println("│ Exceptions                                                                                                                                            │");
                     });
 
                     watchStream(jsm, watchMap, false, logStreamName, logSs, v -> {
@@ -278,7 +279,7 @@ public abstract class AbstractCustomWorkload extends Workload {
         StreamState ss = si.getStreamState();
         long fseq = si.getStreamState().getFirstSequence();
         long lseq = si.getStreamState().getLastSequence();
-        System.out.printf(SUMMARY_LINE_FORMAT, stream, ss.getMsgCount(), ss.getSubjectCount(), ss.getConsumerCount(), fseq, lseq);
+        System.out.printf(SUMMARY_LINE_FORMAT, stream, ss.getMsgCount(), ss.getSubjectCount(), ss.getConsumerCount(), fseq, lseq, humanBytes(ss.getByteCount()));
         return ss;
     }
 
