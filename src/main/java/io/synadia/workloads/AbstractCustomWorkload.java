@@ -21,8 +21,6 @@ import static io.nats.client.support.NatsObjectStoreUtil.OBJ_STREAM_PREFIX;
 import static io.nats.jsmulti.shared.Stats.humanBytes;
 import static io.nats.jsmulti.shared.Stats.humanTime;
 import static io.nats.jsmulti.shared.Utils.sleep;
-import static io.synadia.utils.Constants.FULL_DATE_FORMATTER_ALT;
-import static io.synadia.utils.Constants.TIME_FORMATTER;
 
 @SuppressWarnings("SameParameterValue")
 public abstract class AbstractCustomWorkload extends Workload {
@@ -187,29 +185,38 @@ public abstract class AbstractCustomWorkload extends Workload {
         });
     }
 
-    public static final String SUMMARY_TOP_LINE    = "├──────────────┬────────────┬────────────┬────────────┬────────────┬────────────┬────────────┤";
-    public static final String SUMMARY_LINE_HEADER = "│ Stream       │   Messages │   Subjects │  Consumers │  First Seq │   Last Seq │      Bytes │";
-    public static final String SUMMARY_SEP_LINE    = "├──────────────┼────────────┼────────────┼────────────┼────────────┼────────────┼────────────┤";
-    public static final String SUMMARY_FOOT_LINE   = "└──────────────┴────────────┴────────────┴────────────┴────────────┴────────────┴────────────┘";
-    public static final String SUMMARY_LINE_FORMAT = "│ %-12s │ %10d │ %10d │ %10d │ %10d │ %10d │ %10s │\n";
+    public static final String SUMMARY_START   = "┌────────────────────────────────────────────────────────────────────────────────────────────┐";
+    public static final String SUMMARY_DESC    = "│ Stream Information                                                     " + Debug.rfcTime() + " │";
+    public static final String SUMMARY_TOP_SEP = "├──────────────┬────────────┬────────────┬────────────┬────────────┬────────────┬────────────┤";
+    public static final String SUMMARY_HEADER  = "│ Stream       │   Messages │   Subjects │  Consumers │  First Seq │   Last Seq │      Bytes │";
+    public static final String SUMMARY_SEP     = "├──────────────┼────────────┼────────────┼────────────┼────────────┼────────────┼────────────┤";
+    public static final String SUMMARY_FOOT    = "└──────────────┴────────────┴────────────┴────────────┴────────────┴────────────┴────────────┘";
+    public static final String SUMMARY_DATA    = "│ %-12s │ %,10d │ %,10d │ %,10d │ %,10d │ %,10d │ %10s │\n";
 
-    public static final String OSMMRY_TOP_LINE    = "├──────────────┬────────────┬────────────┤";
-    public static final String OSMMRY_LINE_HEADER = "│ Bucket       │    Objects │     Chunks │";
-    public static final String OSMMRY_SEP_LINE    = "├──────────────┼────────────┼────────────┤";
-    public static final String OSMMRY_FOOT_LINE   = "└──────────────┴────────────┴────────────┘";
-    public static final String OSMMRY_LINE_FORMAT = "│ %-12s │ %10d │ %10d │\n";
+    public static final String EX_START   = "┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐";
+    public static final String EX_DESC    = "│ Exceptions                                                                                                                 │";
+    public static final String EX_TOP_SEP = "├────────────────┬─────────────────────┬────────────┬────────────────────────────────────────────────────────────────────────┤";
+    public static final String EX_HEADER  = "│ ? Job (Thread) │ Last Occurrence     │      Count │ Details                                                                │";
+    public static final String EX_SEP     = "├────────────────┼─────────────────────┼────────────┼────────────────────────────────────────────────────────────────────────┤";
+    public static final String EX_FOOT    = "└────────────────┴─────────────────────┴────────────┴────────────────────────────────────────────────────────────────────────┘";
+    public static final String EX_DATA    = "│ %-14s │ %-17s │ %,10d │ %-70s │\n";
 
-    public static final String EX_TOP_LINE    = "├────────────────┬───────────────────┬────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────────┤";
-    public static final String EX_LINE_HEADER = "│ ? Job (Thread) │ Message Time      │ Elapsed        │ Details                                                                                         │";
-    public static final String EX_SEP_LINE    = "├────────────────┼───────────────────┼────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────┤";
-    public static final String EX_FOOT_LINE   = "└────────────────┴───────────────────┴────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────┘";
-    public static final String EX_LINE_FORMAT = "│ %-14s │ %-17s │ %-14s │ %90s │\n";
+    public static final String LOG_START       = "┌─────────────────────────────────────────────────┐";
+    public static final String LOG_DESC        = "│ Log                                             │";
+    public static final String LOG_TOP_SEP     = "├────────────────┬────────────────┬───────────────┤";
+    public static final String LOG_LINE_HEADER = "│ ? Job (Thread) │ Count          │ Elapsed       │";
+    public static final String LOG_SEP_LINE    = "├────────────────┼────────────────┼───────────────┤";
+    public static final String LOG_FOOT_LINE   = "└────────────────┴────────────────┴───────────────┘";
+    public static final String LOG_LINE_FORMAT = "│ %-14s │ %-14s │ %-13s │\n";
 
-    public static final String TOP_LINE    = "├────────────────┬────────────────┬───────────────┤";
-    public static final String LINE_HEADER = "│ ? Job (Thread) │ Count          │ Elapsed       │";
-    public static final String SEP_LINE    = "├────────────────┼────────────────┼───────────────┤";
-    public static final String FOOT_LINE   = "└────────────────┴────────────────┴───────────────┘";
-    public static final String LINE_FORMAT = "│ %-14s │ %-14s │ %-13s │\n";
+    public static final String OBJ_START       = "┌────────────────────────────────────────┐";
+    public static final String OBJ_DESC        = "│ Object Stores                          │";
+    public static final String OBJ_TOP_LINE    = "├──────────────┬────────────┬────────────┤";
+    public static final String OBJ_LINE_HEADER = "│ Bucket       │    Objects │     Chunks │";
+    public static final String OBJ_SEP_LINE    = "├──────────────┼────────────┼────────────┤";
+    public static final String OBJ_FOOT_LINE   = "└──────────────┴────────────┴────────────┘";
+    public static final String OBJ_LINE_FMT_1  = "│ %-12s ...";
+    public static final String OBJ_LINE_FMT_2  = "\b\b\b│ %,10d │ %,10d │\n";
 
     @SuppressWarnings("InfiniteLoopStatement")
     protected void doWatch(String... customStreams) throws IOException, JetStreamApiException, InterruptedException {
@@ -229,43 +236,43 @@ public abstract class AbstractCustomWorkload extends Workload {
                     System.out.println();
                     System.out.println();
                     System.out.println();
-                    System.out.println("┌────────────────────────────────────────────────────────────────────────────────────────────┐");
-                    System.out.println("│ Stream Information                                            " + FULL_DATE_FORMATTER_ALT.format(new Date()) + " │");
+                    System.out.println(SUMMARY_START);
+                    System.out.println(SUMMARY_DESC);
 
                     // STREAM SUMMARIES
-                    System.out.println(SUMMARY_TOP_LINE);
-                    System.out.println(SUMMARY_LINE_HEADER);
-                    System.out.println(SUMMARY_SEP_LINE);
+                    System.out.println(SUMMARY_TOP_SEP);
+                    System.out.println(SUMMARY_HEADER);
+                    System.out.println(SUMMARY_SEP);
                     for (String stream : customStreams) {
                         summarize(jsm, stream);
                     }
                     StreamState exSs = summarize(jsm, exStreamName);
                     StreamState logSs = summarize(jsm, logStreamName);
-                    System.out.println(SUMMARY_FOOT_LINE);
-
-                    if (hasObjectStreams) {
-                        System.out.println("┌────────────────────────────────────────┐");
-                        System.out.println("│ Object Stores                          │");
-
-                        // OBJECT SUMMARIES
-                        System.out.println(OSMMRY_TOP_LINE);
-                        System.out.println(OSMMRY_LINE_HEADER);
-                        System.out.println(OSMMRY_SEP_LINE);
-                        for (String stream : objectStreams) {
-                            summarizeObjectStream(nc, stream);
-                        }
-                        System.out.println(OSMMRY_FOOT_LINE);
-                    }
+                    System.out.println(SUMMARY_FOOT);
 
                     watchStream(jsm, watchMap, true, exStreamName, exSs, v -> {
-                        System.out.println("┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐");
-                        System.out.println("│ Exceptions                                                                                                                                            │");
+                        System.out.println(EX_START);
+                        System.out.println(EX_DESC);
                     });
 
                     watchStream(jsm, watchMap, false, logStreamName, logSs, v -> {
-                        System.out.println("┌─────────────────────────────────────────────────┐");
-                        System.out.println("│ Log                                             │");
+                        System.out.println(LOG_START);
+                        System.out.println(LOG_DESC);
                     });
+
+                    if (hasObjectStreams) {
+                        System.out.println(OBJ_START);
+                        System.out.println(OBJ_DESC);
+
+                        // OBJECT SUMMARIES
+                        System.out.println(OBJ_TOP_LINE);
+                        System.out.println(OBJ_LINE_HEADER);
+                        System.out.println(OBJ_SEP_LINE);
+                        for (String stream : objectStreams) {
+                            summarizeObjectStream(nc, stream);
+                        }
+                        System.out.println(OBJ_FOOT_LINE);
+                    }
                 }
                 catch (Exception ignore) {}
                 sleep(watchFrequency);
@@ -278,7 +285,7 @@ public abstract class AbstractCustomWorkload extends Workload {
         StreamState ss = si.getStreamState();
         long fseq = si.getStreamState().getFirstSequence();
         long lseq = si.getStreamState().getLastSequence();
-        System.out.printf(SUMMARY_LINE_FORMAT, stream, ss.getMsgCount(), ss.getSubjectCount(), ss.getConsumerCount(), fseq, lseq, humanBytes(ss.getByteCount()));
+        System.out.printf(SUMMARY_DATA, stream, ss.getMsgCount(), ss.getSubjectCount(), ss.getConsumerCount(), fseq, lseq, humanBytes(ss.getByteCount()));
         return ss;
     }
 
@@ -289,6 +296,7 @@ public abstract class AbstractCustomWorkload extends Workload {
         OrderedConsumerContext occ = ctx.createOrderedConsumer(
             new OrderedConsumerConfiguration().filterSubject(filter));
 
+        System.out.printf(OBJ_LINE_FMT_1, bucketName);
         long chunks = 0;
         long items = 0;
         try (IterableConsumer it = occ.iterate()) {
@@ -301,22 +309,24 @@ public abstract class AbstractCustomWorkload extends Workload {
                 }
                 m = it.nextMessage(1000);
             }
-            System.out.printf(OSMMRY_LINE_FORMAT, bucketName, items, chunks);
+            System.out.printf(OBJ_LINE_FMT_2, items, chunks);
         }
         catch (Exception ignore) {
-            System.out.printf(OSMMRY_LINE_FORMAT, bucketName, -1, -1);
+            System.out.printf(OBJ_LINE_FMT_2, -1, -1);
         }
     }
 
     protected void watchStream(JetStreamManagement jsm, Map<String, Event> watchMap, boolean isEx, String streamName, StreamState ss, java.util.function.Consumer<Void> beforeFirst) {
-        List<String> allSubjects = new ArrayList<>();
+        Map<String, Long> map = new HashMap<>();
+        List<String> sorted = new ArrayList<>();
         for (Subject subject : ss.getSubjects()) {
-            allSubjects.add(subject.getName());
+            sorted.add(subject.getName());
+            map.put(subject.getName(), subject.getCount());
         }
-        Collections.sort(allSubjects);
+        Collections.sort(sorted);
 
         boolean first = true;
-        for (String subject : allSubjects) {
+        for (String subject : sorted) {
             try {
                 MessageInfo mi = jsm.getLastMessage(streamName, subject);
                 if (mi != null) {
@@ -324,14 +334,14 @@ public abstract class AbstractCustomWorkload extends Workload {
                         first = false;
                         beforeFirst.accept(null);
                         if (isEx) {
-                            System.out.println(EX_TOP_LINE);
-                            System.out.println(EX_LINE_HEADER);
-                            System.out.println(EX_SEP_LINE);
+                            System.out.println(EX_TOP_SEP);
+                            System.out.println(EX_HEADER);
+                            System.out.println(EX_SEP);
                         }
                         else {
-                            System.out.println(TOP_LINE);
-                            System.out.println(LINE_HEADER);
-                            System.out.println(SEP_LINE);
+                            System.out.println(LOG_TOP_SEP);
+                            System.out.println(LOG_LINE_HEADER);
+                            System.out.println(LOG_SEP_LINE);
                         }
                     }
                     Event prev = watchMap.get(subject);
@@ -345,16 +355,17 @@ public abstract class AbstractCustomWorkload extends Workload {
                     String ht = humanTime(event.elapsed);
 
                     if (isEx) {
-                        String time = TIME_FORMATTER.format(Date.from(mi.getTime().toInstant()));
-                        String deets = event.exceptionClass == null ? "" : event.exceptionClass + ": " + event.exceptionMessage + "                    ";
-                        System.out.printf(EX_LINE_FORMAT, job, time, ht, deets);
+                        String time = Debug.rfcTime(mi.getTime());
+                        long count = map.get(subject);
+                        String deets = event.exceptionClass == null ? "" : event.exceptionMessage;
+                        System.out.printf(EX_DATA, job, time, count, deets);
                     }
                     else {
                         String cnt = "";
                         if (event.count > 0) {
                             cnt = String.format("%,d", event.count);
                         }
-                        System.out.printf(LINE_FORMAT, job, cnt, ht);
+                        System.out.printf(LOG_LINE_FORMAT, job, cnt, ht);
                     }
                 }
             }
@@ -364,7 +375,7 @@ public abstract class AbstractCustomWorkload extends Workload {
         }
 
         if (!first) {
-            System.out.println(isEx ? EX_FOOT_LINE : FOOT_LINE);
+            System.out.println(isEx ? EX_FOOT : LOG_FOOT_LINE);
         }
     }
 

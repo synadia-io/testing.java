@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.time.ZonedDateTime;
 import java.util.List;
 
+import static io.nats.client.support.DateTimeUtils.toRfc3339;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 // MODIFIED 1/16/2024
@@ -29,13 +30,17 @@ public abstract class Debug {
         void println(String s);
     }
 
+    public static final int NO_TIME = 0;
+    public static final int RFC_TIME = -1;
+    public static final int RFC_SHORT_TIME = -2;
+
     public static final String SEP = " | ";
     public static final String DIV = "/";
     public static final String PAD = "                                                                                                                                                                                                                                                                                                                                                                                                                                    ";
     public static final String REPLACE = "\\Q%s\\E";
     public static boolean DO_NOT_TRUNCATE = true;
     public static boolean PRINT_THREAD_ID = true;
-    public static boolean PRINT_TIME = true;
+    public static int TIME_HACK = 10;
     public static boolean PAUSE = false;
     public static DebugPrinter DEBUG_PRINTER = System.out::println;
     public static int MAX_DATA_DISPLAY = 50;
@@ -104,10 +109,10 @@ public abstract class Debug {
     public static void info(String label, Message msg, boolean forMsg, String extra) {
         if (PAUSE) { return; }
         String start;
-        if (PRINT_TIME && PRINT_THREAD_ID) {
+        if (TIME_HACK != NO_TIME && PRINT_THREAD_ID) {
             start = "[" + Thread.currentThread().getName() + "@" + time() + "] ";
         }
-        else if (PRINT_TIME){
+        else if (TIME_HACK != NO_TIME){
             start = "[" + time() + "] ";
         }
         else if (PRINT_THREAD_ID){
@@ -201,8 +206,29 @@ public abstract class Debug {
     }
 
     public static String time() {
+        switch (TIME_HACK) {
+            case RFC_TIME: return rfcTime();
+            case RFC_SHORT_TIME : return rfcShortTime();
+        }
         String t = "" + System.currentTimeMillis();
-        return t.substring(t.length() - 10);
+        return TIME_HACK > t.length() ? t : t.substring(t.length() - TIME_HACK);
+    }
+
+    // RFC 2025-02-15T14:09:45
+    public static String rfcTime() {
+        return toRfc3339(DateTimeUtils.gmtNow()).substring(0, 19);
+    }
+
+    public static String rfcTime(ZonedDateTime zdt) {
+        return toRfc3339(zdt).substring(0, 19);
+    }
+
+    public static String rfcShortTime() {
+        return rfcShortTime(DateTimeUtils.gmtNow());
+    }
+
+    public static String rfcShortTime(ZonedDateTime zdt) {
+        return toRfc3339(zdt).substring(0, 19).replace("-", "").replace(":", "");
     }
 
     public static String dataString(Message msg) {
