@@ -201,13 +201,13 @@ public abstract class AbstractCustomWorkload extends Workload {
     public static final String EX_FOOT    = "└────────────────┴─────────────────────┴────────────┴────────────────────────────────────────────────────────────────────────┘";
     public static final String EX_DATA    = "│ %-14s │ %-17s │ %,10d │ %-70s │\n";
 
-    public static final String LOG_START       = "┌─────────────────────────────────────────────────┐";
-    public static final String LOG_DESC        = "│ Log                                             │";
-    public static final String LOG_TOP_SEP     = "├────────────────┬────────────────┬───────────────┤";
-    public static final String LOG_LINE_HEADER = "│ ? Job (Thread) │ Count          │ Elapsed       │";
-    public static final String LOG_SEP_LINE    = "├────────────────┼────────────────┼───────────────┤";
-    public static final String LOG_FOOT_LINE   = "└────────────────┴────────────────┴───────────────┘";
-    public static final String LOG_LINE_FORMAT = "│ %-14s │ %-14s │ %-13s │\n";
+    public static final String LOG_START       = "┌────────────────────────────────────────────────────┐";
+    public static final String LOG_DESC        = "│ Log                                                │";
+    public static final String LOG_TOP_SEP     = "├───────────────────┬────────────────┬───────────────┤";
+    public static final String LOG_LINE_HEADER = "│ ? Job (Thread)    │ Count          │ Elapsed       │";
+    public static final String LOG_SEP_LINE    = "├───────────────────┼────────────────┼───────────────┤";
+    public static final String LOG_FOOT_LINE   = "└───────────────────┴────────────────┴───────────────┘";
+    public static final String LOG_LINE_FORMAT = "│ %-17s │ %-14s │ %-13s │\n";
 
     public static final String OBJ_START       = "┌────────────────────────────────────────┐";
     public static final String OBJ_DESC        = "│ Object Stores                          │";
@@ -593,9 +593,11 @@ public abstract class AbstractCustomWorkload extends Workload {
     // EVENT HELPERS
     // ----------------------------------------------------------------------------------------------------
 
-    protected void log(JetStream js, String job, String workId, int tix, long count, long elapsed) {
+    protected void log(JetStream js, String job, String workId, int tix, long count, long elapsed, boolean console) {
         Event event = new Event(job, workId, tix, null, count, elapsed, null);
-        Debug.info(event.ident(), event.extras());
+        if (console) {
+            Debug.info(event.ident(), event.extras());
+        }
         publish(js, event);
     }
 

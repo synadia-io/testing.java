@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.nats.jsmulti.shared.Utils.sleep;
 
@@ -49,6 +50,13 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
     private int infoThreadCount;
     private long infoReportFrequency;
     private long infoJitter;
+
+    private String comboJob;
+    private int comboThreadCount;
+    private long comboReportFrequency;
+    private long comboJitter;
+    private int comboProduce;
+    private int comboConsume;
 
     @Override
     public void init(CommandLine commandLine) {
@@ -84,6 +92,13 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
         infoReportFrequency = JsonValueUtils.readLong(params.jv, "info_report_frequency", 1000);
         infoJitter = JsonValueUtils.readLong(params.jv, "info_jitter", 10_000);
 
+        comboJob = JsonValueUtils.readString(params.jv, "combo_job", "combo");
+        comboThreadCount = JsonValueUtils.readInteger(params.jv, "combo_thread_count", 3);
+        comboReportFrequency = JsonValueUtils.readLong(params.jv, "combo_report_frequency", 100);
+        comboJitter = JsonValueUtils.readLong(params.jv, "combo_jitter", 500);
+        comboProduce = JsonValueUtils.readInteger(params.jv, "combo_produce", 1);
+        comboConsume = JsonValueUtils.readInteger(params.jv, "combo_produce", 2);
+
         Debug.info(workLabel, "dataStreamName", dataStreamName);
         Debug.info(workLabel, "dataSubjectPrefix", dataSubjectPrefix);
         Debug.info(workLabel, "dataStreamSubject", dataStreamSubject);
@@ -113,11 +128,18 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
         Debug.info(workLabel, "infoThreadCount", infoThreadCount);
         Debug.info(workLabel, "infoReportFrequency", infoReportFrequency);
         Debug.info(workLabel, "infoJitter", infoJitter);
+
+        Debug.info(workLabel, "comboJob", comboJob);
+        Debug.info(workLabel, "comboThreadCount", comboThreadCount);
+        Debug.info(workLabel, "comboReportFrequency", comboReportFrequency);
+        Debug.info(workLabel, "comboJitter", comboJitter);
+        Debug.info(workLabel, "comboProduce", comboProduce);
+        Debug.info(workLabel, "comboConsume", comboConsume);
     }
 
     @Override
     protected String[] commands() {
-        return new String[] {"setup", "list", "produce", "consume", "info", "watch", "stream", "clear consumers|data|queue|log|ex", "purge <job>"};
+        return new String[] {"setup", "list", "produce", "consume", "info", "combo", "watch", "stream", "clear consumers|data|queue|log|ex", "purge <job>"};
     }
 
     @Override
@@ -126,6 +148,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
             case "list"    -> doList();
             case "produce" -> doWorker(produceJob, produceThreadCount, this::produceWorker);
             case "consume" -> doWorker(consumeJob, consumeThreadCount, this::consumeWorker);
+            case "combo"   -> doWorker(comboJob, comboThreadCount, this::comboWorker);
             case "info"    -> doWorker(infoJob, infoThreadCount, this::infoWorker);
             case "watch"   -> doWatch(dataStreamName, queueStreamName);
             case "stream"  -> doStream();
@@ -232,46 +255,9 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                 JetStream js = nc.jetStream();
                 printConnect(nc, produceJob, ws.workId, tix);
                 jitter(produceJitter / 10);
-                int cutoff = maxConsumers;
+                AtomicInteger cutoff = new AtomicInteger(maxConsumers);
                 while (true) {
-                    try {
-                        StreamInfo si = jsm.getStreamInfo(dataStreamName);
-                        long siCount = si.getStreamState().getConsumerCount();
-                        if (siCount >= cutoff) {
-                            if (cutoff == maxConsumers) { // just to avoid repeat printing when full
-                                cutoff = maxConsumers * 10 / 100; // 10 percent
-                                print(produceJob, ws.workId, tix, null, 0, ws.elapse(), "* System is full. " + siCount + "/" + maxConsumers);
-                            }
-                        }
-                        else {
-                            cutoff = maxConsumers;
-                            String consumerName = generateName();
-                            String dataSubject = toDataSubject(consumerName);
-                            int messageCount = ThreadLocalRandom.current().nextInt(produceMessageMin, produceMessageMax + 1);
-
-                            // 1. create the consumer
-                            jsm.createConsumer(dataStreamName, ConsumerConfiguration.builder()
-                                .durable(consumerName)
-                                .filterSubject(dataSubject)
-                                .build());
-
-                            // 2. publish messages
-                            for (int i = 0; i < messageCount; i++) {
-                                js.publish(dataSubject, null);
-                            }
-
-                            // 3. put a record in the queue last so it's not used until messages are published
-                            js.publish(queueSubject, new QueueData(consumerName, dataSubject, messageCount).serialize());
-                            
-                            long count = ws.increment();
-                            if (count % produceReportFrequency == 0) {
-                                log(js, produceJob, ws.workId, NO_TIX, count, ws.elapse());
-                            }
-                        }
-                    }
-                    catch (IOException | JetStreamApiException e) {
-                        log(js, produceJob, ws.workId, ws.elapse(), e);
-                    }
+                    _produce(jsm, js, tix, ws, cutoff, produceJob, produceReportFrequency);
                     jitter(produceJitter);
                 }
             }
@@ -279,6 +265,48 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                 throw new RuntimeException(e);
             }
         };
+    }
+
+    private void _produce(JetStreamManagement jsm, JetStream js, int tix, WorkState ws, AtomicInteger cutoff, String job, long reportFrequency) {
+        try {
+            StreamInfo si = jsm.getStreamInfo(dataStreamName);
+            long siCount = si.getStreamState().getConsumerCount();
+            int co = cutoff.get();
+            if (siCount >= co) {
+                if (co == maxConsumers) { // just to avoid repeat printing when full
+                    cutoff.set(maxConsumers * 10 / 100); // 10 percent
+                    print(job, ws.workId, tix, null, 0, ws.elapse(), "* System is full. " + siCount + "/" + maxConsumers);
+                }
+            }
+            else {
+                cutoff.set(maxConsumers);
+                String consumerName = generateName();
+                String dataSubject = toDataSubject(consumerName);
+                int messageCount = ThreadLocalRandom.current().nextInt(produceMessageMin, produceMessageMax + 1);
+
+                // 1. create the consumer
+                jsm.createConsumer(dataStreamName, ConsumerConfiguration.builder()
+                    .durable(consumerName)
+                    .filterSubject(dataSubject)
+                    .build());
+
+                // 2. publish messages
+                for (int i = 0; i < messageCount; i++) {
+                    js.publish(dataSubject, null);
+                }
+
+                // 3. put a record in the queue last so it's not used until messages are published
+                js.publish(queueSubject, new QueueData(consumerName, dataSubject, messageCount).serialize());
+
+                long count = ws.increment();
+                if (count % reportFrequency == 0) {
+                    log(js, job, ws.workId, NO_TIX, count, ws.elapse(), true);
+                }
+            }
+        }
+        catch (IOException | JetStreamApiException e) {
+            log(js, produceJob, ws.workId, ws.elapse(), e);
+        }
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
@@ -291,38 +319,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                 jitter(consumeJitter / 10);
                 ConsumerContext qConsumerCtx = nc.getConsumerContext(queueStreamName, queueConsumerName);
                 while (true) {
-                    try {
-                        QueueData qd = queueNext(qConsumerCtx);
-                        if (qd != null) {
-                            StreamContext sctx = nc.getStreamContext(dataStreamName);
-                            ConsumerContext cctx = sctx.getConsumerContext(qd.consumerName);
-                            try (FetchConsumer fc = cctx.fetch(FetchConsumeOptions.builder().maxMessages(consumeBatch).noWait().build())) {
-                                Message m = fc.nextMessage();
-                                while (m != null) {
-                                    m.ack();
-                                    m = fc.nextMessage();
-                                }
-                                long count = ws.increment();
-                                if (count % consumeReportFrequency == 0) {
-                                    log(js, consumeJob, ws.workId, NO_TIX, count, ws.elapse());
-                                }
-                            }
-                            catch (IOException | JetStreamApiException e) {
-                                log(js, consumeJob, ws.workId, ws.elapse(), e);
-                            }
-                            finally {
-                                try {
-                                    jsm.deleteConsumer(dataStreamName, qd.consumerName);
-                                }
-                                catch (Exception ignore) {}
-                                try {
-                                    jsm.purgeStream(dataStreamName, PurgeOptions.subject(qd.dataSubject));
-                                }
-                                catch (Exception ignore) {}
-                            }
-                        }
-                    }
-                    catch (Exception ignore) {}
+                    _consume(nc, jsm, js, ws, qConsumerCtx, consumeJob, consumeReportFrequency);
                     jitter(consumeJitter);
                 }
             }
@@ -332,6 +329,41 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
         };
     }
 
+    private void _consume(Connection nc, JetStreamManagement jsm, JetStream js, WorkState ws, ConsumerContext qConsumerCtx, String job, long reportFrequency) {
+        try {
+            QueueData qd = queueNext(qConsumerCtx);
+            if (qd != null) {
+                StreamContext sctx = nc.getStreamContext(dataStreamName);
+                ConsumerContext cctx = sctx.getConsumerContext(qd.consumerName);
+                try (FetchConsumer fc = cctx.fetch(FetchConsumeOptions.builder().maxMessages(consumeBatch).noWait().build())) {
+                    Message m = fc.nextMessage();
+                    while (m != null) {
+                        m.ack();
+                        m = fc.nextMessage();
+                    }
+                    long count = ws.increment();
+                    if (count % reportFrequency == 0) {
+                        log(js, job, ws.workId, NO_TIX, count, ws.elapse(), true);
+                    }
+                }
+                catch (IOException | JetStreamApiException e) {
+                    log(js, job, ws.workId, ws.elapse(), e);
+                }
+                finally {
+                    try {
+                        jsm.deleteConsumer(dataStreamName, qd.consumerName);
+                    }
+                    catch (Exception ignore) {}
+                    try {
+                        jsm.purgeStream(dataStreamName, PurgeOptions.subject(qd.dataSubject));
+                    }
+                    catch (Exception ignore) {}
+                }
+            }
+        }
+        catch (Exception ignore) {}
+    }
+
     private QueueData queueNext(ConsumerContext qConsumerCtx) throws JetStreamApiException, IOException, InterruptedException, JetStreamStatusCheckedException {
         Message qm = qConsumerCtx.next(1000);
         if (qm != null) {
@@ -339,6 +371,35 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
             return new QueueData(qm.getData());
         }
         return null;
+    }
+
+    @SuppressWarnings("InfiniteLoopStatement")
+    private Runnable comboWorker(Options options, int tix, WorkState ws) {
+        return () -> {
+            try (Connection nc = Nats.connect(options)) {
+                JetStreamManagement jsm = nc.jetStreamManagement();
+                JetStream js = nc.jetStream();
+                printConnect(nc, comboJob, ws.workId, tix);
+                ConsumerContext qConsumerCtx = nc.getConsumerContext(queueStreamName, queueConsumerName);
+                AtomicInteger produceCutoff = new AtomicInteger(maxConsumers);
+                jitter(comboJitter / 10);
+                String pJob = comboJob + ":" + produceJob;
+                String cJob = comboJob + ":" + consumeJob;
+                while (true) {
+                    for (int x = 0; x < comboConsume; x++) {
+                        _consume(nc, jsm, js, ws, qConsumerCtx, cJob, comboReportFrequency);
+                        jitter(comboJitter);
+                    }
+                    for (int x = 0; x < comboProduce; x++) {
+                        _produce(jsm, js, tix, ws, produceCutoff, pJob, comboReportFrequency);
+                        jitter(comboJitter);
+                    }
+                }
+            }
+            catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        };
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
@@ -358,10 +419,10 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                             jsm.getConsumerInfo(dataStreamName, consumerName);
                             long groupCount = ws.increment();
                             if (groupCount % infoReportFrequency == 0) {
-                                log(js, infoJob, ws.workId, NO_TIX, groupCount, ws.elapse());
+                                log(js, infoJob, ws.workId, NO_TIX, groupCount, ws.elapse(), true);
                             }
                             if (++ownCount % infoReportFrequency == 0) {
-                                log(js, infoJob, ws.workId, tix, ownCount, ws.elapse());
+                                log(js, infoJob, ws.workId, tix, ownCount, ws.elapse(), false);
                             }
                         }
                         catch (IOException | JetStreamApiException e) {
