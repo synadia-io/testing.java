@@ -461,31 +461,37 @@ public class Generator {
         }
 
         public void print() {
-            System.out.println("doPublic: " + doPublic);
-            System.out.println("os: " + os);
-            System.out.println("shellExt: " + shellExt);
-            System.out.println("keyFile: " + keyFile);
-            System.out.println("serverUser: " + serverUser);
-            System.out.println("clientUser: " + clientUser);
-            System.out.println("faberUser: " + faberUser);
-            System.out.println("instancePrefix: " + instancePrefix);
-            System.out.println("serverFilter: " + serverFilter);
-            System.out.println("clientFilter: " + clientFilter);
-            System.out.println("faberFilter: " + faberFilter);
-            System.out.println("natsProto: " + natsProto);
-            System.out.println("natsPort: " + natsPort);
-            System.out.println("localPorts: " + localPorts);
-            System.out.println("testingStreamName: " + testingStreamName);
-            System.out.println("testingStreamSubject: " + testingStreamSubject);
-            System.out.println("multiBucket: " + multiBucket);
-            System.out.println("statsBucket: " + statsBucket);
-            System.out.println("profileBucket: " + profileBucket);
-            System.out.println("profileStreamName: " + profileStreamName);
-            System.out.println("profileStreamSubject: " + profileStreamSubject);
-            System.out.println("saveStreamName: " + saveStreamName);
-            System.out.println("saveStreamSubject: " + saveStreamSubject);
-            System.out.println("statsWatchWaitTime: " + statsWatchWaitTime);
-            System.out.println("profileWatchWaitTime: " + profileWatchWaitTime);
+            printMaybe("doPublic", doPublic);
+            printMaybe("os", os);
+            printMaybe("shellExt", shellExt);
+            printMaybe("keyFile", keyFile);
+            printMaybe("serverUser", serverUser);
+            printMaybe("clientUser", clientUser);
+            printMaybe("faberUser", faberUser);
+            printMaybe("instancePrefix", instancePrefix);
+            printMaybe("serverFilter", serverFilter);
+            printMaybe("clientFilter", clientFilter);
+            printMaybe("faberFilter", faberFilter);
+            printMaybe("natsProto", natsProto);
+            printMaybe("natsPort", natsPort);
+            printMaybe("localPorts", localPorts);
+            printMaybe("testingStreamName", testingStreamName);
+            printMaybe("testingStreamSubject", testingStreamSubject);
+            printMaybe("multiBucket", multiBucket);
+            printMaybe("statsBucket", statsBucket);
+            printMaybe("profileBucket", profileBucket);
+            printMaybe("profileStreamName", profileStreamName);
+            printMaybe("profileStreamSubject", profileStreamSubject);
+            printMaybe("saveStreamName", saveStreamName);
+            printMaybe("saveStreamSubject", saveStreamSubject);
+            printMaybe("statsWatchWaitTime", statsWatchWaitTime);
+            printMaybe("profileWatchWaitTime", profileWatchWaitTime);
+        }
+
+        private void printMaybe(String label, Object value) {
+            if (value != null && !value.equals(DO_NOT_MATCH)) {
+                System.out.println(label + ": " + value);
+            }
         }
 
         private JsonValue loadConfig(String generatorJsonVariant) throws IOException {
