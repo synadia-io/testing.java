@@ -274,7 +274,9 @@ public class Generator {
                                     String repl = SSH_PREFIX + (++calc.clients) + TAG_END;
                                     calc.startSshTemplate = calc.startSshTemplate.replace(repl, ssh);
                                 }
-                                printNatsCli(instance);
+                                if (which != Which.Local && cfg.doPublic) {
+                                    printNatsCli(instance);
+                                }
                             }
                         }
                         catch (Exception ignore) {
