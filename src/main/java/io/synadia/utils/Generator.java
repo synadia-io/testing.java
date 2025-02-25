@@ -56,7 +56,7 @@ public class Generator {
     public static final String SAVE_STREAM_SUBJECT = "<SaveStreamSubject>";
     public static final String INSTANCE_PREFIX = "<InstancePrefix>";
 
-    public static final String NA = "na";
+    public static final String DO_NOT_MATCH = "do-not-match";
 
     public static void main(String[] args) throws Exception {
         if (args == null || args.length == 0) {
@@ -114,7 +114,7 @@ public class Generator {
                 printNatsCli(current);
 
                 // SERVER SCRIPT
-                if (which == Which.Full) {
+                if (which == Which.Full && calc.runningServers.size() == 3) {
                     String template = readTemplate("server.sh", cfg)
                         .replace("<InstancePrefix>", cfg.instancePrefix)
                         .replace("<InstanceId>", "" + x)
@@ -182,7 +182,7 @@ public class Generator {
     }
 
     private static String printSsh(Instance current, boolean server, Config cfg) {
-        if (!NA.equals(cfg.keyFile)) {
+        if (!DO_NOT_MATCH.equals(cfg.keyFile)) {
             String cmd = "ssh -oStrictHostKeyChecking=no -i "
                 + cfg.keyFile + " "
                 + (server ? cfg.serverUser : cfg.clientUser)
@@ -265,9 +265,25 @@ public class Generator {
                         catch (Exception ignore) {
                         }
                     }
+                    else if (instance.name.contains(cfg.faberFilter)) {
+                        try {
+                            heading("faber " + instance.name + " [" + instance.stateName + "]");
+                            if (instance.isRunning()) {
+                                String ssh = printSsh(instance, false, cfg);
+                                if (ssh != null) {
+                                    String repl = SSH_PREFIX + (++calc.clients) + TAG_END;
+                                    calc.startSshTemplate = calc.startSshTemplate.replace(repl, ssh);
+                                }
+                                printNatsCli(instance);
+                            }
+                        }
+                        catch (Exception ignore) {
+                        }
+                    }
                 }
                 catch (WarningException ignore) {}
                 catch (Exception e) {
+                    e.printStackTrace();
                     System.out.println(e.getMessage());
                 }
             }
@@ -373,9 +389,11 @@ public class Generator {
         public final String keyFile;
         public final String serverUser;
         public final String clientUser;
+        public final String faberUser;
         public final String instancePrefix;
         public final String serverFilter;
         public final String clientFilter;
+        public final String faberFilter;
         public final String natsProto;
         public final String natsPort;
         public final List<String> localPorts;
@@ -401,11 +419,13 @@ public class Generator {
             String temp = readString(jv, ("shell_ext"));
             shellExt = temp == null ? "" : temp;
             keyFile = readString(jv, ("key_file"));
-            serverUser = readString(jv, ("server_user"));
-            clientUser = readString(jv, ("client_user"));
+            serverUser = readString(jv, ("server_user"), DO_NOT_MATCH);
+            clientUser = readString(jv, ("client_user"), DO_NOT_MATCH);
+            faberUser = readString(jv, ("faber_user"), DO_NOT_MATCH);
             instancePrefix = readString(jv, ("instance_prefix"));
-            serverFilter = readString(jv, ("server_filter"));
-            clientFilter = readString(jv, ("client_filter"));
+            serverFilter = readString(jv, ("server_filter"), DO_NOT_MATCH);
+            clientFilter = readString(jv, ("client_filter"), DO_NOT_MATCH);
+            faberFilter = readString(jv, ("faber_filter"), DO_NOT_MATCH);
             natsProto = readString(jv, ("nats_proto"));
             natsPort = readString(jv, ("nats_port"));
             localPorts = JsonValueUtils.readStringList(jv, "local_ports");
@@ -447,9 +467,11 @@ public class Generator {
             System.out.println("keyFile: " + keyFile);
             System.out.println("serverUser: " + serverUser);
             System.out.println("clientUser: " + clientUser);
+            System.out.println("faberUser: " + faberUser);
             System.out.println("instancePrefix: " + instancePrefix);
             System.out.println("serverFilter: " + serverFilter);
             System.out.println("clientFilter: " + clientFilter);
+            System.out.println("faberFilter: " + faberFilter);
             System.out.println("natsProto: " + natsProto);
             System.out.println("natsPort: " + natsPort);
             System.out.println("localPorts: " + localPorts);
@@ -472,12 +494,14 @@ public class Generator {
                 .put("do_public", false)
                 .put("os", "unix")
                 // .put("shell_ext", ".sh")
-                .put("key_file", NA)
+                .put("key_file", DO_NOT_MATCH)
                 .put("server_user", "ubuntu")
                 .put("client_user", "ec2-user")
+                .put("faber_user", "ec2-user")
                 .put("instance_prefix", "prefix-")
                 .put("server_filter", "-server-")
-                .put("client_filter", NA)
+                .put("client_filter", DO_NOT_MATCH)
+                .put("faber_filter", DO_NOT_MATCH)
                 .put("nats_proto", "nats://")
                 .put("nats_port", "4222")
                 .put("local_ports", JsonValueUtils.arrayBuilder().add("4222").add("5222").add("6222"))
