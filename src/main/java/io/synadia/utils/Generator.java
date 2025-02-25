@@ -23,6 +23,8 @@ import static io.nats.client.support.JsonValueUtils.readString;
 import static io.synadia.utils.Constants.*;
 
 public class Generator {
+    enum Kind {SERVER, CLIENT, FAILGROUND}
+
     public static final String INPUT_DIR = "templates";
     public static final String SCRIPT_OUTPUT_DIR = "gen";
     public static final String PARAMS_OUTPUT_DIR = "params";
@@ -110,7 +112,7 @@ public class Generator {
 
             if (which != Which.Local && cfg.doPublic) {
                 heading("server " + current.name + " [" + current.stateName + "] " + scriptName);
-                printSsh(current, true, cfg);
+                printSsh(current, Kind.SERVER, cfg);
                 printNatsCli(current);
 
                 // SERVER SCRIPT
@@ -181,11 +183,16 @@ public class Generator {
         System.out.println("nats s list -a -s " + instance.publicIpAddr);
     }
 
-    private static String printSsh(Instance current, boolean server, Config cfg) {
+    private static String printSsh(Instance current, Kind kind, Config cfg) {
         if (!DO_NOT_MATCH.equals(cfg.keyFile)) {
+            String user = switch (kind) {
+                case SERVER -> cfg.serverUser;
+                case CLIENT -> cfg.clientUser;
+                case FAILGROUND -> cfg.failgroundUser;
+            };
             String cmd = "ssh -oStrictHostKeyChecking=no -i "
                 + cfg.keyFile + " "
-                + (server ? cfg.serverUser : cfg.clientUser)
+                + user
                 + "@" + current.publicDnsName;
             System.out.println(cmd);
             return cmd;
@@ -255,7 +262,7 @@ public class Generator {
                         try {
                             heading("client " + instance.name + " [" + instance.stateName + "]");
                             if (instance.isRunning()) {
-                                String ssh = printSsh(instance, false, cfg);
+                                String ssh = printSsh(instance, Kind.CLIENT, cfg);
                                 if (ssh != null) {
                                     String repl = SSH_PREFIX + (++calc.clients) + TAG_END;
                                     calc.startSshTemplate = calc.startSshTemplate.replace(repl, ssh);
@@ -265,11 +272,11 @@ public class Generator {
                         catch (Exception ignore) {
                         }
                     }
-                    else if (instance.name.contains(cfg.faberFilter)) {
+                    else if (instance.name.contains(cfg.failgroundFilter)) {
                         try {
-                            heading("faber " + instance.name + " [" + instance.stateName + "]");
+                            heading("failground " + instance.name + " [" + instance.stateName + "]");
                             if (instance.isRunning()) {
-                                String ssh = printSsh(instance, false, cfg);
+                                String ssh = printSsh(instance, Kind.FAILGROUND, cfg);
                                 if (ssh != null) {
                                     String repl = SSH_PREFIX + (++calc.clients) + TAG_END;
                                     calc.startSshTemplate = calc.startSshTemplate.replace(repl, ssh);
@@ -391,11 +398,11 @@ public class Generator {
         public final String keyFile;
         public final String serverUser;
         public final String clientUser;
-        public final String faberUser;
+        public final String failgroundUser;
         public final String instancePrefix;
         public final String serverFilter;
         public final String clientFilter;
-        public final String faberFilter;
+        public final String failgroundFilter;
         public final String natsProto;
         public final String natsPort;
         public final List<String> localPorts;
@@ -423,11 +430,11 @@ public class Generator {
             keyFile = readString(jv, ("key_file"));
             serverUser = readString(jv, ("server_user"), DO_NOT_MATCH);
             clientUser = readString(jv, ("client_user"), DO_NOT_MATCH);
-            faberUser = readString(jv, ("faber_user"), DO_NOT_MATCH);
+            failgroundUser = readString(jv, ("failground_user"), DO_NOT_MATCH);
             instancePrefix = readString(jv, ("instance_prefix"));
             serverFilter = readString(jv, ("server_filter"), DO_NOT_MATCH);
             clientFilter = readString(jv, ("client_filter"), DO_NOT_MATCH);
-            faberFilter = readString(jv, ("faber_filter"), DO_NOT_MATCH);
+            failgroundFilter = readString(jv, ("failground_filter"), DO_NOT_MATCH);
             natsProto = readString(jv, ("nats_proto"));
             natsPort = readString(jv, ("nats_port"));
             localPorts = JsonValueUtils.readStringList(jv, "local_ports");
@@ -469,11 +476,11 @@ public class Generator {
             printMaybe("keyFile", keyFile);
             printMaybe("serverUser", serverUser);
             printMaybe("clientUser", clientUser);
-            printMaybe("faberUser", faberUser);
+            printMaybe("failgroundUser", failgroundUser);
             printMaybe("instancePrefix", instancePrefix);
             printMaybe("serverFilter", serverFilter);
             printMaybe("clientFilter", clientFilter);
-            printMaybe("faberFilter", faberFilter);
+            printMaybe("failgroundFilter", failgroundFilter);
             printMaybe("natsProto", natsProto);
             printMaybe("natsPort", natsPort);
             printMaybe("localPorts", localPorts);
@@ -508,11 +515,11 @@ public class Generator {
                 .put("key_file", DO_NOT_MATCH)
                 .put("server_user", "ubuntu")
                 .put("client_user", "ec2-user")
-                .put("faber_user", "ec2-user")
+                .put("failground_user", "ec2-user")
                 .put("instance_prefix", DO_NOT_MATCH)
                 .put("server_filter", DO_NOT_MATCH)
                 .put("client_filter", DO_NOT_MATCH)
-                .put("faber_filter", DO_NOT_MATCH)
+                .put("failground_filter", DO_NOT_MATCH)
                 .put("nats_proto", "nats://")
                 .put("nats_port", "4222")
                 .put("local_ports", JsonValueUtils.arrayBuilder().add("4222").add("5222").add("6222"))
