@@ -489,8 +489,11 @@ public class Generator {
         }
 
         private void printMaybe(String label, Object value) {
-            if (value != null && !value.equals(DO_NOT_MATCH)) {
-                System.out.println(label + ": " + value);
+            if (value != null) {
+                String s = value.toString();
+                if (!s.isEmpty() && !s.equals(DO_NOT_MATCH)) {
+                    System.out.println(label + ": " + value);
+                }
             }
         }
 
