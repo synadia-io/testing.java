@@ -528,7 +528,9 @@ public class Generator {
                 .toJsonValue();
 
             // override with custom settings
+            System.out.println("LOAD CONFIG: " + generatorJsonVariant);
             Path p = Paths.get("generator" + generatorJsonVariant + ".json");
+            System.out.println("LOAD CONFIG: " + p);
             if (p.toFile().exists()) {
                 JsonValue jvCustom = JsonParser.parse(Files.readAllBytes(p));
                 jv.map.putAll(jvCustom.map);
