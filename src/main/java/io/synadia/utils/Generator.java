@@ -507,8 +507,8 @@ public class Generator {
                 .put("server_user", "ubuntu")
                 .put("client_user", "ec2-user")
                 .put("faber_user", "ec2-user")
-                .put("instance_prefix", "prefix-")
-                .put("server_filter", "-server-")
+                .put("instance_prefix", DO_NOT_MATCH)
+                .put("server_filter", DO_NOT_MATCH)
                 .put("client_filter", DO_NOT_MATCH)
                 .put("faber_filter", DO_NOT_MATCH)
                 .put("nats_proto", "nats://")
@@ -530,9 +530,11 @@ public class Generator {
             // override with custom settings
             System.out.println("LOAD CONFIG: " + generatorJsonVariant);
             Path p = Paths.get("generator" + generatorJsonVariant + ".json");
-            System.out.println("LOAD CONFIG: " + p);
             if (p.toFile().exists()) {
                 JsonValue jvCustom = JsonParser.parse(Files.readAllBytes(p));
+                for (String key : jvCustom.map.keySet()) {
+                    System.out.println("LOAD CONFIG: KEY: " + key + " VALUE: " + jvCustom.map.get(key));
+                }
                 jv.map.putAll(jvCustom.map);
             }
             return jv;
