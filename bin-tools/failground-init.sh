@@ -43,6 +43,9 @@ ls -la /usr/bin/nats-server
 which nats-server
 nats-server -v
 
+# NATS CLI
+curl -sf https://binaries.nats.dev/nats-io/natscli/nats@latest | sh
+
 # DOCKER
 # Add Docker's official GPG key:
 sudo apt-get update

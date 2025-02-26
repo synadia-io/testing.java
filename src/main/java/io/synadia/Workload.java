@@ -140,7 +140,6 @@ public abstract class Workload {
                 }
             }
         }
-
     }
 
     public static final String PADDING = "                                                                                                                                                                ";
@@ -150,16 +149,12 @@ public abstract class Workload {
 
     public List<Options> roundRobinOptions(int numConnections) {
         List<Options> options = new ArrayList<>(numConnections);
-        int cx = 2;
+        int cx = -1;
         for (int i = 0; i < numConnections; i++) {
-            if (++cx == 3) {
+            if (++cx == params.servers.size()) {
                 cx = 0;
             }
-            switch (cx) {
-                case 0 -> options.add(getOptions(params.server0));
-                case 1 -> options.add(getOptions(params.server1));
-                case 2 -> options.add(getOptions(params.server2));
-            }
+            options.add(getOptions(params.servers.get(cx)));
         }
         return options;
     }

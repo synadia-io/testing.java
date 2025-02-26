@@ -3,6 +3,8 @@
   "server0": "<Server0>",
   "server1": "<Server1>",
   "server2": "<Server2>",
+  "server3": "<Server3>",
+  "server4": "<Server4>",
   "admin_server": "<AdminServer>",
   "bootstrap": "<Bootstrap>",
   "testing_stream_name": "<TestingStreamName>",

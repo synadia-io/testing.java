@@ -11,6 +11,7 @@ import io.synadia.utils.Debug;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 
 import static io.nats.client.support.JsonValueUtils.*;
@@ -26,9 +27,7 @@ public class Params implements JsonSerializable {
     public final JsonValue jvMultiConfig;
     public final boolean createStream;
     public final String adminServer;
-    public final String server0;
-    public final String server1;
-    public final String server2;
+    public final List<String> servers;
     public final String testingStreamName;
     public final String testingStreamSubject;
     public final String multiBucket;
@@ -54,9 +53,22 @@ public class Params implements JsonSerializable {
         createStream = streamConfig != null && readBoolean(jv, "create_stream", false);
         jvMultiConfig = readObject(jv, "multi_config");
         adminServer = readString(jv, "admin_server", Options.DEFAULT_URL);
-        server0 = readString(jv, "server0");
-        server1 = readString(jv, "server1");
-        server2 = readString(jv, "server2");
+        servers = new ArrayList<>();
+        int supplied = 0;
+        int replace = -1;
+        for (int x = 0; x < 5; x++) {
+            temp = readString(jv, "server" + x);
+            if (temp.startsWith("<Server")) {
+                if (++replace == supplied) {
+                    replace = 0;
+                }
+                temp = servers.get(replace);
+            }
+            else {
+                supplied++;
+            }
+            servers.add(temp);
+        }
         testingStreamName = readString(jv, "testing_stream_name");
         testingStreamSubject = readString(jv, "testing_stream_subject");
         multiBucket = readString(jv, "multi_bucket");
@@ -97,9 +109,7 @@ public class Params implements JsonSerializable {
         _debug("createStream", createStream);
         _debug("jvMultiConfig", createStream ? jvMultiConfig : null);
         _debug("adminServer", adminServer);
-        _debug("server0", server0);
-        _debug("server1", server1);
-        _debug("server2", server2);
+        _debug("servers", servers);
 
         _debug("testingStreamName", testingStreamName);
         _debug("testingStreamSubject", testingStreamSubject);
