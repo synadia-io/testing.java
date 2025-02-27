@@ -13,6 +13,8 @@ import io.synadia.utils.Debug;
 import java.io.IOException;
 import java.util.concurrent.ThreadLocalRandom;
 
+import static io.nats.jsmulti.shared.Utils.sleep;
+
 public class FailgroundSim extends AbstractCustomWorkload {
     private String dataStreamName;
     private String dataSubject;
@@ -114,12 +116,13 @@ public class FailgroundSim extends AbstractCustomWorkload {
                         if (count % publishReportFrequency == 0) {
                             log(js, publishJob, ws.workId, NO_TIX, count, ws.elapse());
                         }
+                        jitter(publishJitter);
                     }
                     catch (IOException | JetStreamApiException e) {
+                        sleep(publishJitter);
                         lastSeq = -1;
                         log(js, publishJob, ws.workId, ws.elapse(), e);
                     }
-                    jitter(publishJitter);
                 }
             }
             catch (InterruptedException | IOException e) {
@@ -169,11 +172,12 @@ public class FailgroundSim extends AbstractCustomWorkload {
                         catch (Exception e) {
                             // auto closeable problem, ignore
                         }
+                        jitter(orderedJitter);
                     }
                     catch (IOException | JetStreamApiException | FailureException e) {
+                        sleep(orderedJitter);
                         log(js, orderedJob, ws.workId, ws.elapse(), e);
                     }
-                    jitter(orderedJitter);
                 }
             }
             catch (InterruptedException | IOException e) {
