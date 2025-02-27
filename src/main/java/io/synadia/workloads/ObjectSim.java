@@ -230,7 +230,7 @@ public class ObjectSim extends AbstractCustomWorkload {
 
                             long count = ws.increment();
                             if (count % putReportFrequency == 0) {
-                                log(js, putJob, ws.workId, NO_TIX, count, ws.elapse(), true);
+                                log(js, putJob, ws.workId, NO_TIX, count, ws.elapse());
                             }
                         }
                     }
@@ -298,7 +298,7 @@ public class ObjectSim extends AbstractCustomWorkload {
                                     os.get(objectName, out);
                                     long count = ws.increment();
                                     if (count % getReportFrequency == 0) {
-                                        log(js, getJob, ws.workId, NO_TIX, count, ws.elapse(), true);
+                                        log(js, getJob, ws.workId, NO_TIX, count, ws.elapse());
                                     }
                                 }
                                 catch (IOException | JetStreamApiException e) {

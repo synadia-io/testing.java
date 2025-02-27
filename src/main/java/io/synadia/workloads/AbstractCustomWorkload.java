@@ -230,11 +230,12 @@ public abstract class AbstractCustomWorkload extends Workload {
 
     public static final String EX_START   = "┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐";
     public static final String EX_DESC    = "│ Exceptions                                                                                                                 │";
-    public static final String EX_TOP_SEP = "├────────────────┬─────────────────────┬────────────┬────────────────────────────────────────────────────────────────────────┤";
-    public static final String EX_HEADER  = "│ ? Job (Thread) │ Last Occurrence     │      Count │ Details                                                                │";
-    public static final String EX_SEP     = "├────────────────┼─────────────────────┼────────────┼────────────────────────────────────────────────────────────────────────┤";
-    public static final String EX_FOOT    = "└────────────────┴─────────────────────┴────────────┴────────────────────────────────────────────────────────────────────────┘";
-    public static final String EX_DATA    = "│ %-14s │ %-17s │ %,10d │ %-70s │\n";
+    public static final String EX_TOP_SEP = "├────────────────┬─────────────────────┬───────┬─────────────────────────────────────────────────────────────────────────────┤";
+    public static final String EX_HEADER  = "│ ? Job (Thread) │ Last Occurrence     │ Count │ Exception                                                                   │";
+    public static final String EX_SEP     = "├────────────────┼─────────────────────┼───────┼─────────────────────────────────────────────────────────────────────────────┤";
+    public static final String EX_FOOT    = "└────────────────┴─────────────────────┴───────┴─────────────────────────────────────────────────────────────────────────────┘";
+    public static final String EX_DATA    = "│ %-14s │ %-17s │ %,5d │ %-75s │\n";
+    public static final int EX_WIDTH = 75;
 
     public static final String LOG_START      = "┌────────────────────────────────────────────────────┐";
     public static final String LOG_DESC       = "│ Log                                                │";
@@ -268,9 +269,7 @@ public abstract class AbstractCustomWorkload extends Workload {
 
             while (true) {
                 try {
-                    System.out.println();
-                    System.out.println();
-                    System.out.println();
+                    System.out.println("\n\n\n\n");
                     System.out.println(SUMMARY_START);
                     System.out.println(SUMMARY_DESC);
 
@@ -387,13 +386,21 @@ public abstract class AbstractCustomWorkload extends Workload {
                     if (event.tix != NO_TIX) {
                         job = job + " (" + event.tix + ")";
                     }
+                    if (event.qualifier != null) {
+                        job = job + " {" + event.qualifier + "}";
+                    }
 
                     String ht = humanTime(event.elapsed);
 
                     if (isEx) {
                         String time = Debug.rfcTime(mi.getTime());
                         long count = map.get(subject);
-                        String deets = event.exceptionClass == null ? "" : event.exceptionMessage;
+                        String deets = event.exceptionClass == null
+                            ? ""
+                            : event.exceptionClass.replace("Exception", "") + ": " + event.exceptionMessage;
+                        if (deets.length() > EX_WIDTH) {
+                            deets = deets.substring(0, EX_WIDTH - 3) + "...";
+                        }
                         System.out.printf(EX_DATA, job, time, count, deets);
                     }
                     else {
@@ -519,17 +526,30 @@ public abstract class AbstractCustomWorkload extends Workload {
 
     }
 
-    protected interface Worker {
+    protected interface SingleThreadedWorker {
+        Runnable getWork(Options options, WorkState workState);
+    }
+
+    protected interface MultiThreadedWorker {
         Runnable getWork(Options options, int tix, WorkState workState);
     }
 
-    protected void doWorker(String job, int threadCount, Worker worker) throws InterruptedException {
+    protected void doWorker(String job, SingleThreadedWorker worker) throws InterruptedException {
         startJob(job);
-        List<Options> options = roundRobinOptions(threadCount);
+        WorkState ws = new WorkState();
+        Thread t = new Thread(worker.getWork(roundRobinOptions().getFirst(), ws));
+        t.setName(job);
+        t.start();
+        t.join();
+    }
+
+    protected void doWorker(String job, int threadCount, MultiThreadedWorker worker) throws InterruptedException {
+        startJob(job);
+        List<Options> optionsList = roundRobinOptions();
         List<Thread> threads = new ArrayList<>(threadCount);
         WorkState ws = new WorkState();
         for (int tix = 0; tix < threadCount; tix++) {
-            Thread t = new Thread(worker.getWork(options.get(tix), tix, ws));
+            Thread t = new Thread(worker.getWork(optionsList.get(tix), tix, ws));
             t.setName(job + " " + tix + " ");
             t.start();
             threads.add(t);
@@ -689,16 +709,30 @@ public abstract class AbstractCustomWorkload extends Workload {
     // ----------------------------------------------------------------------------------------------------
     // LOG HELPERS
     // ----------------------------------------------------------------------------------------------------
-    protected void log(JetStream js, String job, String workId, int tix, long count, long elapsed, boolean console) {
+    protected void log(JetStream js, String job, String workId, int tix, long count, long elapsed) {
         Event event = new Event(job, workId, tix, null, count, elapsed, null);
-        if (console) {
-            Debug.info(event.ident(), event.extras());
-        }
+        Debug.info(event.ident(), event.extras());
         publish(js, event);
+    }
+
+    protected void log(JetStream js, String job, String workId, int tix, String qualifier, long count, long elapsed) {
+        Event event = new Event(job, workId, tix, qualifier, count, elapsed, null);
+        Debug.info(event.ident(), event.extras());
+        publish(js, event);
+    }
+
+    protected void logNoConsole(JetStream js, String job, String workId, int tix, long count, long elapsed) {
+        publish(js, new Event(job, workId, tix, null, count, elapsed, null));
     }
 
     protected void log(JetStream js, String job, String workId, long elapsed, Exception exception) {
         Event event = new Event(job, workId, NO_TIX, null, 0, elapsed, exception);
+        Debug.info(event.ident(), event.extras());
+        publish(js, event);
+    }
+
+    protected void log(JetStream js, String job, String workId, String qualifier, long elapsed, Exception exception) {
+        Event event = new Event(job, workId, NO_TIX, qualifier, 0, elapsed, exception);
         Debug.info(event.ident(), event.extras());
         publish(js, event);
     }

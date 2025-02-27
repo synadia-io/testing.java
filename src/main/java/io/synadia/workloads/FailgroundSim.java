@@ -4,9 +4,9 @@
 package io.synadia.workloads;
 
 import io.nats.client.*;
-import io.nats.client.api.PublishAck;
-import io.nats.client.api.StreamConfiguration;
+import io.nats.client.api.*;
 import io.nats.client.support.JsonValueUtils;
+import io.nats.jsmulti.shared.FailureException;
 import io.synadia.CommandLine;
 import io.synadia.utils.Debug;
 
@@ -24,6 +24,10 @@ public class FailgroundSim extends AbstractCustomWorkload {
     private int publishMinMessageSize;
     private int publishMaxMessageSize;
 
+    private String orderedJob;
+    private long orderedReportFrequency;
+    private long orderedJitter;
+
     @Override
     public void init(CommandLine commandLine) {
         init("Failground Sim", commandLine);
@@ -31,7 +35,7 @@ public class FailgroundSim extends AbstractCustomWorkload {
         dataStreamName = JsonValueUtils.readString(params.jv, "data_stream_name", "data");
 
         initCustom(
-            new String[]{"pub"},
+            new String[]{"pub", "ordered"},
             new String[]{dataStreamName}
         );
 
@@ -43,7 +47,7 @@ public class FailgroundSim extends AbstractCustomWorkload {
 
         publishJob = JsonValueUtils.readString(params.jv, "publish_job", "Publish");
         publishReportFrequency = JsonValueUtils.readLong(params.jv, "publish_report_frequency", 100);
-        publishJitter = JsonValueUtils.readLong(params.jv, "publish_jitter", 100);
+        publishJitter = JsonValueUtils.readLong(params.jv, "publish_jitter", 10);
         publishMinMessageSize = JsonValueUtils.readInteger(params.jv, "publish_min_message_size", 100);
         publishMaxMessageSize = JsonValueUtils.readInteger(params.jv, "publish_max_message_size", 1000);
         Debug.info(workLabel, "publishJob", publishJob);
@@ -51,13 +55,31 @@ public class FailgroundSim extends AbstractCustomWorkload {
         Debug.info(workLabel, "publishJitter", publishJitter);
         Debug.info(workLabel, "publishMinMessageSize", publishMinMessageSize);
         Debug.info(workLabel, "publishMaxMessageSize", publishMaxMessageSize);
+
+
+        orderedJob = JsonValueUtils.readString(params.jv, "ordered_job", "Ordered");
+        orderedReportFrequency = JsonValueUtils.readLong(params.jv, "ordered_report_frequency", 10000);
+        orderedJitter = JsonValueUtils.readLong(params.jv, "ordered_jitter", 10);
+        Debug.info(workLabel, "orderedJob", orderedJob);
+        Debug.info(workLabel, "orderedReportFrequency", orderedReportFrequency);
+        Debug.info(workLabel, "orderedJitter", orderedJitter);
+    }
+
+    @Override
+    protected void subDoSetup(Connection nc, JetStreamManagement jsm) throws IOException, JetStreamApiException, InterruptedException {
+        addStream(jsm, StreamConfiguration.builder()
+            .name(dataStreamName)
+            .subjects(dataSubject)
+            .maxMessages(dataMaxMessages)
+            .build());
     }
 
     @Override
     protected boolean subRunWorkload(String arg) throws Exception {
         switch (arg) {
-            case "pub" -> doWorker(publishJob, 1, this::pubWorker);
-            default    -> { return false; }
+            case "pub"     -> doWorker(publishJob, this::pubWorker);
+            case "ordered" -> doWorker(publishJob, this::orderedWorker);
+            default        -> { return false; }
         }
         return true;
     }
@@ -72,7 +94,7 @@ public class FailgroundSim extends AbstractCustomWorkload {
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
-    private Runnable pubWorker(Options options, int tix, WorkState ws) {
+    private Runnable pubWorker(Options options, WorkState ws) {
         return () -> {
             try (Connection nc = Nats.connect(options)) {
                 JetStream js = nc.jetStream();
@@ -81,11 +103,6 @@ public class FailgroundSim extends AbstractCustomWorkload {
                 long lastSeq = -1;
                 while (true) {
                     try {
-                        if (publishJitter > 0) {
-                            //noinspection BusyWait
-                            Thread.sleep(ThreadLocalRandom.current().nextLong(publishJitter));
-                        }
-
                         String pubId = NUID.nextGlobal();
                         PublishOptions po = lastSeq == -1
                             ? PublishOptions.builder().build()
@@ -95,7 +112,7 @@ public class FailgroundSim extends AbstractCustomWorkload {
 
                         long count = ws.increment();
                         if (count % publishReportFrequency == 0) {
-                            log(js, publishJob, ws.workId, NO_TIX, count, ws.elapse(), true);
+                            log(js, publishJob, ws.workId, NO_TIX, count, ws.elapse());
                         }
                     }
                     catch (IOException | JetStreamApiException e) {
@@ -111,12 +128,57 @@ public class FailgroundSim extends AbstractCustomWorkload {
         };
     }
 
-    @Override
-    protected void subDoSetup(Connection nc, JetStreamManagement jsm) throws IOException, JetStreamApiException, InterruptedException {
-        addStream(jsm, StreamConfiguration.builder()
-            .name(dataStreamName)
-            .subjects(dataSubject)
-            .maxMessages(dataMaxMessages)
-            .build());
+    @SuppressWarnings("InfiniteLoopStatement")
+    private Runnable orderedWorker(Options options, WorkState ws) {
+        return () -> {
+            try (Connection nc = Nats.connect(options)) {
+                JetStream js = nc.jetStream();
+                printConnect(nc, orderedJob, ws.workId, NO_TIX);
+                jitter(orderedJitter / 10);
+                while (true) {
+                    try {
+                        StreamContext ctx = nc.getStreamContext(dataStreamName);
+                        StreamInfo si = ctx.getStreamInfo(StreamInfoOptions.builder().filterSubjects(dataSubject).build());
+                        long available = si.getStreamState().getSubjectMap().get(dataSubject);
+                        OrderedConsumerContext occ = ctx.createOrderedConsumer(new OrderedConsumerConfiguration());
+                        long nextExpectedSequence = -1;
+                        try (IterableConsumer it = occ.iterate()) {
+                            Message m = it.nextMessage(1000);
+                            while (m != null) {
+                                long seq = m.metaData().streamSequence();
+                                if (nextExpectedSequence != -1) {
+                                    if (nextExpectedSequence != seq) {
+                                        throw new FailureException("Ordered consumer returned incorrect sequence");
+                                    }
+                                }
+                                nextExpectedSequence = seq + 1;
+                                long count = ws.increment();
+                                if (--available < 1) {
+                                    log(js, orderedJob, ws.workId, NO_TIX, count, ws.elapse());
+                                    break;
+                                }
+                                if (count % orderedReportFrequency == 0) {
+                                    log(js, orderedJob, ws.workId, NO_TIX, count, ws.elapse());
+                                }
+                                m = it.nextMessage(1000);
+                            }
+                        }
+                        catch (IOException | JetStreamApiException | FailureException e) {
+                            throw e; // rethrow this
+                        }
+                        catch (Exception e) {
+                            // auto closeable problem, ignore
+                        }
+                    }
+                    catch (IOException | JetStreamApiException | FailureException e) {
+                        log(js, orderedJob, ws.workId, ws.elapse(), e);
+                    }
+                    jitter(orderedJitter);
+                }
+            }
+            catch (InterruptedException | IOException e) {
+                throw new RuntimeException(e);
+            }
+        };
     }
 }

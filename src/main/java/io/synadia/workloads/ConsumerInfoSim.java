@@ -283,7 +283,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
 
                 long count = ws.increment();
                 if (count % reportFrequency == 0) {
-                    log(js, job, ws.workId, NO_TIX, count, ws.elapse(), true);
+                    log(js, job, ws.workId, NO_TIX, count, ws.elapse());
                 }
             }
         }
@@ -326,7 +326,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                     }
                     long count = ws.increment();
                     if (count % reportFrequency == 0) {
-                        log(js, job, ws.workId, NO_TIX, count, ws.elapse(), true);
+                        log(js, job, ws.workId, NO_TIX, count, ws.elapse());
                     }
                 }
                 catch (IOException | JetStreamApiException e) {
@@ -402,10 +402,10 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                             jsm.getConsumerInfo(dataStreamName, consumerName);
                             long groupCount = ws.increment();
                             if (groupCount % infoReportFrequency == 0) {
-                                log(js, infoJob, ws.workId, NO_TIX, groupCount, ws.elapse(), true);
+                                log(js, infoJob, ws.workId, NO_TIX, groupCount, ws.elapse());
                             }
                             if (++ownCount % infoReportFrequency == 0) {
-                                log(js, infoJob, ws.workId, tix, ownCount, ws.elapse(), false);
+                                logNoConsole(js, infoJob, ws.workId, tix, ownCount, ws.elapse());
                             }
                         }
                         catch (IOException | JetStreamApiException e) {
