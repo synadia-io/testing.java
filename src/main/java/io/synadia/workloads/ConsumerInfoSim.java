@@ -60,19 +60,34 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
 
     @Override
     public void init(CommandLine commandLine) {
-        customWorkloadInit("Consumer Info Sim", true, commandLine);
+        init("Consumer Info Sim", commandLine);
 
         dataStreamName = JsonValueUtils.readString(params.jv, "data_stream_name", "data");
+        queueStreamName = JsonValueUtils.readString(params.jv, "queue_stream_name", "queue");
+
+        initCustom(
+            new String[]{"list", "produce", "consume", "info", "combo", "stream"},
+            new String[]{dataStreamName, queueStreamName}
+        );
+
         dataSubjectPrefix = JsonValueUtils.readString(params.jv, "data_subject_prefix", "data.");
         dataStreamSubject = JsonValueUtils.readString(params.jv, "data_stream_subject", "data.>");
         dataMaxMessages = JsonValueUtils.readLong(params.jv, "data_max_messages", 1_000_000);
+        Debug.info(workLabel, "dataStreamName", dataStreamName);
+        Debug.info(workLabel, "dataSubjectPrefix", dataSubjectPrefix);
+        Debug.info(workLabel, "dataStreamSubject", dataStreamSubject);
+        Debug.info(workLabel, "dataMaxMessages", dataMaxMessages);
 
-        queueStreamName = JsonValueUtils.readString(params.jv, "queue_stream_name", "queue");
         queueSubject = JsonValueUtils.readString(params.jv, "queue_subject", "qsub");
         queueConsumerName = JsonValueUtils.readString(params.jv, "queue_consumer_name", "qcon");
         queueMaxMessages = JsonValueUtils.readLong(params.jv, "queue_max_messages", 1_000_000);
+        Debug.info(workLabel, "queueStreamName", queueStreamName);
+        Debug.info(workLabel, "queueSubject", queueSubject);
+        Debug.info(workLabel, "queueConsumerName", queueConsumerName);
+        Debug.info(workLabel, "queueMaxMessages", queueMaxMessages);
 
         maxConsumers = JsonValueUtils.readInteger(params.jv, "max_consumers", 10_000);
+        Debug.info(workLabel, "maxConsumers", maxConsumers);
 
         produceJob = JsonValueUtils.readString(params.jv, "produce_job", "Produce");
         produceThreadCount = JsonValueUtils.readInteger(params.jv, "produce_thread_count", 3);
@@ -80,37 +95,6 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
         produceJitter = JsonValueUtils.readLong(params.jv, "produce_jitter", 1000);
         produceMessageMin = JsonValueUtils.readInteger(params.jv, "produce_message_min", 10);
         produceMessageMax = JsonValueUtils.readInteger(params.jv, "produce_message_max", 100);
-
-        consumeJob = JsonValueUtils.readString(params.jv, "consume_job", "Consume");
-        consumeThreadCount = JsonValueUtils.readInteger(params.jv, "consume_thread_count", 3);
-        consumeReportFrequency = JsonValueUtils.readLong(params.jv, "consume_report_frequency", 100);
-        consumeJitter = JsonValueUtils.readLong(params.jv, "consume_jitter", 500);
-        consumeBatch = JsonValueUtils.readInteger(params.jv, "consume_batch", 10);
-
-        infoJob = JsonValueUtils.readString(params.jv, "info_job", "Info");
-        infoThreadCount = JsonValueUtils.readInteger(params.jv, "info_thread_count", 8);
-        infoReportFrequency = JsonValueUtils.readLong(params.jv, "info_report_frequency", 1000);
-        infoJitter = JsonValueUtils.readLong(params.jv, "info_jitter", 10_000);
-
-        comboJob = JsonValueUtils.readString(params.jv, "combo_job", "combo");
-        comboThreadCount = JsonValueUtils.readInteger(params.jv, "combo_thread_count", 3);
-        comboReportFrequency = JsonValueUtils.readLong(params.jv, "combo_report_frequency", 100);
-        comboJitter = JsonValueUtils.readLong(params.jv, "combo_jitter", 500);
-        comboProduce = JsonValueUtils.readInteger(params.jv, "combo_produce", 1);
-        comboConsume = JsonValueUtils.readInteger(params.jv, "combo_produce", 2);
-
-        Debug.info(workLabel, "dataStreamName", dataStreamName);
-        Debug.info(workLabel, "dataSubjectPrefix", dataSubjectPrefix);
-        Debug.info(workLabel, "dataStreamSubject", dataStreamSubject);
-        Debug.info(workLabel, "dataMaxMessages", dataMaxMessages);
-
-        Debug.info(workLabel, "queueStreamName", queueStreamName);
-        Debug.info(workLabel, "queueSubject", queueSubject);
-        Debug.info(workLabel, "queueConsumerName", queueConsumerName);
-        Debug.info(workLabel, "queueMaxMessages", queueMaxMessages);
-
-        Debug.info(workLabel, "maxConsumers", maxConsumers);
-
         Debug.info(workLabel, "produceJob", produceJob);
         Debug.info(workLabel, "produceThreadCount", produceThreadCount);
         Debug.info(workLabel, "produceReportFrequency", produceReportFrequency);
@@ -118,28 +102,38 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
         Debug.info(workLabel, "produceMessageMin", produceMessageMin);
         Debug.info(workLabel, "produceMessageMax", produceMessageMax);
 
+        consumeJob = JsonValueUtils.readString(params.jv, "consume_job", "Consume");
+        consumeThreadCount = JsonValueUtils.readInteger(params.jv, "consume_thread_count", 3);
+        consumeReportFrequency = JsonValueUtils.readLong(params.jv, "consume_report_frequency", 100);
+        consumeJitter = JsonValueUtils.readLong(params.jv, "consume_jitter", 500);
+        consumeBatch = JsonValueUtils.readInteger(params.jv, "consume_batch", 10);
         Debug.info(workLabel, "consumeJob", consumeJob);
         Debug.info(workLabel, "consumeThreadCount", consumeThreadCount);
         Debug.info(workLabel, "consumeReportFrequency", consumeReportFrequency);
         Debug.info(workLabel, "consumeJitter", consumeJitter);
         Debug.info(workLabel, "consumeBatch", consumeBatch);
 
+        infoJob = JsonValueUtils.readString(params.jv, "info_job", "Info");
+        infoThreadCount = JsonValueUtils.readInteger(params.jv, "info_thread_count", 8);
+        infoReportFrequency = JsonValueUtils.readLong(params.jv, "info_report_frequency", 1000);
+        infoJitter = JsonValueUtils.readLong(params.jv, "info_jitter", 10_000);
         Debug.info(workLabel, "infoJob", infoJob);
         Debug.info(workLabel, "infoThreadCount", infoThreadCount);
         Debug.info(workLabel, "infoReportFrequency", infoReportFrequency);
         Debug.info(workLabel, "infoJitter", infoJitter);
 
+        comboJob = JsonValueUtils.readString(params.jv, "combo_job", "combo");
+        comboThreadCount = JsonValueUtils.readInteger(params.jv, "combo_thread_count", 3);
+        comboReportFrequency = JsonValueUtils.readLong(params.jv, "combo_report_frequency", 100);
+        comboJitter = JsonValueUtils.readLong(params.jv, "combo_jitter", 500);
+        comboProduce = JsonValueUtils.readInteger(params.jv, "combo_produce", 1);
+        comboConsume = JsonValueUtils.readInteger(params.jv, "combo_produce", 2);
         Debug.info(workLabel, "comboJob", comboJob);
         Debug.info(workLabel, "comboThreadCount", comboThreadCount);
         Debug.info(workLabel, "comboReportFrequency", comboReportFrequency);
         Debug.info(workLabel, "comboJitter", comboJitter);
         Debug.info(workLabel, "comboProduce", comboProduce);
         Debug.info(workLabel, "comboConsume", comboConsume);
-    }
-
-    @Override
-    protected String[] commands() {
-        return new String[] {"setup", "list", "produce", "consume", "info", "combo", "watch", "stream", "clear consumers|data|queue|log|ex", "purge <job>"};
     }
 
     @Override
@@ -150,7 +144,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
             case "consume" -> doWorker(consumeJob, consumeThreadCount, this::consumeWorker);
             case "combo"   -> doWorker(comboJob, comboThreadCount, this::comboWorker);
             case "info"    -> doWorker(infoJob, infoThreadCount, this::infoWorker);
-            case "watch"   -> doWatch(dataStreamName, queueStreamName);
+            case "watch"   -> doWatch();
             case "stream"  -> doStream();
             default        -> { return false; }
         }

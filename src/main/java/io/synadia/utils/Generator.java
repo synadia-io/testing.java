@@ -84,10 +84,6 @@ public class Generator {
             generate(START_CLIENTS_BAT, calc.startSshTemplate, SCRIPT_OUTPUT_DIR);
         }
 
-//        if (calc.runningServers.size() != cfg.serverCount) {
-//            return;
-//        }
-
         Kind lastKind = null;
         for (int x = 0; x < cfg.serverCount; x++) {
             String scriptName = "server" + x;

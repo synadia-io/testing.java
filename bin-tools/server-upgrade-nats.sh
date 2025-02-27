@@ -15,3 +15,4 @@ nats-server -v
 # START THE SERVER
 sudo systemctl daemon-reload
 sudo systemctl start nats-server.service
+sudo systemctl status nats-server.service

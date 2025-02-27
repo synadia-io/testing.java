@@ -9,12 +9,8 @@ public class DebugWorkload extends AbstractCustomWorkload {
 
     @Override
     public void init(CommandLine commandLine) {
-        customWorkloadInit("Debug Workload", true, commandLine);
-    }
-
-    @Override
-    protected String[] commands() {
-        return new String[] {};
+        init("Debug Workload", commandLine);
+        initCustom(new String[0], new String[0]);
     }
 
     @Override

@@ -50,7 +50,7 @@ public class ObjectSim extends AbstractCustomWorkload {
     private String getFilePrefix;
 
     public void init(CommandLine commandLine) {
-        customWorkloadInit("Object Store Sim", true, commandLine);
+        init("Object Store Sim", commandLine);
 
         bucketName = JsonValueUtils.readString(params.jv, "bucket_name", "bucket");
         bucketStreamName = NatsObjectStoreUtil.toStreamName(bucketName);
@@ -60,6 +60,11 @@ public class ObjectSim extends AbstractCustomWorkload {
         queueSubject = JsonValueUtils.readString(params.jv, "queue_subject", "qsub");
         queueConsumerName = JsonValueUtils.readString(params.jv, "queue_consumer_name", "qcon");
         queueMaxMessages = JsonValueUtils.readLong(params.jv, "queue_max_messages", 1_000_000);
+
+        initCustom(
+            new String[] {"put", "get", "cleanup"},
+            new String[] {bucketStreamName, queueStreamName}
+        );
 
         maxObjects = JsonValueUtils.readInteger(params.jv, "max_objects", 10_000);
 
@@ -107,16 +112,10 @@ public class ObjectSim extends AbstractCustomWorkload {
     }
 
     @Override
-    protected String[] commands() {
-        return new String[] {"setup", "put", "get", "watch", "cleanup", "clear queue|log|ex"};
-    }
-
-    @Override
     protected boolean subRunWorkload(String arg) throws Exception {
         switch (arg) {
             case "put"     -> doWorker(putJob, putThreadCount, this::putObjectWorker);
             case "get"     -> doWorker(getJob, getThreadCount, this::getObjectWorker);
-            case "watch"   -> doWatch(bucketStreamName, queueStreamName);
             case "cleanup" -> doCleanup();
             default        -> { return false; }
         }

@@ -107,7 +107,7 @@ public class Params implements JsonSerializable {
         _debug("os", os);
         _debug("streamConfig", streamConfig);
         _debug("createStream", createStream);
-        _debug("jvMultiConfig", createStream ? jvMultiConfig : null);
+        _debug("jvMultiConfig", jvMultiConfig);
         _debug("adminServer", adminServer);
         _debug("servers", servers);
 
