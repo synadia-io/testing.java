@@ -67,7 +67,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
         queueStreamName = JsonValueUtils.readString(params.jv, "queue_stream_name", "queue");
 
         initCustom(
-            new String[]{"list", "produce", "consume", "info", "combo", "stream"},
+            new String[]{"list [consumers]", "produce", "consume", "info", "combo", "clear [consumers]"},
             new String[]{dataStreamName, queueStreamName}
         );
 
@@ -140,13 +140,12 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
     @Override
     protected boolean subRunWorkload(String arg) throws Exception {
         switch (arg) {
-            case "list"    -> doList();
+            case "list"    -> doListConsumers();
             case "produce" -> doWorker(produceJob, produceThreadCount, this::produceWorker);
             case "consume" -> doWorker(consumeJob, consumeThreadCount, this::consumeWorker);
             case "combo"   -> doWorker(comboJob, comboThreadCount, this::comboWorker);
             case "info"    -> doWorker(infoJob, infoThreadCount, this::infoWorker);
-            case "watch"   -> doWatch();
-            case "stream"  -> doStream();
+            case "clear"   -> doClearConsumers();
             default        -> { return false; }
         }
         return true;
@@ -171,22 +170,13 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
         jsm.createConsumer(queueStreamName, ConsumerConfiguration.builder().durable(queueConsumerName).filterSubject(queueSubject).build());
     }
 
-    private void doList() throws IOException, JetStreamApiException, InterruptedException {
+    private void doListConsumers() throws IOException, JetStreamApiException, InterruptedException {
         runAdminCommand((nc, jsm) -> {
             startProgressJob("List Consumers");
             List<String> consumerNames = jsm.getConsumerNames(dataStreamName);
             consumerNames.forEach(cn -> System.out.println("Consumer: " + cn));
             System.out.println("Total: " + consumerNames.size());
         });
-    }
-
-    @Override
-    protected boolean subDoClear(String option) throws IOException, JetStreamApiException, InterruptedException {
-        if (option.equals("consumers")) {
-            doClearConsumers();
-            return true;
-        }
-        return false;
     }
 
     private void doClearConsumers() throws IOException, JetStreamApiException, InterruptedException {

@@ -10,6 +10,7 @@ public class DebugWorkload extends AbstractCustomWorkload {
     @Override
     public void init(CommandLine commandLine) {
         init("Debug Workload", commandLine);
+        commandLine.args.add("debug");
         initCustom(new String[0], new String[0]);
     }
 

@@ -351,7 +351,7 @@ public abstract class Debug {
             }
             return sb.toString();
         }
-        String s = o.toString().trim();
+        String s = o.toString();
         return s.isEmpty() ? "<empty>" : s;
     }
 

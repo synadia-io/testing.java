@@ -38,33 +38,16 @@ public abstract class AbstractCustomWorkload extends Workload {
     protected String watchDateFormat;
 
     protected List<String> customStreams;
-    protected String commands;
+    protected String commandHelp;
 
+    // ----------------------------------------------------------------------------------------------------
+    // INITIALIZATION
+    // ----------------------------------------------------------------------------------------------------
     protected void initCustom(String[] commands, String[] customStreams) {
-        // setup commands before anything, so if we need to exit, they can be printed
-        StringBuilder sb = new StringBuilder();
-        sb.append("setup");
-        for (String command : commands) {
-            sb.append(" ~ ");
-            sb.append(command);
-        }
-        sb.append(" ~ watch");
-        sb.append(" ~ clear <stream-name>");
-        boolean first = true;
-        for (String cs : customStreams) {
-            if(first) {
-                first = false;
-            }
-            else {
-                sb.append('|');
-            }
-            sb.append(cs);
-        }
-        sb.append("|log|ex");
-        sb.append(" ~ purge <job>");
-        this.commands = sb.toString();
+        // build help first...
+        buildCommandHelp(commands, customStreams);
 
-        // all workloads in this hierarchy expect args...
+        // all workloads in this hierarchy expect at least 1 arg...
         if (commandLine.args.isEmpty()) {
             exit("Argument(s) Required");
         }
@@ -93,20 +76,49 @@ public abstract class AbstractCustomWorkload extends Workload {
         Debug.info(workLabel, "watchDateFormat", watchDateFormat);
     }
 
+    private void buildCommandHelp(String[] commands, String[] customStreams) {
+        StringBuilder ssb = new StringBuilder();
+        boolean first = true;
+        for (String cs : customStreams) {
+            if(first) {
+                first = false;
+            }
+            else {
+                ssb.append('|');
+            }
+            ssb.append(cs);
+        }
+        ssb.append("|log|ex");
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n- setup");
+        for (String command : commands) {
+            sb.append("\n- ");
+            sb.append(command);
+        }
+        sb.append("\n- watch");
+        sb.append("\n- stream ").append(ssb);
+        sb.append("\n- purge ").append(ssb).append(" (<filter>)");
+        commandHelp = sb.toString();
+    }
+
     protected void exit(String reason) {
         Debug.info(workLabel, reason);
-        Debug.info(workLabel, "Commands", commands);
+        Debug.info(workLabel, "Commands", commandHelp);
         System.exit(0);
     }
 
+    // ----------------------------------------------------------------------------------------------------
+    // WORKLOAD START POINT
+    // ----------------------------------------------------------------------------------------------------
     @Override
     public void runWorkload() throws Exception {
         String arg = commandLine.args.getFirst();
         switch (arg) {
-            case "setup" -> doSetup();
-            case "watch" -> doWatch();
-            case "clear" -> doClear();
-            case "purge" -> doPurge();
+            case "setup"  -> doSetup();
+            case "watch"  -> doWatch();
+            case "stream" -> doStream();
+            case "purge"  -> doPurge();
             default -> {
                 if (!subRunWorkload(arg)) {
                     exit("Unknown custom workload command: '" + arg + "'");
@@ -133,7 +145,7 @@ public abstract class AbstractCustomWorkload extends Workload {
     }
 
     // ----------------------------------------------------------------------------------------------------
-    // DO SETUP COMMAND
+    // COMMAND: SETUP
     // ----------------------------------------------------------------------------------------------------
     @SuppressWarnings("SameParameterValue")
     protected void doSetup() throws IOException, JetStreamApiException, InterruptedException {
@@ -166,58 +178,47 @@ public abstract class AbstractCustomWorkload extends Workload {
     }
 
     // ----------------------------------------------------------------------------------------------------
-    // DO CLEAR COMMAND
+    // COMMAND: CLEAR
     // ----------------------------------------------------------------------------------------------------
-    protected void doClear() throws IOException, JetStreamApiException, InterruptedException {
+    protected void doPurge() throws IOException, JetStreamApiException, InterruptedException {
         String option = getStringArgFromPosition(2);
         if (option == null || option.isEmpty()) {
-            exit("Clear option not provided");
+            exit("Purge stream not provided");
             return;
         }
         if (option.equals("log")) {
-            doClearStream(logStreamName);
+            doPurge(logStreamName);
         }
         else if (option.equals("ex")) {
-            doClearStream(exStreamName);
+            doPurge(exStreamName);
         }
         else if (customStreams.contains(option)) {
-            doClearStream(option);
+            doPurge(option);
         }
-        else if (!subDoClear(option)) {
-            exit("Unknown clear option: '" + option + "'");
+        else {
+            exit("Unknown purge option: '" + option + "'");
         }
-    }
-
-    protected boolean subDoClear(String option) throws IOException, JetStreamApiException, InterruptedException {
-        return false;
-    }
-
-    protected void doClearStream(String streamName) throws IOException, JetStreamApiException, InterruptedException {
-        runAdminCommand((nc, jsm) -> {
-            startJob("Clear '" + streamName + "'");
-            nc.jetStreamManagement().purgeStream(streamName);
-        });
     }
 
     // ----------------------------------------------------------------------------------------------------
-    // DO PURGE COMMAND
+    // COMMAND: PURGE
     // ----------------------------------------------------------------------------------------------------
-    protected void doPurge() throws IOException, JetStreamApiException, InterruptedException {
+    protected void doPurge(String streamName) throws IOException, JetStreamApiException, InterruptedException {
         runAdminCommand((nc, jsm) -> {
-            String code = getStringArgFromPosition(2);
-            if (code == null || code.isEmpty()) {
-                exit("Purge option not provided");
+            String filter = getStringArgFromPosition(2);
+            if (filter == null || filter.isEmpty()) {
+                startJob("Purge " + streamName);
+                nc.jetStreamManagement().purgeStream(streamName);
             }
             else {
-                String purge = logSubjectPrefix + code + ".>";
-                startProgressJob("Purge: " + code + "(" + purge + ")");
-                jsm.purgeStream(logStreamName, PurgeOptions.builder().subject(purge).build());
+                startJob("Purge " + streamName + " (" + filter + ")");
+                jsm.purgeStream(logStreamName, PurgeOptions.builder().subject(filter).build());
             }
         });
     }
 
     // ----------------------------------------------------------------------------------------------------
-    // DO WATCH COMMAND
+    // COMMAND: WATCH
     // ----------------------------------------------------------------------------------------------------
     public static final String SUMMARY_START   = "┌────────────────────────────────────────────────────────────────────────────────────────────┐";
     public static final String SUMMARY_DESC    = "│ Stream Information                                                     " + Debug.rfcTime() + " │";
@@ -415,7 +416,7 @@ public abstract class AbstractCustomWorkload extends Workload {
     }
 
     // ----------------------------------------------------------------------------------------------------
-    // DO STREAM COMMAND
+    // COMMAND: STREAM
     // ----------------------------------------------------------------------------------------------------
     protected void doStream() throws Exception {
         startJob("Stream");
@@ -686,9 +687,8 @@ public abstract class AbstractCustomWorkload extends Workload {
     }
 
     // ----------------------------------------------------------------------------------------------------
-    // EVENT HELPERS
+    // LOG HELPERS
     // ----------------------------------------------------------------------------------------------------
-
     protected void log(JetStream js, String job, String workId, int tix, long count, long elapsed, boolean console) {
         Event event = new Event(job, workId, tix, null, count, elapsed, null);
         if (console) {
