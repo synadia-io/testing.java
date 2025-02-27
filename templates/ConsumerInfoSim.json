@@ -14,7 +14,7 @@
   "log_stream_name": "log",
   "log_subject_prefix": "log.",
   "log_stream_subject": "log.>",
-  "ex_stream_name": "exception",
+  "ex_stream_name": "ex",
   "ex_subject_prefix": "ex.",
   "ex_stream_subject": "ex.>",
   "data_stream_name": "data",

@@ -49,7 +49,7 @@ public abstract class AbstractCustomWorkload extends Workload {
             sb.append(command);
         }
         sb.append(" ~ watch");
-        sb.append(" ~ clear ");
+        sb.append(" ~ clear <stream-name>");
         boolean first = true;
         for (String cs : customStreams) {
             if(first) {
@@ -75,7 +75,7 @@ public abstract class AbstractCustomWorkload extends Workload {
         logStreamName = JsonValueUtils.readString(params.jv, "log_stream_name", "log");
         logSubjectPrefix = JsonValueUtils.readString(params.jv, "log_subject_prefix", "log.");
         logStreamSubject = JsonValueUtils.readString(params.jv, "log_stream_subject", "log.>");
-        exStreamName = JsonValueUtils.readString(params.jv, "ex_stream_name", "exception");
+        exStreamName = JsonValueUtils.readString(params.jv, "ex_stream_name", "ex");
         exSubjectPrefix = JsonValueUtils.readString(params.jv, "ex_subject_prefix", "ex.");
         exStreamSubject = JsonValueUtils.readString(params.jv, "ex_stream_subject", "ex.>");
         watchFrequency = JsonValueUtils.readLong(params.jv, "watch_frequency", 5000);
@@ -132,6 +132,9 @@ public abstract class AbstractCustomWorkload extends Workload {
         }
     }
 
+    // ----------------------------------------------------------------------------------------------------
+    // DO SETUP COMMAND
+    // ----------------------------------------------------------------------------------------------------
     @SuppressWarnings("SameParameterValue")
     protected void doSetup() throws IOException, JetStreamApiException, InterruptedException {
         runAdminCommand((nc, jsm) -> {
@@ -151,33 +154,37 @@ public abstract class AbstractCustomWorkload extends Workload {
                 .name(exStreamName)
                 .subjects(exStreamSubject)
                 .build());
-
             subDoSetup(nc, jsm);
         });
     }
+
+    protected void subDoSetup(Connection nc, JetStreamManagement jsm) throws IOException, JetStreamApiException, InterruptedException {}
 
     protected static void addStream(JetStreamManagement jsm, StreamConfiguration sc) throws IOException, JetStreamApiException {
         StreamInfo si = jsm.addStream(sc);
         printFormatted(si.getJv());
     }
 
-    protected void subDoSetup(Connection nc, JetStreamManagement jsm) throws IOException, JetStreamApiException, InterruptedException {
-    }
-
+    // ----------------------------------------------------------------------------------------------------
+    // DO CLEAR COMMAND
+    // ----------------------------------------------------------------------------------------------------
     protected void doClear() throws IOException, JetStreamApiException, InterruptedException {
         String option = getStringArgFromPosition(2);
         if (option == null || option.isEmpty()) {
             exit("Clear option not provided");
             return;
         }
-        switch (option) {
-            case "log" -> doClear("Log", logStreamName);
-            case "ex" -> doClearExceptions();
-            default -> {
-                if (!subDoClear(option)) {
-                    exit("Unknown clear option: '" + option + "'");
-                }
-            }
+        if (option.equals("log")) {
+            doClearStream(logStreamName);
+        }
+        else if (option.equals("ex")) {
+            doClearStream(exStreamName);
+        }
+        else if (customStreams.contains(option)) {
+            doClearStream(option);
+        }
+        else if (!subDoClear(option)) {
+            exit("Unknown clear option: '" + option + "'");
         }
     }
 
@@ -185,20 +192,16 @@ public abstract class AbstractCustomWorkload extends Workload {
         return false;
     }
 
-    protected void doClear(String label, String streamName) throws IOException, JetStreamApiException, InterruptedException {
+    protected void doClearStream(String streamName) throws IOException, JetStreamApiException, InterruptedException {
         runAdminCommand((nc, jsm) -> {
-            startJob("Clear " + label);
+            startJob("Clear '" + streamName + "'");
             nc.jetStreamManagement().purgeStream(streamName);
         });
     }
 
-    protected void doClearExceptions() throws IOException, JetStreamApiException, InterruptedException {
-        runAdminCommand((nc, jsm) -> {
-            startJob("Clear Exception");
-            nc.jetStreamManagement().purgeStream(exStreamName);
-        });
-    }
-
+    // ----------------------------------------------------------------------------------------------------
+    // DO PURGE COMMAND
+    // ----------------------------------------------------------------------------------------------------
     protected void doPurge() throws IOException, JetStreamApiException, InterruptedException {
         runAdminCommand((nc, jsm) -> {
             String code = getStringArgFromPosition(2);
@@ -213,36 +216,39 @@ public abstract class AbstractCustomWorkload extends Workload {
         });
     }
 
-    public static final String SUMMARY_START = "┌────────────────────────────────────────────────────────────────────────────────────────────┐";
-    public static final String SUMMARY_DESC = "│ Stream Information                                                     " + Debug.rfcTime() + " │";
+    // ----------------------------------------------------------------------------------------------------
+    // DO WATCH COMMAND
+    // ----------------------------------------------------------------------------------------------------
+    public static final String SUMMARY_START   = "┌────────────────────────────────────────────────────────────────────────────────────────────┐";
+    public static final String SUMMARY_DESC    = "│ Stream Information                                                     " + Debug.rfcTime() + " │";
     public static final String SUMMARY_TOP_SEP = "├──────────────┬────────────┬────────────┬────────────┬────────────┬────────────┬────────────┤";
-    public static final String SUMMARY_HEADER = "│ Stream       │   Messages │   Subjects │  Consumers │  First Seq │   Last Seq │      Bytes │";
-    public static final String SUMMARY_SEP = "├──────────────┼────────────┼────────────┼────────────┼────────────┼────────────┼────────────┤";
-    public static final String SUMMARY_FOOT = "└──────────────┴────────────┴────────────┴────────────┴────────────┴────────────┴────────────┘";
-    public static final String SUMMARY_DATA = "│ %-12s │ %,10d │ %,10d │ %,10d │ %,10d │ %,10d │ %10s │\n";
+    public static final String SUMMARY_HEADER  = "│ Stream       │   Messages │   Subjects │  Consumers │  First Seq │   Last Seq │      Bytes │";
+    public static final String SUMMARY_SEP     = "├──────────────┼────────────┼────────────┼────────────┼────────────┼────────────┼────────────┤";
+    public static final String SUMMARY_FOOT    = "└──────────────┴────────────┴────────────┴────────────┴────────────┴────────────┴────────────┘";
+    public static final String SUMMARY_DATA    = "│ %-12s │ %,10d │ %,10d │ %,10d │ %,10d │ %,10d │ %10s │\n";
 
-    public static final String EX_START = "┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐";
-    public static final String EX_DESC = "│ Exceptions                                                                                                                 │";
+    public static final String EX_START   = "┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐";
+    public static final String EX_DESC    = "│ Exceptions                                                                                                                 │";
     public static final String EX_TOP_SEP = "├────────────────┬─────────────────────┬────────────┬────────────────────────────────────────────────────────────────────────┤";
-    public static final String EX_HEADER = "│ ? Job (Thread) │ Last Occurrence     │      Count │ Details                                                                │";
-    public static final String EX_SEP = "├────────────────┼─────────────────────┼────────────┼────────────────────────────────────────────────────────────────────────┤";
-    public static final String EX_FOOT = "└────────────────┴─────────────────────┴────────────┴────────────────────────────────────────────────────────────────────────┘";
-    public static final String EX_DATA = "│ %-14s │ %-17s │ %,10d │ %-70s │\n";
+    public static final String EX_HEADER  = "│ ? Job (Thread) │ Last Occurrence     │      Count │ Details                                                                │";
+    public static final String EX_SEP     = "├────────────────┼─────────────────────┼────────────┼────────────────────────────────────────────────────────────────────────┤";
+    public static final String EX_FOOT    = "└────────────────┴─────────────────────┴────────────┴────────────────────────────────────────────────────────────────────────┘";
+    public static final String EX_DATA    = "│ %-14s │ %-17s │ %,10d │ %-70s │\n";
 
-    public static final String LOG_START = "┌────────────────────────────────────────────────────┐";
-    public static final String LOG_DESC = "│ Log                                                │";
-    public static final String LOG_TOP_SEP = "├───────────────────┬────────────────┬───────────────┤";
-    public static final String LOG_LINE_HEADER = "│ ? Job (Thread)    │ Count          │ Elapsed       │";
-    public static final String LOG_SEP_LINE = "├───────────────────┼────────────────┼───────────────┤";
-    public static final String LOG_FOOT_LINE = "└───────────────────┴────────────────┴───────────────┘";
-    public static final String LOG_LINE_FORMAT = "│ %-17s │ %-14s │ %-13s │\n";
+    public static final String LOG_START      = "┌────────────────────────────────────────────────────┐";
+    public static final String LOG_DESC       = "│ Log                                                │";
+    public static final String LOG_TOP_SEP    = "├───────────────────┬────────────────┬───────────────┤";
+    public static final String LOG_HEADER     = "│ ? Job (Thread)    │ Count          │ Elapsed       │";
+    public static final String LOG_SEP_LINE   = "├───────────────────┼────────────────┼───────────────┤";
+    public static final String LOG_FOOT_LINE  = "└───────────────────┴────────────────┴───────────────┘";
+    public static final String LOG_DATA       = "│ %-17s │ %-14s │ %-13s │\n";
 
-    public static final String OBJ_START = "┌────────────────────────────────────────┐";
-    public static final String OBJ_DESC = "│ Object Stores                          │";
-    public static final String OBJ_TOP_LINE = "├──────────────┬────────────┬────────────┤";
-    public static final String OBJ_LINE_HEADER = "│ Bucket       │    Objects │     Chunks │";
-    public static final String OBJ_SEP_LINE = "├──────────────┼────────────┼────────────┤";
-    public static final String OBJ_FOOT_LINE = "└──────────────┴────────────┴────────────┘";
+    public static final String OBJ_START      = "┌────────────────────────────────────────┐";
+    public static final String OBJ_DESC       = "│ Object Stores                          │";
+    public static final String OBJ_TOP_LINE   = "├──────────────┬────────────┬────────────┤";
+    public static final String OBJ_HEADER     = "│ Bucket       │    Objects │     Chunks │";
+    public static final String OBJ_SEP_LINE   = "├──────────────┼────────────┼────────────┤";
+    public static final String OBJ_FOOT_LINE  = "└──────────────┴────────────┴────────────┘";
     public static final String OBJ_LINE_FMT_1 = "│ %-12s ...";
     public static final String OBJ_LINE_FMT_2 = "\b\b\b│ %,10d │ %,10d │\n";
 
@@ -295,7 +301,7 @@ public abstract class AbstractCustomWorkload extends Workload {
 
                         // OBJECT SUMMARIES
                         System.out.println(OBJ_TOP_LINE);
-                        System.out.println(OBJ_LINE_HEADER);
+                        System.out.println(OBJ_HEADER);
                         System.out.println(OBJ_SEP_LINE);
                         for (String stream : objectStreams) {
                             summarizeObjectStream(nc, stream);
@@ -369,7 +375,7 @@ public abstract class AbstractCustomWorkload extends Workload {
                         }
                         else {
                             System.out.println(LOG_TOP_SEP);
-                            System.out.println(LOG_LINE_HEADER);
+                            System.out.println(LOG_HEADER);
                             System.out.println(LOG_SEP_LINE);
                         }
                     }
@@ -394,7 +400,7 @@ public abstract class AbstractCustomWorkload extends Workload {
                         if (event.count > 0) {
                             cnt = String.format("%,d", event.count);
                         }
-                        System.out.printf(LOG_LINE_FORMAT, job, cnt, ht);
+                        System.out.printf(LOG_DATA, job, cnt, ht);
                     }
                 }
             }
@@ -406,6 +412,67 @@ public abstract class AbstractCustomWorkload extends Workload {
         if (!first) {
             System.out.println(isEx ? EX_FOOT : LOG_FOOT_LINE);
         }
+    }
+
+    // ----------------------------------------------------------------------------------------------------
+    // DO STREAM COMMAND
+    // ----------------------------------------------------------------------------------------------------
+    protected void doStream() throws Exception {
+        startJob("Stream");
+        String streamName = getStringArgFromPosition(2);
+        if (streamName == null || streamName.isEmpty()) {
+            exit("Stream not provided");
+        }
+        doStream(streamName);
+    }
+
+    @SuppressWarnings("InfiniteLoopStatement")
+    protected void doStream(String streamName) throws IOException, JetStreamApiException, InterruptedException {
+        runAdminCommand((nc, jsm) -> {
+            StreamInfo si = jsm.getStreamInfo(streamName);
+            long seq = si.getStreamState().getFirstSequence();
+            seq = getLongArgFromPosition(3, seq);
+            long last = si.getStreamState().getLastSequence();
+            int tracker = 0;
+            while (true) {
+                if (seq > last) {
+                    si = jsm.getStreamInfo(streamName);
+                    long currentLast = si.getStreamState().getLastSequence();
+                    last = si.getStreamState().getLastSequence();
+                    if (currentLast <= last) {
+                        sleep(1000);
+                        continue;
+                    }
+                }
+                try {
+                    MessageInfo mi = jsm.getNextMessage(streamName, seq, ">");
+                    seq = mi.getSeq() + 1;
+                    byte[] data = mi.getData();
+                    String sdata = "<no data>";
+                    if (data != null && data.length > 0) {
+                        sdata = new String(data);
+                    }
+                    if (tracker > 0) {
+                        System.out.println();
+                    }
+                    System.out.println(mi.getSeq() + " | " + mi.getSubject() + " | " + sdata);
+                    tracker = 0;
+                }
+                catch (JetStreamApiException e) {
+                    if (e.getMessage().contains("10037")) { // it's fine the message is gone
+                        if (++tracker % progressFrequency == 0) {
+                            System.out.println();
+                        }
+                        else {
+                            System.out.print('x');
+                        }
+                    }
+                    else {
+                        throw e;
+                    }
+                }
+            }
+        });
     }
 
     // ----------------------------------------------------------------------------------------------------

@@ -56,8 +56,8 @@ public class FailgroundSim extends AbstractCustomWorkload {
     @Override
     protected boolean subRunWorkload(String arg) throws Exception {
         switch (arg) {
-            case "pub"   -> doWorker(publishJob, 1, this::pubWorker);
-            default      -> { return false; }
+            case "pub" -> doWorker(publishJob, 1, this::pubWorker);
+            default    -> { return false; }
         }
         return true;
     }

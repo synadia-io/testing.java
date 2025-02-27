@@ -4,7 +4,10 @@
 package io.synadia.workloads;
 
 import io.nats.client.*;
-import io.nats.client.api.*;
+import io.nats.client.api.ConsumerConfiguration;
+import io.nats.client.api.RetentionPolicy;
+import io.nats.client.api.StreamConfiguration;
+import io.nats.client.api.StreamInfo;
 import io.nats.client.support.JsonParser;
 import io.nats.client.support.JsonSerializable;
 import io.nats.client.support.JsonValue;
@@ -17,8 +20,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import static io.nats.jsmulti.shared.Utils.sleep;
 
 public class ConsumerInfoSim extends AbstractCustomWorkload {
     private String dataStreamName;
@@ -181,13 +182,11 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
 
     @Override
     protected boolean subDoClear(String option) throws IOException, JetStreamApiException, InterruptedException {
-        switch (option) {
-            case "consumers" -> doClearConsumers();
-            case "data"      -> doClear("Data", dataStreamName);
-            case "queue"     -> doClear("Queue", queueStreamName);
-            default          -> { return false; } // unknown option returns false, others fall through to return true
+        if (option.equals("consumers")) {
+            doClearConsumers();
+            return true;
         }
-        return true;
+        return false;
     }
 
     private void doClearConsumers() throws IOException, JetStreamApiException, InterruptedException {
@@ -436,59 +435,5 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
 
     private String toDataSubject(String consumerName) {
         return dataSubjectPrefix + consumerName;
-    }
-
-    @SuppressWarnings("InfiniteLoopStatement")
-    protected void doStream() throws Exception {
-        runAdminCommand((nc, jsm) -> {
-            startJob("Stream");
-            String streamName = getStringArgFromPosition(2);
-            if (streamName == null || streamName.isEmpty()) {
-                exit("Stream not provided");
-            }
-            StreamInfo si = jsm.getStreamInfo(streamName);
-            long seq = si.getStreamState().getFirstSequence();
-            seq = getLongArgFromPosition(3, seq);
-            long last = si.getStreamState().getLastSequence();
-            int tracker = 0;
-            while (true) {
-                if (seq > last) {
-                    si = jsm.getStreamInfo(streamName);
-                    long currentLast = si.getStreamState().getLastSequence();
-                    last = si.getStreamState().getLastSequence();
-                    if (currentLast <= last) {
-                        sleep(1000);
-                        continue;
-                    }
-                }
-                try {
-                    MessageInfo mi = jsm.getNextMessage(streamName, seq, ">");
-                    seq = mi.getSeq() + 1;
-                    byte[] data = mi.getData();
-                    String sdata = "<no data>";
-                    if (data != null && data.length > 0) {
-                        sdata = new String(data);
-                    }
-                    if (tracker > 0) {
-                        System.out.println();
-                    }
-                    System.out.println(mi.getSeq() + " | " + mi.getSubject() + " | " + sdata);
-                    tracker = 0;
-                }
-                catch (JetStreamApiException e) {
-                    if (e.getMessage().contains("10037")) { // it's fine the message is gone
-                        if (++tracker % progressFrequency == 0) {
-                            System.out.println();
-                        }
-                        else {
-                            System.out.print('x');
-                        }
-                    }
-                    else {
-                        throw e;
-                    }
-                }
-            }
-        });
     }
 }

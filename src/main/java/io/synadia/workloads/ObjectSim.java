@@ -183,16 +183,6 @@ public class ObjectSim extends AbstractCustomWorkload {
         printFormatted(ci.getJv());
     }
 
-    @Override
-    protected boolean subDoClear(String option) throws IOException, JetStreamApiException, InterruptedException {
-        //noinspection SwitchStatementWithTooFewBranches
-        switch (option) {
-            case "queue"     -> doClear("Queue", queueStreamName);
-            default          -> { return false; } // unknown option returns false, others fall through to return true
-        }
-        return true;
-    }
-
     private final ReentrantLock powLock = new ReentrantLock();
     @SuppressWarnings("InfiniteLoopStatement")
     private Runnable putObjectWorker(Options options, int tix, WorkState ws) {
