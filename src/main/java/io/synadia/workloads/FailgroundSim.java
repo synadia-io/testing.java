@@ -42,8 +42,8 @@ public class FailgroundSim extends AbstractCustomWorkload {
         Debug.info(workLabel, "dataMaxMessages", dataMaxMessages);
 
         publishJob = JsonValueUtils.readString(params.jv, "publish_job", "Publish");
-        publishReportFrequency = JsonValueUtils.readLong(params.jv, "publish_report_frequency", 1000);
-        publishJitter = JsonValueUtils.readLong(params.jv, "publish_jitter", 1000);
+        publishReportFrequency = JsonValueUtils.readLong(params.jv, "publish_report_frequency", 100);
+        publishJitter = JsonValueUtils.readLong(params.jv, "publish_jitter", 100);
         publishMinMessageSize = JsonValueUtils.readInteger(params.jv, "publish_min_message_size", 100);
         publishMaxMessageSize = JsonValueUtils.readInteger(params.jv, "publish_max_message_size", 1000);
         Debug.info(workLabel, "publishJob", publishJob);
@@ -92,8 +92,6 @@ public class FailgroundSim extends AbstractCustomWorkload {
                             : PublishOptions.builder().expectedLastSequence(lastSeq).build();
                         PublishAck pa = js.publish(dataSubject, getData(pubId), po);
                         lastSeq = pa.getSeqno();
-
-                        js.publish(dataSubject, getData(pubId));
 
                         long count = ws.increment();
                         if (count % publishReportFrequency == 0) {
