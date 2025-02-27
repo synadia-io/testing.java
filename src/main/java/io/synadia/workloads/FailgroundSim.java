@@ -99,6 +99,7 @@ public class FailgroundSim extends AbstractCustomWorkload {
                         }
                     }
                     catch (IOException | JetStreamApiException e) {
+                        lastSeq = -1;
                         log(js, publishJob, ws.workId, ws.elapse(), e);
                     }
                     jitter(publishJitter);
