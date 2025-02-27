@@ -45,8 +45,6 @@ public class Generator {
     public static final String SSH_PREFIX = "<Ssh";
     public static final String TAG_END = ">";
 
-    public static final String TESTING_STREAM_NAME = "<TestingStreamName>";
-    public static final String TESTING_STREAM_SUBJECT = "<TestingStreamSubject>";
     public static final String MULTI_BUCKET = "<MultiBucket>";
     public static final String STATS_BUCKET = "<StatsBucket>";
     public static final String STATS_WATCH_WAIT_TIME = "<StatsWatchWaitTime>";
@@ -418,8 +416,6 @@ public class Generator {
         public final String natsProto;
         public final List<String> natsPorts;
         public final List<String> localPorts;
-        public final String testingStreamName;
-        public final String testingStreamSubject;
         public final String multiBucket;
         public final String statsBucket;
         public final String profileBucket;
@@ -447,12 +443,10 @@ public class Generator {
             serverFilter = readString(jv, ("server_filter"), DO_NOT_MATCH);
             clientFilter = readString(jv, ("client_filter"), DO_NOT_MATCH);
             failgroundFilter = readString(jv, ("failground_filter"), DO_NOT_MATCH);
-            natsProto = readString(jv, ("nats_proto"));
+            natsProto = readString(jv, "nats_proto", "nats://");
             natsPorts = JsonValueUtils.readStringList(jv, "nats_ports");
             localPorts = JsonValueUtils.readStringList(jv, "local_ports");
 
-            testingStreamName = readString(jv, "testing_stream_name");
-            testingStreamSubject = readString(jv, "testing_stream_subject");
             multiBucket = readString(jv, "multi_bucket");
             statsBucket = readString(jv, "stats_bucket");
 
@@ -467,8 +461,7 @@ public class Generator {
         }
 
         public String populate(String template) {
-            return template.replace(TESTING_STREAM_NAME, testingStreamName)
-                .replace(TESTING_STREAM_SUBJECT, testingStreamSubject)
+            return template
                 .replace(MULTI_BUCKET, multiBucket)
                 .replace(STATS_BUCKET, statsBucket)
                 .replace(STATS_WATCH_WAIT_TIME, statsWatchWaitTime)
@@ -496,8 +489,6 @@ public class Generator {
             printMaybe("natsProto", natsProto);
             printMaybe("natsPort", natsPorts);
             printMaybe("localPorts", localPorts);
-            printMaybe("testingStreamName", testingStreamName);
-            printMaybe("testingStreamSubject", testingStreamSubject);
             printMaybe("multiBucket", multiBucket);
             printMaybe("statsBucket", statsBucket);
             printMaybe("profileBucket", profileBucket);
@@ -535,8 +526,6 @@ public class Generator {
                 .put("nats_proto", "nats://")
                 .put("nats_ports", JsonValueUtils.arrayBuilder().add("4222"))
                 .put("local_ports", JsonValueUtils.arrayBuilder().add("4222").add("5222").add("6222"))
-                .put("testing_stream_name", "testingStream")
-                .put("testing_stream_subject", "t")
                 .put("multi_bucket", "multiBucket")
                 .put("stats_bucket", "statsBucket")
                 .put("stats_watch_wait_time", 5000)

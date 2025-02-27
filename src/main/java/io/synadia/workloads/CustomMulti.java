@@ -30,8 +30,8 @@ public class CustomMulti extends Workload {
         Arguments a = Arguments.instance().addJsonConfig(params.jvMultiConfig.toJson());
         a.appClass(TestingApplication.class);
 
-        STREAM = params.testingStreamName;
-        SUBJECT = params.testingStreamSubject;
+        STREAM = "testingStream";
+        SUBJECT = "t";
 
         if ("consumers".equals(readString(params.jv, "which"))) {
             a.customAction(CustomActionRunner.class);

@@ -28,8 +28,6 @@ public class Params implements JsonSerializable {
     public final boolean createStream;
     public final String adminServer;
     public final List<String> servers;
-    public final String testingStreamName;
-    public final String testingStreamSubject;
     public final String multiBucket;
     public final String statsBucket;
     public final String profileBucket;
@@ -69,8 +67,6 @@ public class Params implements JsonSerializable {
             }
             servers.add(temp);
         }
-        testingStreamName = readString(jv, "testing_stream_name");
-        testingStreamSubject = readString(jv, "testing_stream_subject");
         multiBucket = readString(jv, "multi_bucket");
         statsBucket = readString(jv, "stats_bucket");
         profileBucket = readString(jv, "profile_bucket");
@@ -111,8 +107,6 @@ public class Params implements JsonSerializable {
         _debug("adminServer", adminServer);
         _debug("servers", servers);
 
-        _debug("testingStreamName", testingStreamName);
-        _debug("testingStreamSubject", testingStreamSubject);
         _debug("multiBucket", multiBucket);
         _debug("statsBucket", statsBucket);
         _debug("profileBucket", profileBucket);

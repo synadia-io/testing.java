@@ -7,8 +7,6 @@
   "server4": "<Server4>",
   "admin_server": "<AdminServer>",
   "bootstrap": "<Bootstrap>",
-  "testing_stream_name": "<TestingStreamName>",
-  "testing_stream_subject": "<TestingStreamSubject>",
   "multi_bucket" : "<MultiBucket>",
   "stats_bucket" : "<StatsBucket>",
   "profile_bucket" : "<ProfileBucket>",
