@@ -395,9 +395,7 @@ public abstract class AbstractCustomWorkload extends Workload {
                     if (isEx) {
                         String time = Debug.rfcTime(mi.getTime());
                         long count = map.get(subject);
-                        String deets = event.exceptionClass == null
-                            ? ""
-                            : event.exceptionClass.replace("Exception", "") + ": " + event.exceptionMessage;
+                        String deets = event.exceptionMessage == null ? "" : event.exceptionMessage;
                         if (deets.length() > EX_WIDTH) {
                             deets = deets.substring(0, EX_WIDTH - 3) + "...";
                         }
@@ -726,7 +724,8 @@ public abstract class AbstractCustomWorkload extends Workload {
     }
 
     protected void log(JetStream js, String job, String workId, long elapsed, Exception exception) {
-        Event event = new Event(job, workId, NO_TIX, null, 0, elapsed, exception);
+        String qualifier = exception.getClass().getSimpleName().replace("Exception", "");
+        Event event = new Event(job, workId, NO_TIX, qualifier, 0, elapsed, exception);
         Debug.info(event.ident(), event.extras());
         publish(js, event);
     }
