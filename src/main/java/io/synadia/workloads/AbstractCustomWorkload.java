@@ -609,7 +609,11 @@ public abstract class AbstractCustomWorkload extends Workload {
                 this.qualifier = null;
             }
             else {
-                this.qualifier = qualifier.toLowerCase().replace(" ", "").trim();
+                this.qualifier = qualifier
+                    .replace(" ", "")
+                    .replace("*", "")
+                    .replace(">", "")
+                    .replace(".", "").trim();
             }
             this.count = count;
             this.elapsed = elapsed;
