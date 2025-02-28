@@ -20,6 +20,7 @@
   "data_stream_name": "data",
   "data_subject": "d",
   "data_max_messages": 1000000,
+  "progress_frequency": 100,
   "publish_job": "Publish",
   "publish_report_frequency": 100,
   "publish_jitter": 10,

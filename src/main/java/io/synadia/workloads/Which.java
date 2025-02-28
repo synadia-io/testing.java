@@ -1,6 +1,6 @@
 package io.synadia.workloads;
 
-import static io.synadia.utils.Constants.*;
+import static io.synadia.utils.Commons.*;
 
 public enum Which {
 

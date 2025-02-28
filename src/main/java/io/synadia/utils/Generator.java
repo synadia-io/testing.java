@@ -20,7 +20,7 @@ import java.util.Map;
 
 import static io.nats.client.support.JsonValueUtils.readInteger;
 import static io.nats.client.support.JsonValueUtils.readString;
-import static io.synadia.utils.Constants.*;
+import static io.synadia.utils.Commons.*;
 
 public class Generator {
     enum Kind {SERVER, CLIENT, FAILGROUND}

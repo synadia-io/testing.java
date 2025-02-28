@@ -5,8 +5,10 @@ import io.nats.client.api.*;
 import io.nats.client.support.JsonValueUtils;
 import io.nats.client.support.NatsObjectStoreUtil;
 import io.synadia.CommandLine;
+import io.synadia.utils.Commons;
 import io.synadia.utils.DataGenerator;
 import io.synadia.utils.Debug;
+import io.synadia.workloads.support.WorkState;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -19,6 +21,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static io.nats.client.support.JsonUtils.printFormatted;
 import static io.nats.jsmulti.shared.Utils.sleep;
+import static io.synadia.utils.Commons.NO_TIX;
 
 public class ObjectSim extends AbstractCustomWorkload {
     private String bucketName;
@@ -220,7 +223,7 @@ public class ObjectSim extends AbstractCustomWorkload {
                             }
                         }
                         else {
-                            String objectName = generateName();
+                            String objectName = Commons.generateName();
                             try (FileInputStream in = new FileInputStream(putFileName)) {
                                 os.put(objectName, in);
                             }

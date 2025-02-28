@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static io.synadia.utils.Constants.FINAL;
+import static io.synadia.utils.Commons.FINAL;
 
 public class ParsedEntry {
     public final String key;

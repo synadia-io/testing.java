@@ -15,8 +15,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static io.nats.client.support.JsonValueUtils.*;
-import static io.synadia.utils.Constants.OS_UNIX;
-import static io.synadia.utils.Constants.OS_WIN;
+import static io.synadia.utils.Commons.OS_UNIX;
+import static io.synadia.utils.Commons.OS_WIN;
 
 public class Params implements JsonSerializable {
     private static final String PARAMS = "Params";

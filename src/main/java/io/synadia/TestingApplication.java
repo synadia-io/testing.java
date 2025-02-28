@@ -14,7 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.Map;
 
-import static io.synadia.utils.Constants.*;
+import static io.synadia.utils.Commons.*;
 
 public class TestingApplication implements Application, AutoCloseable {
 
