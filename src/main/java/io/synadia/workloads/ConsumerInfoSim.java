@@ -240,13 +240,15 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                 printConnect(nc, produceJob, ws.workId, tix);
                 jitter(produceJitter / 10);
                 AtomicInteger cutoff = new AtomicInteger(maxConsumers);
-                int jitterCountdown = maxConsumers / produceThreadCount;
+                StreamInfo si = jsm.getStreamInfo(dataStreamName);
+                int siCount = (int)si.getStreamState().getConsumerCount();
+                int jitterCountdown = (maxConsumers - siCount) / produceThreadCount;
                 while (true) {
                     _produce(jsm, js, tix, ws, cutoff, produceJob, produceReportFrequency);
                     jitterCountdown = jitterCountdown(jitterCountdown, produceJitter);
                 }
             }
-            catch (InterruptedException | IOException e) {
+            catch (InterruptedException | IOException | JetStreamApiException e) {
                 throw new RuntimeException(e);
             }
         };
