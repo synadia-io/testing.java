@@ -15,18 +15,23 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static io.nats.client.support.JsonValueUtils.*;
-import static io.synadia.utils.Generator.*;
 
 public class Params implements JsonSerializable {
-    private static final String PARAMS = "Params";
-
     public final JsonValue jv;
+
     public final boolean optionsVirtualThreads;
-    public final StreamConfiguration streamConfig;
-    public final JsonValue jvMultiConfig;
-    public final boolean createStream;
     public final String adminServer;
+    public final String bootstrap;
     public final List<String> servers;
+
+    public final StreamConfiguration streamConfig;
+    public final boolean createStream;
+
+    public final JsonValue jvMultiConfig;
+
+    // TESTING APP SPECIFIC
+    public final String testingStreamName;
+    public final String testingStreamSubject;
     public final String multiBucket;
     public final String statsBucket;
     public final String profileBucket;
@@ -45,10 +50,8 @@ public class Params implements JsonSerializable {
     public Params(JsonValue jv) {
         this.jv = jv;
         optionsVirtualThreads = readBoolean(jv, "options_virtual_threads", false);
-        streamConfig = loadStreamConfig("stream_config");
-        createStream = streamConfig != null && readBoolean(jv, "create_stream", false);
-        jvMultiConfig = readObject(jv, "multi_config");
         adminServer = readString(jv, "admin_server", Options.DEFAULT_URL);
+        bootstrap = readString(jv, "bootstrap", Options.DEFAULT_URL);
         servers = new ArrayList<>();
         int supplied = 0;
         int replace = -1;
@@ -65,22 +68,34 @@ public class Params implements JsonSerializable {
             }
             servers.add(temp);
         }
-        multiBucket = readString(jv, "multi_bucket");
-        statsBucket = readString(jv, "stats_bucket");
-        profileBucket = readString(jv, "profile_bucket");
-        profileStreamName = readString(jv, "profile_stream_name");
-        profileStreamSubject = readString(jv, "profile_stream_subject");
-        saveServer = readString(jv, "save_server");
-        saveStreamName = readString(jv, "save_stream_name");
-        saveStreamSubject = readString(jv, "save_stream_subject");
-        watchWaitTime = readLong(jv, "watch_wait_time", 5000);
-        trackProfile = readBoolean(jv, "track_profile", false);
+
+        streamConfig = loadStreamConfig("stream_config");
+        createStream = streamConfig != null && readBoolean(jv, "create_stream", false);
+
+        jvMultiConfig = readObject(jv, "multi_config");
+
+        JsonValue jvta = readObject(jv, "testing_app");
+        testingStreamName = readString(jvta, "testing_stream_name");
+        testingStreamSubject = readString(jvta, "testing_stream_subject");
+        multiBucket = readString(jvta, "multi_bucket");
+        statsBucket = readString(jvta, "stats_bucket");
+        profileBucket = readString(jvta, "profile_bucket");
+        profileStreamName = readString(jvta, "profile_stream_name");
+        profileStreamSubject = readString(jvta, "profile_stream_subject");
+        saveServer = readString(jvta, "save_server");
+        saveStreamName = readString(jvta, "save_stream_name");
+        saveStreamSubject = readString(jvta, "save_stream_subject");
+        watchWaitTime = readLong(jvta, "watch_wait_time", 5000);
+        trackProfile = readBoolean(jvta, "track_profile", false);
     }
 
     @Override
     public String toJson() {
         return jv.toJson();
     }
+
+    private static final String PARAMS_LABEL = "params";
+    private static final String TESTING_APP_LABEL = "testing app";
 
     private static JsonValue readParamsFiles(List<String> paramsFiles) {
         JsonValue jv = mapBuilder().jv;
@@ -90,49 +105,39 @@ public class Params implements JsonSerializable {
                 jv.map.putAll(JsonParser.parse(bytes).map);
             }
             catch (IOException e) {
-                Debug.info(PARAMS, "Unable to load params file '" + paramsFile + "', " + e);
+                Debug.info(PARAMS_LABEL, "Unable to load params file '" + paramsFile + "', " + e);
                 throw new RuntimeException(e);
             }
         }
         return jv;
     }
 
-    public String populate(String template) {
-        return template
-            .replace(MULTI_BUCKET, multiBucket)
-            .replace(STATS_BUCKET, statsBucket)
-            .replace(PROFILE_BUCKET, profileBucket)
-            .replace(PROFILE_STREAM_NAME, profileStreamName)
-            .replace(PROFILE_STREAM_SUBJECT, profileStreamSubject)
-            .replace(SAVE_STREAM_NAME, saveStreamName)
-            .replace(SAVE_STREAM_SUBJECT, saveStreamSubject)
-            ;
-    }
-
     public void debug() {
-        _debug("optionsVirtualThreads", optionsVirtualThreads);
-        _debug("streamConfig", streamConfig);
-        _debug("createStream", createStream);
-        _debug("jvMultiConfig", jvMultiConfig);
-        _debug("adminServer", adminServer);
-        _debug("servers", servers);
+        _debug(PARAMS_LABEL, "optionsVirtualThreads", optionsVirtualThreads);
+        _debug(PARAMS_LABEL, "streamConfig", streamConfig);
+        _debug(PARAMS_LABEL, "createStream", createStream);
+        _debug(PARAMS_LABEL, "jvMultiConfig", jvMultiConfig);
+        _debug(PARAMS_LABEL, "adminServer", adminServer);
+        _debug(PARAMS_LABEL, "servers", servers);
 
-        _debug("multiBucket", multiBucket);
-        _debug("statsBucket", statsBucket);
-        _debug("profileBucket", profileBucket);
-        _debug("profileStreamName", profileStreamName);
-        _debug("profileStreamSubject", profileStreamSubject);
-        _debug("saveServer", saveServer);
-        _debug("saveStreamName", saveStreamName);
-        _debug("saveStreamSubject", saveStreamSubject);
-
-        _debug("watchWaitTime", watchWaitTime);
-        _debug("trackProfile", trackProfile);
+        // TESTING _APP SPECIFIC
+        _debug(TESTING_APP_LABEL, "testingStreamName", testingStreamName);
+        _debug(TESTING_APP_LABEL, "testingStreamSubject", testingStreamSubject);
+        _debug(TESTING_APP_LABEL, "multiBucket", multiBucket);
+        _debug(TESTING_APP_LABEL, "statsBucket", statsBucket);
+        _debug(TESTING_APP_LABEL, "profileBucket", profileBucket);
+        _debug(TESTING_APP_LABEL, "profileStreamName", profileStreamName);
+        _debug(TESTING_APP_LABEL, "profileStreamSubject", profileStreamSubject);
+        _debug(TESTING_APP_LABEL, "saveServer", saveServer);
+        _debug(TESTING_APP_LABEL, "saveStreamName", saveStreamName);
+        _debug(TESTING_APP_LABEL, "saveStreamSubject", saveStreamSubject);
+        _debug(TESTING_APP_LABEL, "watchWaitTime", watchWaitTime);
+        _debug(TESTING_APP_LABEL, "trackProfile", trackProfile);
     }
 
-    private void _debug(String name, Object value) {
+    private void _debug(String label, String name, Object value) {
         if (value != null) {
-            Debug.info(PARAMS, name, value);
+            Debug.info(label, name, value);
         }
     }
 
@@ -147,7 +152,7 @@ public class Params implements JsonSerializable {
                 streamConfig = StreamConfiguration.instance(streamConfigJv.toJson());
             }
             catch (JsonParseException e) {
-                Debug.info(PARAMS, "Unable to parse stream config, " + e);
+                Debug.info(PARAMS_LABEL, "Unable to parse stream config, " + e);
                 throw new RuntimeException(e);
             }
         }

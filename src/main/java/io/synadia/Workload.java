@@ -150,21 +150,18 @@ public abstract class Workload {
         return (s + PADDING).substring(0, width);
     }
 
-    public List<Options> roundRobinOptions() {
-        List<Options> options = buildOptionsList(params.servers.size());
-        Collections.shuffle(options);
-        return options.subList(0, 1);
-    }
-
-    private List<Options> buildOptionsList(int numConnections) {
+    public List<Options> allOptionsShuffled() {
+        int numConnections = params.servers.size();
         List<Options> options = new ArrayList<>(numConnections);
+        String[] servers = params.bootstrap.split(",");
         int cx = -1;
         for (int i = 0; i < numConnections; i++) {
-            if (++cx == params.servers.size()) {
+            if (++cx == servers.length) {
                 cx = 0;
             }
-            options.add(getOptions(params.servers.get(cx)));
+            options.add(getOptions(servers[cx]));
         }
+        Collections.shuffle(options);
         return options;
     }
 }

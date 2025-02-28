@@ -33,11 +33,10 @@ public class Generator {
     public static final String DOT_JSON = ".json";
     public static final String SH_BAT_DOT_TXT = "-sh-bat.txt";
 
-    public static final String CONFIG_JSON = "config.json";
+    public static final String PARAMS_JSON = "params.json";
     public static final String START_CLIENTS_BAT = "start-clients.bat";
     public static final String START_CLIENTS_BAT_TXT = "start-clients-bat.txt";
 
-    public static final String OPTIONS_VIRTUAL_THREADS = "<OptionsVirtualThreads>";
     public static final String BOOTSTRAP = "<Bootstrap>";
     public static final String ADMIN_SERVER = "<AdminServer>";
     public static final String OS = "<OS>";
@@ -47,6 +46,9 @@ public class Generator {
     public static final String SSH_PREFIX = "<Ssh";
     public static final String TAG_END = ">";
 
+    // TESTING APP SPECIFIC
+    public static final String TESTING_STREAM_NAME = "<TestingStreamName>";
+    public static final String TESTING_STREAM_SUBJECT = "<TestingStreamSubject>";
     public static final String MULTI_BUCKET = "<MultiBucket>";
     public static final String STATS_BUCKET = "<StatsBucket>";
     public static final String PROFILE_BUCKET = "<ProfileBucket>";
@@ -64,18 +66,18 @@ public class Generator {
         Which which = Which.instance(GENERATOR, args[0]);
         String generatorJsonVariant = args.length == 2 ? args[1] : "";
 
-        Config cfg = new Config(generatorJsonVariant);
+        Gen gen = new Gen(generatorJsonVariant);
         if (which != Which.Show) {
-            cfg.print();
+            gen.print();
             prepareOutputDirs();
         }
-        Calculations calc = new Calculations(cfg);
+        Calculations calc = new Calculations(gen);
 
         if (which == Which.Local) {
-            calculateLocal(cfg, calc);
+            calculateLocal(gen, calc);
         }
         else {
-            calculateAws(cfg, calc, which);
+            calculateAws(gen, calc, which);
         }
 
         if (calc.clients > 0) {
@@ -87,13 +89,13 @@ public class Generator {
         }
 
         Kind lastKind = null;
-        for (int x = 0; x < cfg.serverCount; x++) {
+        for (int x = 0; x < gen.serverCount; x++) {
             String scriptName = "server" + x;
 
             Instance current = calc.runningServers.getFirst();
             String port = current.ports.get(x % current.ports.size());
-            String privateServer = cfg.natsProto + current.privateIpAddr + ":" + port;
-            String publicServer = cfg.natsProto + current.publicIpAddr + ":" + port;
+            String privateServer = gen.natsProto + current.privateIpAddr + ":" + port;
+            String publicServer = gen.natsProto + current.publicIpAddr + ":" + port;
 
             if (x == 0) {
                 calc.privateAdmin = privateServer;
@@ -109,16 +111,16 @@ public class Generator {
             calc.configTemplatePrivate = calc.configTemplatePrivate.replace(SERVER_PREFIX + x + TAG_END, privateServer);
             calc.configTemplatePublic = calc.configTemplatePublic.replace(SERVER_PREFIX + x + TAG_END, publicServer);
 
-            if (which != Which.Local && cfg.doPublic && !current.failground) {
+            if (which != Which.Local && gen.doPublic && !current.failground) {
                 lastKind = printInstance(lastKind, Kind.SERVER, current, scriptName);
-                printSsh(current, Kind.SERVER, cfg);
+                printSsh(current, Kind.SERVER, gen);
                 printNatsCli(current);
                 System.out.println();
 
                 // SERVER SCRIPT
                 if (which == Which.Full && calc.runningServers.size() == 3) {
-                    String template = readTemplate("server.sh", cfg)
-                        .replace("<InstancePrefix>", cfg.instancePrefix)
+                    String template = readTemplate("server.sh", gen)
+                        .replace("<InstancePrefix>", gen.instancePrefix)
                         .replace("<InstanceId>", "" + x)
                         .replace("<PrivateIpRoute1>", calc.runningServers.get(1).privateIpAddr)
                         .replace("<PrivateIpRoute2>", calc.runningServers.get(2).privateIpAddr);
@@ -129,48 +131,48 @@ public class Generator {
             calc.runningServers.add(calc.runningServers.removeFirst());
         }
 
-        calc.configTemplatePrivate = finishJsonTemplatePopulate(calc.configTemplatePrivate, cfg, calc.privateBootstrap, calc.privateAdmin);
-        calc.configTemplatePublic = finishJsonTemplatePopulate(calc.configTemplatePublic, cfg, calc.publicBootstrap, calc.publicAdmin);
+        calc.configTemplatePrivate = finishJsonTemplatePopulate(calc.configTemplatePrivate, gen, calc.privateBootstrap, calc.privateAdmin);
+        calc.configTemplatePublic = finishJsonTemplatePopulate(calc.configTemplatePublic, gen, calc.publicBootstrap, calc.publicAdmin);
 
         if (which != Which.Show) {
             File[] files = new File(INPUT_DIR).listFiles();
             if (files != null) {
                 for (File f : files) {
                     String filename = f.getName();
-                    if (filename.equals(CONFIG_JSON)) {
-                        if (cfg.doPublic) {
-                            generate(CONFIG_JSON, calc.configTemplatePublic, PARAMS_OUTPUT_DIR);
+                    if (filename.equals(PARAMS_JSON)) {
+                        if (gen.doPublic) {
+                            generate(filename, calc.configTemplatePublic, PARAMS_OUTPUT_DIR);
                         }
                         else {
-                            generate(CONFIG_JSON, calc.configTemplatePrivate, PARAMS_OUTPUT_DIR);
+                            generate(filename, calc.configTemplatePrivate, PARAMS_OUTPUT_DIR);
                         }
                     }
                     else if (filename.endsWith(DOT_JSON)) {
-                        writeJson(filename, cfg, calc.publicBootstrap, calc.publicAdmin, calc.privateBootstrap, calc.privateAdmin);
+                        writeJson(filename, gen, calc.publicBootstrap, calc.publicAdmin, calc.privateBootstrap, calc.privateAdmin);
                     }
                     else if (filename.endsWith(SH_BAT_DOT_TXT)) {
-                        script(filename, cfg);
+                        script(filename, gen);
                     }
                 }
             }
         }
     }
 
-    private static void writeJson(String filename, Config cfg, StringBuilder publicBootstrap, String publicAdmin, StringBuilder privateBootstrap, String privateAdmin) throws IOException {
-        String jsonTemplate = readTemplate(filename, cfg);
-        if (cfg.doPublic) {
-            jsonTemplate = finishJsonTemplatePopulate(jsonTemplate, cfg, publicBootstrap, publicAdmin);
+    private static void writeJson(String filename, Gen gen, StringBuilder publicBootstrap, String publicAdmin, StringBuilder privateBootstrap, String privateAdmin) throws IOException {
+        String jsonTemplate = readTemplate(filename, gen);
+        if (gen.doPublic) {
+            jsonTemplate = finishJsonTemplatePopulate(jsonTemplate, gen, publicBootstrap, publicAdmin);
         }
         else {
-            jsonTemplate = finishJsonTemplatePopulate(jsonTemplate, cfg, privateBootstrap, privateAdmin);
+            jsonTemplate = finishJsonTemplatePopulate(jsonTemplate, gen, privateBootstrap, privateAdmin);
         }
         generate(filename, jsonTemplate, PARAMS_OUTPUT_DIR);
     }
 
-    private static void script(String filename, Config cfg) throws IOException {
+    private static void script(String filename, Gen gen) throws IOException {
         String name = filename.replace(SH_BAT_DOT_TXT, "");
-        String scriptTemplate = readTemplate(filename, cfg);
-        String genName = cfg.unix ? name + cfg.shellExt : name + ".bat";
+        String scriptTemplate = readTemplate(filename, gen);
+        String genName = gen.unix ? name + gen.shellExt : name + ".bat";
         generate(genName, scriptTemplate, SCRIPT_OUTPUT_DIR);
     }
 
@@ -191,15 +193,15 @@ public class Generator {
         }
     }
 
-    private static String printSsh(Instance current, Kind kind, Config cfg) {
-        if (!DO_NOT_MATCH.equals(cfg.keyFile)) {
+    private static String printSsh(Instance current, Kind kind, Gen gen) {
+        if (!DO_NOT_MATCH.equals(gen.keyFile)) {
             String user = switch (kind) {
-                case SERVER -> cfg.serverUser;
-                case CLIENT -> cfg.clientUser;
-                case FAILGROUND -> cfg.failgroundUser;
+                case SERVER -> gen.serverUser;
+                case CLIENT -> gen.clientUser;
+                case FAILGROUND -> gen.failgroundUser;
             };
             String cmd = "ssh -oStrictHostKeyChecking=no -i "
-                + cfg.keyFile + " "
+                + gen.keyFile + " "
                 + user
                 + "@" + current.publicDnsName;
             System.out.println(cmd);
@@ -208,20 +210,31 @@ public class Generator {
         return null;
     }
 
-    private static String readTemplate(String tpl, Config cfg) throws IOException {
+    private static String readTemplate(String tpl, Gen gen) throws IOException {
         String template = Files.readString(Paths.get(INPUT_DIR, tpl));
-        if (cfg.unix) {
+        if (gen.unix) {
             return template.replace(PATH_SEP, "/").replace(ARG, "$");
         }
         return template.replace(PATH_SEP, "\\").replace(ARG, "%");
     }
 
-    private static String finishJsonTemplatePopulate(String template, Config cfg, StringBuilder bootstrap, String admin) {
-        return cfg.params.populate(template
+    private static String finishJsonTemplatePopulate(String template, Gen gen, StringBuilder bootstrap, String admin) {
+        return template
             .replace(BOOTSTRAP, bootstrap)
             .replace(ADMIN_SERVER, admin)
-            .replace(OS, cfg.os)
-        );
+            .replace(OS, gen.os)
+            .replace(TESTING_STREAM_NAME, gen.params.testingStreamName)
+            .replace(TESTING_STREAM_SUBJECT, gen.params.testingStreamSubject)
+            .replace(MULTI_BUCKET, gen.params.multiBucket)
+            .replace(STATS_BUCKET, gen.params.statsBucket)
+            .replace(MULTI_BUCKET, gen.params.multiBucket)
+            .replace(STATS_BUCKET, gen.params.statsBucket)
+            .replace(PROFILE_BUCKET, gen.params.profileBucket)
+            .replace(PROFILE_STREAM_NAME, gen.params.profileStreamName)
+            .replace(PROFILE_STREAM_SUBJECT, gen.params.profileStreamSubject)
+            .replace(SAVE_STREAM_NAME, gen.params.saveStreamName)
+            .replace(SAVE_STREAM_SUBJECT, gen.params.saveStreamSubject)
+            ;
     }
 
     private static void generate(String fn, String data, String dir) throws IOException {
@@ -255,7 +268,7 @@ public class Generator {
         }
     }
 
-    private static void calculateAws(Config cfg, Calculations calc, Which which) throws IOException {
+    private static void calculateAws(Gen cfg, Calculations calc, Which which) throws IOException {
         // parse the aws json
         JsonValue jv = JsonParser.parse(Files.readAllBytes(Paths.get("aws.json")));
         Kind lastKind = null;
@@ -379,7 +392,7 @@ public class Generator {
         }
     }
 
-    private static void calculateLocal(Config cfg, Calculations calc) {
+    private static void calculateLocal(Gen cfg, Calculations calc) {
         for (String lp : cfg.localPorts) {
             calc.runningServers.add(new Instance(lp));
         }
@@ -396,17 +409,17 @@ public class Generator {
         public String configTemplatePublic;
         public int clients;
 
-        public Calculations(Config cfg) throws IOException {
+        public Calculations(Gen gen) throws IOException {
             runningServers = new ArrayList<>();
-            startSshTemplate = readTemplate(START_CLIENTS_BAT_TXT, cfg);
+            startSshTemplate = readTemplate(START_CLIENTS_BAT_TXT, gen);
             privateBootstrap = new StringBuilder();
             publicBootstrap = new StringBuilder();
-            configTemplatePrivate = readTemplate(CONFIG_JSON, cfg);
+            configTemplatePrivate = readTemplate(PARAMS_JSON, gen);
             configTemplatePublic = configTemplatePrivate;
         }
     }
 
-    static class Config {
+    static class Gen {
         public final boolean doPublic;
         public final int serverCount;
         public final String os;
@@ -426,7 +439,7 @@ public class Generator {
         public final List<String> localPorts;
         public final Params params;
 
-        public Config(String generatorJsonVariant) throws IOException {
+        public Gen(String generatorJsonVariant) throws IOException {
             JsonValue jv = loadConfig(generatorJsonVariant);
             params = new Params(jv);
             doPublic = jv.map.get("do_public") == null || jv.map.get("do_public").bool;
@@ -482,6 +495,18 @@ public class Generator {
 
         private JsonValue loadConfig(String generatorJsonVariant) throws IOException {
             // set the defaults
+            JsonValue jvta = JsonValueUtils.mapBuilder()
+                .put("testing_stream_name", "testingStream")
+                .put("testing_stream_subject", "t")
+                .put("multi_bucket", "multiBucket")
+                .put("stats_bucket", "statsBucket")
+                .put("profile_bucket", "profileBucket")
+                .put("profile_stream_name", "profileStream")
+                .put("profile_stream_subject", "P.>")
+                .put("save_stream_name", "saveStream")
+                .put("save_stream_subject", "S.>")
+                .toJsonValue();
+
             JsonValue jv = JsonValueUtils.mapBuilder()
                 .put("do_public", false)
                 .put("os", "unix")
@@ -497,15 +522,7 @@ public class Generator {
                 .put("nats_proto", "nats://")
                 .put("nats_ports", JsonValueUtils.arrayBuilder().add("4222"))
                 .put("local_ports", JsonValueUtils.arrayBuilder().add("4222").add("5222").add("6222"))
-                .put("multi_bucket", "multiBucket")
-                .put("stats_bucket", "statsBucket")
-                .put("stats_watch_wait_time", 5000)
-                .put("profile_bucket", "profileBucket")
-                .put("profile_stream_name", "profileStream")
-                .put("profile_stream_subject", "P.>")
-                .put("profile_watch_wait_time", 5000)
-                .put("save_stream_name", "saveStream")
-                .put("save_stream_subject", "S.>")
+                .put("testing_app", jvta)
                 .toJsonValue();
 
             // override with custom settings

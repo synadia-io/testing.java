@@ -578,7 +578,7 @@ public abstract class AbstractCustomWorkload extends Workload {
     protected void doWorker(String job, SingleThreadedWorker worker) throws InterruptedException {
         startJob(job);
         WorkState ws = new WorkState();
-        Thread t = new Thread(worker.getWork(roundRobinOptions().getFirst(), ws));
+        Thread t = new Thread(worker.getWork(allOptionsShuffled().getFirst(), ws));
         t.setName(job);
         t.start();
         t.join();
@@ -586,11 +586,15 @@ public abstract class AbstractCustomWorkload extends Workload {
 
     protected void doWorker(String job, int threadCount, MultiThreadedWorker worker) throws InterruptedException {
         startJob(job);
-        List<Options> optionsList = roundRobinOptions();
+        List<Options> optionsList = allOptionsShuffled();
         List<Thread> threads = new ArrayList<>(threadCount);
         WorkState ws = new WorkState();
+        int option = optionsList.size() - 1;
         for (int tix = 0; tix < threadCount; tix++) {
-            Thread t = new Thread(worker.getWork(optionsList.get(tix), tix, ws));
+            if (++option == optionsList.size()) {
+                option = 0;
+            }
+            Thread t = new Thread(worker.getWork(optionsList.get(option), tix, ws));
             t.setName(job + " " + tix + " ");
             t.start();
             threads.add(t);

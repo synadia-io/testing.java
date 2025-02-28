@@ -1,0 +1,21 @@
+{
+  "os": "<OS>",
+  "server0": "<Server0>",
+  "server1": "<Server1>",
+  "server2": "<Server2>",
+  "server3": "<Server3>",
+  "server4": "<Server4>",
+  "admin_server": "<AdminServer>",
+  "bootstrap": "<Bootstrap>",
+  "testing_app": {
+    "testing_stream_name": "<TestingStreamName>",
+    "testing_stream_subject": "<TestingStreamSubject>",
+    "multi_bucket": "<MultiBucket>",
+    "stats_bucket": "<StatsBucket>",
+    "profile_bucket": "<ProfileBucket>",
+    "profile_stream_name": "<ProfileStreamName>",
+    "profile_stream_subject": "<ProfileStreamSubject>",
+    "save_stream_name": "<SaveStreamName>",
+    "save_stream_subject": "<SaveStreamSubject>"
+  }
+}
