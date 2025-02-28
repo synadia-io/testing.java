@@ -4,6 +4,7 @@ import io.nats.client.support.JsonParser;
 import io.nats.client.support.JsonValue;
 import io.nats.client.support.JsonValueUtils;
 import io.nats.jsmulti.shared.WarningException;
+import io.synadia.Params;
 import io.synadia.workloads.Which;
 
 import java.io.File;
@@ -36,6 +37,7 @@ public class Generator {
     public static final String START_CLIENTS_BAT = "start-clients.bat";
     public static final String START_CLIENTS_BAT_TXT = "start-clients-bat.txt";
 
+    public static final String OPTIONS_VIRTUAL_THREADS = "<OptionsVirtualThreads>";
     public static final String BOOTSTRAP = "<Bootstrap>";
     public static final String ADMIN_SERVER = "<AdminServer>";
     public static final String OS = "<OS>";
@@ -47,11 +49,9 @@ public class Generator {
 
     public static final String MULTI_BUCKET = "<MultiBucket>";
     public static final String STATS_BUCKET = "<StatsBucket>";
-    public static final String STATS_WATCH_WAIT_TIME = "<StatsWatchWaitTime>";
     public static final String PROFILE_BUCKET = "<ProfileBucket>";
     public static final String PROFILE_STREAM_NAME = "<ProfileStreamName>";
     public static final String PROFILE_STREAM_SUBJECT = "<ProfileStreamSubject>";
-    public static final String PROFILE_WATCH_WAIT_TIME = "<ProfileWatchWaitTime>";
     public static final String SAVE_STREAM_NAME = "<SaveStreamName>";
     public static final String SAVE_STREAM_SUBJECT = "<SaveStreamSubject>";
 
@@ -80,6 +80,10 @@ public class Generator {
 
         if (calc.clients > 0) {
             generate(START_CLIENTS_BAT, calc.startSshTemplate, SCRIPT_OUTPUT_DIR);
+        }
+
+        if (calc.runningServers.isEmpty()) {
+            return;
         }
 
         Kind lastKind = null;
@@ -213,7 +217,11 @@ public class Generator {
     }
 
     private static String finishJsonTemplatePopulate(String template, Config cfg, StringBuilder bootstrap, String admin) {
-        return cfg.populate(template.replace(BOOTSTRAP, bootstrap).replace(ADMIN_SERVER, admin).replace(OS, cfg.os));
+        return cfg.params.populate(template
+            .replace(BOOTSTRAP, bootstrap)
+            .replace(ADMIN_SERVER, admin)
+            .replace(OS, cfg.os)
+        );
     }
 
     private static void generate(String fn, String data, String dir) throws IOException {
@@ -416,62 +424,33 @@ public class Generator {
         public final String natsProto;
         public final List<String> natsPorts;
         public final List<String> localPorts;
-        public final String multiBucket;
-        public final String statsBucket;
-        public final String profileBucket;
-        public final String profileStreamName;
-        public final String profileStreamSubject;
-        public final String saveStreamName;
-        public final String saveStreamSubject;
-        public final String statsWatchWaitTime;
-        public final String profileWatchWaitTime;
+        public final Params params;
 
         public Config(String generatorJsonVariant) throws IOException {
             JsonValue jv = loadConfig(generatorJsonVariant);
+            params = new Params(jv);
             doPublic = jv.map.get("do_public") == null || jv.map.get("do_public").bool;
-            os = readString(jv, "os", OS_UNIX).equals(OS_WIN) ? OS_WIN : OS_UNIX;
-            serverCount = readInteger(jv, "server_count", 3);
+
+            String temp = readString(jv, "os");
+            os = OS_WIN.equals(temp) ? OS_WIN : OS_UNIX;
             windows = os.equals(OS_WIN);
             unix = !windows;
-            String temp = readString(jv, ("shell_ext"));
+
+            temp = readString(jv, "shell_ext");
             shellExt = temp == null ? "" : temp;
-            keyFile = readString(jv, ("key_file"));
-            serverUser = readString(jv, ("server_user"), DO_NOT_MATCH);
-            clientUser = readString(jv, ("client_user"), DO_NOT_MATCH);
-            failgroundUser = readString(jv, ("failground_user"), DO_NOT_MATCH);
-            instancePrefix = readString(jv, ("instance_prefix"));
-            serverFilter = readString(jv, ("server_filter"), DO_NOT_MATCH);
-            clientFilter = readString(jv, ("client_filter"), DO_NOT_MATCH);
+            keyFile = readString(jv, "key_file");
+
+            serverCount = readInteger(jv, "server_count", 3);
+            serverUser = readString(jv, "server_user", DO_NOT_MATCH);
+            clientUser = readString(jv, "client_user", DO_NOT_MATCH);
+            failgroundUser = readString(jv, "failground_user", DO_NOT_MATCH);
+            instancePrefix = readString(jv, "instance_prefix");
+            serverFilter = readString(jv, "server_filter", DO_NOT_MATCH);
+            clientFilter = readString(jv, "client_filter", DO_NOT_MATCH);
             failgroundFilter = readString(jv, ("failground_filter"), DO_NOT_MATCH);
             natsProto = readString(jv, "nats_proto", "nats://");
             natsPorts = JsonValueUtils.readStringList(jv, "nats_ports");
             localPorts = JsonValueUtils.readStringList(jv, "local_ports");
-
-            multiBucket = readString(jv, "multi_bucket");
-            statsBucket = readString(jv, "stats_bucket");
-
-            profileBucket = readString(jv, "profile_bucket");
-            profileStreamName = readString(jv, "profile_stream_name");
-            profileStreamSubject = readString(jv, "profile_stream_subject");
-            saveStreamName = readString(jv, "save_stream_name");
-            saveStreamSubject = readString(jv, "save_stream_subject");
-
-            statsWatchWaitTime = jv.map.get("stats_watch_wait_time").i.toString();
-            profileWatchWaitTime = jv.map.get("profile_watch_wait_time").i.toString();
-        }
-
-        public String populate(String template) {
-            return template
-                .replace(MULTI_BUCKET, multiBucket)
-                .replace(STATS_BUCKET, statsBucket)
-                .replace(STATS_WATCH_WAIT_TIME, statsWatchWaitTime)
-                .replace(PROFILE_BUCKET, profileBucket)
-                .replace(PROFILE_STREAM_NAME, profileStreamName)
-                .replace(PROFILE_STREAM_SUBJECT, profileStreamSubject)
-                .replace(PROFILE_WATCH_WAIT_TIME, profileWatchWaitTime)
-                .replace(SAVE_STREAM_NAME, saveStreamName)
-                .replace(SAVE_STREAM_SUBJECT, saveStreamSubject)
-                ;
         }
 
         public void print() {
@@ -479,6 +458,7 @@ public class Generator {
             printMaybe("os", os);
             printMaybe("shellExt", shellExt);
             printMaybe("keyFile", keyFile);
+            printMaybe("serverCount", serverCount);
             printMaybe("serverUser", serverUser);
             printMaybe("clientUser", clientUser);
             printMaybe("failgroundUser", failgroundUser);
@@ -489,15 +469,6 @@ public class Generator {
             printMaybe("natsProto", natsProto);
             printMaybe("natsPort", natsPorts);
             printMaybe("localPorts", localPorts);
-            printMaybe("multiBucket", multiBucket);
-            printMaybe("statsBucket", statsBucket);
-            printMaybe("profileBucket", profileBucket);
-            printMaybe("profileStreamName", profileStreamName);
-            printMaybe("profileStreamSubject", profileStreamSubject);
-            printMaybe("saveStreamName", saveStreamName);
-            printMaybe("saveStreamSubject", saveStreamSubject);
-            printMaybe("statsWatchWaitTime", statsWatchWaitTime);
-            printMaybe("profileWatchWaitTime", profileWatchWaitTime);
         }
 
         private void printMaybe(String label, Object value) {

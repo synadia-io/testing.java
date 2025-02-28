@@ -8,6 +8,7 @@ import io.synadia.utils.Debug;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static io.nats.jsmulti.shared.Utils.sleep;
@@ -84,6 +85,7 @@ public abstract class Workload {
         return new Options.Builder()
             .server(server)
             .connectionListener((x, y) -> {})
+            .executor(params.optionsVirtualThreads ? Executors.newVirtualThreadPerTaskExecutor() : null)
             .errorListener(new ErrorListener() {})
             .build();
     }

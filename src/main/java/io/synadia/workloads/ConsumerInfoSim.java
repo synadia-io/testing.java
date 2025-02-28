@@ -68,7 +68,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
         queueStreamName = JsonValueUtils.readString(params.jv, "queue_stream_name", "queue");
 
         initCustom(
-            new String[]{"list [consumers]", "produce", "consume", "info", "combo", "clear [consumers]"},
+            new String[]{"list (consumers)", "produce", "consume", "info", "combo", "clear (consumers)"},
             new String[]{dataStreamName, queueStreamName}
         );
 

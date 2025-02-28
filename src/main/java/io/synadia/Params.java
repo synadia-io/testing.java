@@ -15,14 +15,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static io.nats.client.support.JsonValueUtils.*;
-import static io.synadia.utils.Commons.OS_UNIX;
-import static io.synadia.utils.Commons.OS_WIN;
+import static io.synadia.utils.Generator.*;
 
 public class Params implements JsonSerializable {
     private static final String PARAMS = "Params";
 
     public final JsonValue jv;
-    public final String os;
+    public final boolean optionsVirtualThreads;
     public final StreamConfiguration streamConfig;
     public final JsonValue jvMultiConfig;
     public final boolean createStream;
@@ -45,8 +44,7 @@ public class Params implements JsonSerializable {
 
     public Params(JsonValue jv) {
         this.jv = jv;
-        String temp = readString(jv, "os");
-        os = OS_WIN.equals(temp) ? OS_WIN : OS_UNIX;
+        optionsVirtualThreads = readBoolean(jv, "options_virtual_threads", false);
         streamConfig = loadStreamConfig("stream_config");
         createStream = streamConfig != null && readBoolean(jv, "create_stream", false);
         jvMultiConfig = readObject(jv, "multi_config");
@@ -55,8 +53,8 @@ public class Params implements JsonSerializable {
         int supplied = 0;
         int replace = -1;
         for (int x = 0; x < 5; x++) {
-            temp = readString(jv, "server" + x);
-            if (temp.startsWith("<Server")) {
+            String temp = readString(jv, "server" + x);
+            if (temp != null && temp.startsWith("<Server")) {
                 if (++replace == supplied) {
                     replace = 0;
                 }
@@ -99,8 +97,20 @@ public class Params implements JsonSerializable {
         return jv;
     }
 
+    public String populate(String template) {
+        return template
+            .replace(MULTI_BUCKET, multiBucket)
+            .replace(STATS_BUCKET, statsBucket)
+            .replace(PROFILE_BUCKET, profileBucket)
+            .replace(PROFILE_STREAM_NAME, profileStreamName)
+            .replace(PROFILE_STREAM_SUBJECT, profileStreamSubject)
+            .replace(SAVE_STREAM_NAME, saveStreamName)
+            .replace(SAVE_STREAM_SUBJECT, saveStreamSubject)
+            ;
+    }
+
     public void debug() {
-        _debug("os", os);
+        _debug("optionsVirtualThreads", optionsVirtualThreads);
         _debug("streamConfig", streamConfig);
         _debug("createStream", createStream);
         _debug("jvMultiConfig", jvMultiConfig);
@@ -118,8 +128,6 @@ public class Params implements JsonSerializable {
 
         _debug("watchWaitTime", watchWaitTime);
         _debug("trackProfile", trackProfile);
-
-        //  TODO show "custom" _debug("custom", custom);
     }
 
     private void _debug(String name, Object value) {

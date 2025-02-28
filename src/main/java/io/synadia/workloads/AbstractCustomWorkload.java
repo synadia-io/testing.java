@@ -25,6 +25,7 @@ import static io.synadia.utils.Commons.*;
 @SuppressWarnings("SameParameterValue")
 public abstract class AbstractCustomWorkload extends Workload {
 
+    public boolean optionsVirtualThreads;
     public String logStreamName;
     public String logSubjectPrefix;
     public String logStreamSubject;
@@ -53,6 +54,7 @@ public abstract class AbstractCustomWorkload extends Workload {
         this.customStreams = new ArrayList<>(Arrays.asList(customStreams));
 
         // common
+        optionsVirtualThreads = JsonValueUtils.readBoolean(params.jv, "options_virtual_threads", false);
         logStreamName = JsonValueUtils.readString(params.jv, "log_stream_name", "log");
         logSubjectPrefix = JsonValueUtils.readString(params.jv, "log_subject_prefix", "log.");
         logStreamSubject = JsonValueUtils.readString(params.jv, "log_stream_subject", "log.>");
@@ -63,6 +65,7 @@ public abstract class AbstractCustomWorkload extends Workload {
         progressFrequency = JsonValueUtils.readInteger(params.jv, "progress_frequency", 100);
         watchDateFormat = JsonValueUtils.readString(params.jv, "watch_date_format", "HH:mm:ss.SSS");
 
+        Debug.info(workLabel, "optionsVirtualThreads", optionsVirtualThreads);
         Debug.info(workLabel, "logStreamName", logStreamName);
         Debug.info(workLabel, "exStreamName", exStreamName);
         Debug.info(workLabel, "logSubjectPrefix", logSubjectPrefix);
@@ -535,28 +538,28 @@ public abstract class AbstractCustomWorkload extends Workload {
                         }
                     }
                 }
+                System.out.println("\n");
+                System.out.println(UN_START);
+                System.out.println(UN_DESC);
+                System.out.println(UN_TOP_SEP);
+                System.out.println(UN_HEADER);
+                System.out.println(UN_SEP);
+                for (Unex unex : map.values()) {
+                    String time = Debug.rfcTime(unex.time);
+                    String deets = unex.event.exceptionMessage;
+                    //noinspection DataFlowIssue
+                    if (deets.length() > UN_WIDTH) {
+                        deets = deets.substring(0, EX_WIDTH - 3) + "...";
+                    }
+                    //noinspection DataFlowIssue
+                    String ex = unex.event.exceptionClass.replace("Exception", "");
+                    System.out.printf(UN_DATA, unex.event.job, ex, time, unex.count, deets);
+                }
+                System.out.println(UN_FOOT);
             }
             catch (Exception e) {
-                throw new RuntimeException(e);
+                exit("INTERNAL ERROR: " + e);
             }
-            System.out.println("\n");
-            System.out.println(UN_START);
-            System.out.println(UN_DESC);
-            System.out.println(UN_TOP_SEP);
-            System.out.println(UN_HEADER);
-            System.out.println(UN_SEP);
-            for (Unex unex : map.values()) {
-                String time = Debug.rfcTime(unex.time);
-                String deets = unex.event.exceptionMessage;
-                //noinspection DataFlowIssue
-                if (deets.length() > UN_WIDTH) {
-                    deets = deets.substring(0, EX_WIDTH - 3) + "...";
-                }
-                //noinspection DataFlowIssue
-                String ex = unex.event.exceptionClass.replace("Exception", "");
-                System.out.printf(UN_DATA, unex.event.job, ex, time, unex.count, deets);
-            }
-            System.out.println(UN_FOOT);
         });
     }
 

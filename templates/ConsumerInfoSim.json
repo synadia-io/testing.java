@@ -1,16 +1,4 @@
 {
-  "multi_config": {
-    "server": "<Bootstrap>",
-    "subject": "<TestingStreamSubject>",
-    "action": "Custom",
-    "message_count": 10000,
-    "payload_size": 1000,
-    "threads": 1,
-    "connection_strategy": "individual",
-    "report_frequency": 100,
-    "options_factory_class_name": "io.synadia.utils.VirtualExecutorOptionsFactory",
-    "jitter": 1500
-  },
   "log_stream_name": "log",
   "log_subject_prefix": "log.",
   "log_stream_subject": "log.>",
