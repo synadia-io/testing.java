@@ -240,21 +240,21 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                 printConnect(nc, produceJob, ws.workId, tix);
                 jitter(produceJitter / 10);
                 AtomicInteger cutoff = new AtomicInteger(maxConsumers);
-                StreamInfo si = jsm.getStreamInfo(dataStreamName);
-                int siCount = (int)si.getStreamState().getConsumerCount();
-                int jitterCountdown = (maxConsumers - siCount) / produceThreadCount;
+                int jitterCountdown = maxConsumers / produceThreadCount;
                 while (true) {
-                    _produce(jsm, js, tix, ws, cutoff, produceJob, produceReportFrequency);
+                    if (_produce(jsm, js, tix, ws, cutoff, produceJob, produceReportFrequency)) {
+                        jitterCountdown = 0; // was full
+                    }
                     jitterCountdown = jitterCountdown(jitterCountdown, produceJitter);
                 }
             }
-            catch (InterruptedException | IOException | JetStreamApiException e) {
+            catch (InterruptedException | IOException e) {
                 throw new RuntimeException(e);
             }
         };
     }
 
-    private void _produce(JetStreamManagement jsm, JetStream js, int tix, WorkState ws, AtomicInteger cutoff, String job, long reportFrequency) {
+    private boolean _produce(JetStreamManagement jsm, JetStream js, int tix, WorkState ws, AtomicInteger cutoff, String job, long reportFrequency) {
         try {
             StreamInfo si = jsm.getStreamInfo(dataStreamName);
             long siCount = si.getStreamState().getConsumerCount();
@@ -264,36 +264,36 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                     cutoff.set(maxConsumers * 10 / 100); // 10 percent
                     print(job, ws.workId, tix, null, 0, ws.elapse(), "* System is full. " + siCount + "/" + maxConsumers);
                 }
+                return true; // full
             }
-            else {
-                cutoff.set(maxConsumers);
-                String consumerName = generateName();
-                String dataSubject = toDataSubject(consumerName);
-                int messageCount = ThreadLocalRandom.current().nextInt(produceMessageMin, produceMessageMax + 1);
+            cutoff.set(maxConsumers);
+            String consumerName = generateName();
+            String dataSubject = toDataSubject(consumerName);
+            int messageCount = ThreadLocalRandom.current().nextInt(produceMessageMin, produceMessageMax + 1);
 
-                // 1. create the consumer
-                jsm.createConsumer(dataStreamName, ConsumerConfiguration.builder()
-                    .durable(consumerName)
-                    .filterSubject(dataSubject)
-                    .build());
+            // 1. create the consumer
+            jsm.createConsumer(dataStreamName, ConsumerConfiguration.builder()
+                .durable(consumerName)
+                .filterSubject(dataSubject)
+                .build());
 
-                // 2. publish messages
-                for (int i = 0; i < messageCount; i++) {
-                    js.publish(dataSubject, null);
-                }
+            // 2. publish messages
+            for (int i = 0; i < messageCount; i++) {
+                js.publish(dataSubject, null);
+            }
 
-                // 3. put a record in the queue last so it's not used until messages are published
-                js.publish(queueSubject, new QueueData(consumerName, dataSubject, messageCount).serialize());
+            // 3. put a record in the queue last so it's not used until messages are published
+            js.publish(queueSubject, new QueueData(consumerName, dataSubject, messageCount).serialize());
 
-                long count = ws.increment();
-                if (count % reportFrequency == 0) {
-                    log(js, job, ws.workId, NO_TIX, count, ws.elapse());
-                }
+            long count = ws.increment();
+            if (count % reportFrequency == 0) {
+                log(js, job, ws.workId, NO_TIX, count, ws.elapse());
             }
         }
         catch (IOException | JetStreamApiException e) {
             log(js, produceJob, ws.workId, ws.elapse(), e);
         }
+        return false; // not full
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
