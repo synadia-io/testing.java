@@ -240,9 +240,10 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                 printConnect(nc, produceJob, ws.workId, tix);
                 jitter(produceJitter / 10);
                 AtomicInteger cutoff = new AtomicInteger(maxConsumers);
+                int jitterCountdown = maxConsumers / produceThreadCount;
                 while (true) {
                     _produce(jsm, js, tix, ws, cutoff, produceJob, produceReportFrequency);
-                    jitter(produceJitter);
+                    jitterCountdown = jitterCountdown(jitterCountdown, produceJitter);
                 }
             }
             catch (InterruptedException | IOException e) {
