@@ -24,7 +24,7 @@
   "produce_message_max": 100,
   "consume_job": "Consume",
   "consume_thread_count": 3,
-  "consume_report_frequency": 100,
+  "consume_report_frequency": 1000,
   "consume_jitter": 750,
   "consume_batch": 10,
   "info_thread_count": 8,
