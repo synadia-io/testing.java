@@ -252,11 +252,13 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                     // 3. put a record in the queue last so it's not used until messages are published
                     wctx.js.publish(queueSubject, new QueueData(consumerName, dataSubject, messageCount).serialize());
 
+                    boolean printedGroup = false;
                     long groupCount = wctx.ws.increment();
                     if (groupCount % produceReportFrequency == 0) {
+                        printedGroup = true;
                         logNoTix(produceJob, wctx, groupCount);
                     }
-                    if (++ownCount % produceReportFrequency == 0) {
+                    if (++ownCount % produceReportFrequency == 0 || printedGroup) {
                         logNoConsole(produceJob, wctx, ownCount);
                     }
                 }
@@ -289,11 +291,13 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                             m.ack();
                             m = fc.nextMessage();
                         }
-                        long groupCount = wctx.increment();
+                        boolean printedGroup = false;
+                        long groupCount = wctx.ws.increment();
                         if (groupCount % consumeReportFrequency == 0) {
+                            printedGroup = true;
                             logNoTix(consumeJob, wctx, groupCount);
                         }
-                        if (++ownCount % consumeReportFrequency == 0) {
+                        if (++ownCount % consumeReportFrequency == 0 || printedGroup) {
                             logNoConsole(consumeJob, wctx, ownCount);
                         }
                     }
@@ -343,11 +347,13 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                 for (String consumerName : consumerNames) {
                     try {
                         wctx.jsm.getConsumerInfo(dataStreamName, consumerName);
+                        boolean printedGroup = false;
                         long groupCount = wctx.ws.increment();
                         if (groupCount % infoReportFrequency == 0) {
+                            printedGroup = true;
                             logNoTix(infoJob, wctx, groupCount);
                         }
-                        if (++ownCount % infoReportFrequency == 0) {
+                        if (++ownCount % infoReportFrequency == 0 || printedGroup) {
                             logNoConsole(infoJob, wctx, ownCount);
                         }
                     }
