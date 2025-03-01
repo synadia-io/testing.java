@@ -253,7 +253,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
 
                     long count = wctx.increment();
                     if (count % produceReportFrequency == 0) {
-                        logNoTix(produceJob, wctx, count);
+                        log(produceJob, wctx, count);
                     }
                 }
                 if (reachedCutoff) {
@@ -286,7 +286,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                         }
                         long count = wctx.increment();
                         if (count % consumeReportFrequency == 0) {
-                            logNoTix(consumeJob, wctx, count);
+                            log(consumeJob, wctx, count);
                         }
                     }
                     catch (IOException | JetStreamApiException e) {
