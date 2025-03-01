@@ -214,6 +214,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
 
     @SuppressWarnings("InfiniteLoopStatement")
     private void produceWorker(WorkContext wctx) {
+        long ownCount = 0;
         AtomicInteger cutoff = new AtomicInteger(maxConsumers);
         boolean reachedCutoff = false;
         while (true) {
@@ -251,9 +252,12 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                     // 3. put a record in the queue last so it's not used until messages are published
                     wctx.js.publish(queueSubject, new QueueData(consumerName, dataSubject, messageCount).serialize());
 
-                    long count = wctx.increment();
-                    if (count % produceReportFrequency == 0) {
-                        log(produceJob, wctx, count);
+                    long groupCount = wctx.ws.increment();
+                    if (groupCount % produceReportFrequency == 0) {
+                        log(produceJob, wctx, groupCount);
+                    }
+                    if (++ownCount % produceReportFrequency == 0) {
+                        logNoConsole(produceJob, wctx, ownCount);
                     }
                 }
                 if (reachedCutoff) {
@@ -268,6 +272,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
 
     @SuppressWarnings("InfiniteLoopStatement")
     private void consumeWorker(WorkContext wctx) {
+        long ownCount = 0;
         ConsumerContext qConsumerCtx = null;
         while (true) {
             try {
@@ -284,9 +289,12 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                             m.ack();
                             m = fc.nextMessage();
                         }
-                        long count = wctx.increment();
-                        if (count % consumeReportFrequency == 0) {
-                            log(consumeJob, wctx, count);
+                        long groupCount = wctx.increment();
+                        if (groupCount % consumeReportFrequency == 0) {
+                            log(consumeJob, wctx, groupCount);
+                        }
+                        if (++ownCount % consumeReportFrequency == 0) {
+                            logNoConsole(consumeJob, wctx, ownCount);
                         }
                     }
                     catch (IOException | JetStreamApiException e) {
