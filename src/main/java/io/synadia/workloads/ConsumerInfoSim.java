@@ -225,9 +225,9 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                     if (co == maxConsumers) { // just to avoid repeat printing when full
                         cutoff.set(maxConsumers * 10 / 100); // 10 percent
                         print(produceJob, wctx, "* System is full. " + siCount + "/" + maxConsumers);
-                        Event event = new Event(this, produceJob, wctx.ws.workId, NO_TIX, null, -wctx.get(), wctx.elapse(), null);
-                        publish(wctx.js, event);
                     }
+                    Event event = new Event(this, produceJob, wctx.ws.workId, NO_TIX, null, -wctx.get(), wctx.elapse(), null);
+                    publish(wctx.js, event);
                     sleep(produceJitter); // extra full sleep since it's full
                     reachedCutoff = true;
                 }

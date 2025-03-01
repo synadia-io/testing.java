@@ -394,7 +394,7 @@ public abstract class AbstractCustomWorkload extends Workload {
                     }
                     else {
                         String cnt = "";
-                        if (event.count > 0) {
+                        if (event.count != 0) {
                             cnt = String.format("%,d", event.count);
                         }
                         System.out.printf(LOG_DATA, job, cnt, ht);
