@@ -11,6 +11,7 @@ import io.nats.client.support.JsonValue;
 import io.nats.client.support.JsonValueUtils;
 import io.synadia.CommandLine;
 import io.synadia.utils.Debug;
+import io.synadia.workloads.support.Event;
 import io.synadia.workloads.support.WorkContext;
 
 import java.io.IOException;
@@ -19,6 +20,8 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static io.nats.jsmulti.shared.Utils.sleep;
+import static io.synadia.utils.Commons.NO_TIX;
 import static io.synadia.utils.Commons.generateName;
 
 public class ConsumerInfoSim extends AbstractCustomWorkload {
@@ -212,7 +215,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
     @SuppressWarnings("InfiniteLoopStatement")
     private void produceWorker(WorkContext wctx) {
         AtomicInteger cutoff = new AtomicInteger(maxConsumers);
-        boolean doJitter = false;
+        boolean reachedCutoff = false;
         while (true) {
             try {
                 StreamInfo si = wctx.jsm.getStreamInfo(dataStreamName);
@@ -222,8 +225,11 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                     if (co == maxConsumers) { // just to avoid repeat printing when full
                         cutoff.set(maxConsumers * 10 / 100); // 10 percent
                         print(produceJob, wctx, "* System is full. " + siCount + "/" + maxConsumers);
+                        Event event = new Event(this, produceJob, wctx.ws.workId, NO_TIX, null, -wctx.get(), wctx.elapse(), null);
+                        publish(wctx.js, event);
                     }
-                    doJitter = true;
+                    sleep(produceJitter); // extra full sleep since it's full
+                    reachedCutoff = true;
                 }
                 else {
                     cutoff.set(maxConsumers);
@@ -247,10 +253,10 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
 
                     long count = wctx.increment();
                     if (count % produceReportFrequency == 0) {
-                        log(produceJob, wctx, count);
+                        logNoTix(produceJob, wctx, count);
                     }
                 }
-                if (doJitter) {
+                if (reachedCutoff) {
                     jitter(produceJitter);
                 }
             }
@@ -280,7 +286,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                         }
                         long count = wctx.increment();
                         if (count % consumeReportFrequency == 0) {
-                            log(consumeJob, wctx, count);
+                            logNoTix(consumeJob, wctx, count);
                         }
                     }
                     catch (IOException | JetStreamApiException e) {

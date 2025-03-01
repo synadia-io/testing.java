@@ -221,13 +221,13 @@ public abstract class AbstractCustomWorkload extends Workload {
     public static final String SUMMARY_FOOT    = "└──────────────┴────────────┴────────────┴────────────┴────────────┴────────────┴────────────┘";
     public static final String SUMMARY_DATA    = "│ %-12s │ %,10d │ %,10d │ %,10d │ %,10d │ %,10d │ %10s │\n";
 
-    public static final String EX_START   = "┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐";
-    public static final String EX_DESC    = "│ Exceptions                                                                                                                                    │";
-    public static final String EX_TOP_SEP = "├────────────────┬────────────────┬─────────────────────┬─────────┬─────────────────────────────────────────────────────────────────────────────┤";
-    public static final String EX_HEADER  = "│ ? Job (Thread) │ Exception      │ Last Occurrence     │ Count   │ Message                                                                     │";
-    public static final String EX_SEP     = "├────────────────┼────────────────┼─────────────────────┼─────────┼─────────────────────────────────────────────────────────────────────────────┤";
-    public static final String EX_FOOT    = "└────────────────┴────────────────┴─────────────────────┴─────────┴─────────────────────────────────────────────────────────────────────────────┘";
-    public static final String EX_DATA    = "│ %-14s │ %-14s │ %-17s │ %,7d │ %-75s │\n";
+    public static final String EX_START   = "┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐";
+    public static final String EX_DESC    = "│ Exceptions                                                                                                                                               │";
+    public static final String EX_TOP_SEP = "├────────────────┬───────────────────────────┬─────────────────────┬─────────┬─────────────────────────────────────────────────────────────────────────────┤";
+    public static final String EX_HEADER  = "│ ? Job (Thread) │ Exception                 │ Last Occurrence     │ Count   │ Message                                                                     │";
+    public static final String EX_SEP     = "├────────────────┼───────────────────────────┼─────────────────────┼─────────┼─────────────────────────────────────────────────────────────────────────────┤";
+    public static final String EX_FOOT    = "└────────────────┴───────────────────────────┴─────────────────────┴─────────┴─────────────────────────────────────────────────────────────────────────────┘";
+    public static final String EX_DATA    = "│ %-14s │ %-25s │ %-17s │ %,7d │ %-75s │\n";
     public static final int EX_WIDTH = 75;
 
     public static final String LOG_START      = "┌────────────────────────────────────────────────────┐";
@@ -402,7 +402,8 @@ public abstract class AbstractCustomWorkload extends Workload {
                 }
             }
             catch (Exception e) {
-                System.out.println("INTERNAL ERROR: " + e);
+                System.out.println("\nError during watch: " + e);
+                first = true; // so it doesn't print
             }
         }
 
@@ -656,6 +657,12 @@ public abstract class AbstractCustomWorkload extends Workload {
     // ----------------------------------------------------------------------------------------------------
     protected void log(String job, WorkContext wctx, long count) {
         Event event = new Event(this, job, wctx.ws.workId, wctx.tix, null, count, wctx.elapse(), null);
+        Debug.info(event.ident(), event.extras());
+        publish(wctx.js, event);
+    }
+
+    protected void logNoTix(String job, WorkContext wctx, long count) {
+        Event event = new Event(this, job, wctx.ws.workId, NO_TIX, null, count, wctx.elapse(), null);
         Debug.info(event.ident(), event.extras());
         publish(wctx.js, event);
     }

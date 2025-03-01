@@ -30,6 +30,10 @@ public class WorkContext {
         js = nc.jetStream();
     }
 
+    public long get() {
+        return ws.get();
+    }
+
     public long increment() {
         return ws.increment();
     }

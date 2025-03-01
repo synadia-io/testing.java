@@ -64,8 +64,14 @@ public class Event implements JsonSerializable {
             exceptionMessage = null;
         }
         else {
-            exceptionClass = exception.getClass().getSimpleName();
-            exceptionMessage = exception.getMessage();
+            if (exception.getCause() == null) {
+                exceptionClass = exception.getClass().getSimpleName();
+                exceptionMessage = exception.getMessage();
+            }
+            else {
+                exceptionClass = exception.getCause().getClass().getSimpleName();
+                exceptionMessage = exception.getCause().getMessage();
+            }
         }
     }
 

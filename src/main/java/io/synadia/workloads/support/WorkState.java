@@ -21,6 +21,16 @@ public class WorkState {
         this.elapsed = 0;
     }
 
+    public long get() {
+        iLock.lock();
+        try {
+            return groupCount;
+        }
+        finally {
+            iLock.unlock();
+        }
+    }
+
     public long increment() {
         iLock.lock();
         try {
