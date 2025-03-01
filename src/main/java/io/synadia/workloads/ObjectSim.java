@@ -8,7 +8,7 @@ import io.synadia.CommandLine;
 import io.synadia.utils.Commons;
 import io.synadia.utils.DataGenerator;
 import io.synadia.utils.Debug;
-import io.synadia.workloads.support.WorkState;
+import io.synadia.workloads.support.WorkContext;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -21,7 +21,6 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static io.nats.client.support.JsonUtils.printFormatted;
 import static io.nats.jsmulti.shared.Utils.sleep;
-import static io.synadia.utils.Commons.NO_TIX;
 
 public class ObjectSim extends AbstractCustomWorkload {
     private String bucketName;
@@ -119,47 +118,43 @@ public class ObjectSim extends AbstractCustomWorkload {
         switch (arg) {
             case "put"     -> doWorker(putJob, putThreadCount, this::putObjectWorker);
             case "get"     -> doWorker(getJob, getThreadCount, this::getObjectWorker);
-            case "cleanup" -> doCleanup();
+            case "cleanup" -> doAdmin(this::doCleanup);
             default        -> { return false; }
         }
         return true;
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
-    private void doCleanup() throws JetStreamApiException, IOException, InterruptedException {
-        WorkState ws = new WorkState();
-        runAdminCommand((nc, js) -> {
-            JetStreamManagement jsm = nc.jetStreamManagement();
-            StreamContext ctx = nc.getStreamContext(bucketStreamName);
-            String filter = NatsObjectStoreUtil.toMetaStreamSubject(bucketName);
+    private void doCleanup(WorkContext wctx) throws JetStreamApiException, IOException, InterruptedException {
+        StreamContext ctx = wctx.nc.getStreamContext(bucketStreamName);
+        String filter = NatsObjectStoreUtil.toMetaStreamSubject(bucketName);
 
-            while (true) {
-                OrderedConsumerContext occ = ctx.createOrderedConsumer(
-                    new OrderedConsumerConfiguration().filterSubject(filter));
-                List<String> subjectsToDelete = new ArrayList<>();
-                try (IterableConsumer it = occ.iterate()) {
-                    Message m = it.nextMessage(1000);
-                    while (m != null) {
-                        ObjectInfo oi = new ObjectInfo(m);
-                        if (oi.isDeleted()) {
-                            subjectsToDelete.add(m.getSubject());
-                        }
-                        m = it.nextMessage(1000);
+        while (true) {
+            OrderedConsumerContext occ = ctx.createOrderedConsumer(
+                new OrderedConsumerConfiguration().filterSubject(filter));
+            List<String> subjectsToDelete = new ArrayList<>();
+            try (IterableConsumer it = occ.iterate()) {
+                Message m = it.nextMessage(1000);
+                while (m != null) {
+                    ObjectInfo oi = new ObjectInfo(m);
+                    if (oi.isDeleted()) {
+                        subjectsToDelete.add(m.getSubject());
                     }
+                    m = it.nextMessage(1000);
+                }
+            }
+            catch (Exception ignore) {}
+
+            print(cleanupJob, wctx, "Cleaning up " + subjectsToDelete.size() + " deleted objects.");
+
+            for (String subject : subjectsToDelete) {
+                try {
+                    wctx.jsm.purgeStream(bucketStreamName, PurgeOptions.subject(subject));
                 }
                 catch (Exception ignore) {}
-
-                print(cleanupJob, ws.workId, NO_TIX, null, 0, ws.elapse(), "Cleaning up " + subjectsToDelete.size() + " deleted objects.");
-
-                for (String subject : subjectsToDelete) {
-                    try {
-                        jsm.purgeStream(bucketStreamName, PurgeOptions.subject(subject));
-                    }
-                    catch (Exception ignore) {}
-                }
-                sleep(cleanupFrequency);
             }
-        });
+            sleep(cleanupFrequency);
+        }
     }
 
     @Override
@@ -187,16 +182,17 @@ public class ObjectSim extends AbstractCustomWorkload {
     }
 
     private final ReentrantLock powLock = new ReentrantLock();
+
     @SuppressWarnings("InfiniteLoopStatement")
-    private Runnable putObjectWorker(Options options, int tix, WorkState ws) {
+    private void putObjectWorker(WorkContext wctx) {
         powLock.lock(); // all threads need the file. tix 0 is the first instance created
         try {
-            if (tix == 0) {
+            if (wctx.tix == 0) {
                 try {
                     generateObject();
                 }
                 catch (IOException e) {
-                    print(putJob, ws.workId, tix, null, 0, ws.elapse(), e.getMessage());
+                    print(putJob, wctx, e.getMessage());
                     System.exit(-1);
                 }
             }
@@ -205,49 +201,41 @@ public class ObjectSim extends AbstractCustomWorkload {
             powLock.unlock();
         }
 
-        return () -> {
-            try (Connection nc = Nats.connect(options)) {
-                printConnect(nc, putJob, ws.workId, tix);
-                JetStream js = nc.jetStream();
-                JetStreamManagement jsm = nc.jetStreamManagement();
-                ObjectStore os = nc.objectStore(bucketName);
-                jitter(putJitter);
-                int cutoff = maxObjects;
-                while (true) {
-                    try {
-                        long queueSize = getQueueSize(jsm);
-                        if (queueSize >= cutoff) {
-                            if (cutoff == maxObjects) { // just to avoid repeat printing when full
-                                cutoff = maxObjects * 2 / 3;
-                                print(putJob, ws.workId, tix, null, 0, ws.elapse(), "* System is full. " + queueSize + "/" + maxObjects);
-                            }
-                        }
-                        else {
-                            String objectName = Commons.generateName();
-                            try (FileInputStream in = new FileInputStream(putFileName)) {
-                                os.put(objectName, in);
-                            }
-
-                            // 3. put a record in the queue last so it's not used until messages are published
-                            js.publish(queueSubject, objectName.getBytes());
-
-                            long count = ws.increment();
-                            if (count % putReportFrequency == 0) {
-                                log(js, putJob, ws.workId, NO_TIX, count, ws.elapse());
-                            }
-                        }
-                    }
-                    catch (IOException | JetStreamApiException | NoSuchAlgorithmException e) {
-                        log(js, putJob, ws.workId, ws.elapse(), e);
-                    }
-                    jitter(putJitter);
+        ObjectStore os = null;
+        int cutoff = maxObjects;
+        while (true) {
+            try {
+                if (os == null) {
+                    os = wctx.nc.objectStore(bucketName);
                 }
+                long queueSize = getQueueSize(wctx.jsm);
+                if (queueSize >= cutoff) {
+                    if (cutoff == maxObjects) { // just to avoid repeat printing when full
+                        cutoff = maxObjects * 2 / 3;
+                        print(putJob, wctx, "* System is full. " + queueSize + "/" + maxObjects);
+                    }
+                }
+                else {
+                    String objectName = Commons.generateName();
+                    try (FileInputStream in = new FileInputStream(putFileName)) {
+                        os.put(objectName, in);
+                    }
+
+                    // 3. put a record in the queue last so it's not used until messages are published
+                    wctx.js.publish(queueSubject, objectName.getBytes());
+
+                    long count = wctx.increment();
+                    if (count % putReportFrequency == 0) {
+                        log(putJob, wctx, count);
+                    }
+                }
+                jitter(putJitter);
             }
-            catch (InterruptedException | IOException e) {
-                print(putJob, ws.workId, tix, null, 0, ws.elapse(), e.getMessage());
-                System.exit(-1);
+            catch (IOException | JetStreamApiException | NoSuchAlgorithmException e) {
+                sleepThenLog(putJob, putJitter, wctx, e);
+                os = null; // clean start
             }
-        };
+        }
     }
 
     private void generateObject() throws IOException {
@@ -272,61 +260,57 @@ public class ObjectSim extends AbstractCustomWorkload {
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
-    private Runnable getObjectWorker(Options options, int tix, WorkState ws) {
-        return () -> {
-            try (Connection nc = Nats.connect(options)) {
-                JetStreamManagement jsm = nc.jetStreamManagement();
-                JetStream js = nc.jetStream();
-                printConnect(nc, getJob, ws.workId, tix);
-                jitter(getJitter / 10);
-                ConsumerContext qConsumerCtx = nc.getConsumerContext(queueStreamName, queueConsumerName);
-                ObjectStore os = nc.objectStore(bucketName);
-                String outFileName = getFilePrefix + "-" + ws.workId + tix + (putFileIsText ? ".txt" : ".dat");
-                long min = maxObjects / 5;
-                long cutoff = min;
-                while (true) {
-                    try {
-                        long queueSize = getQueueSize(jsm);
-                        if (queueSize < cutoff) {
-                            if (cutoff == min) { // just to avoid repeat printing when low
-                                cutoff = (long)maxObjects * 75 / 100;
-                                print(getJob, ws.workId, tix, null, 0, ws.elapse(), "* System is low. " + queueSize + "/" + maxObjects);
+    private void getObjectWorker(WorkContext wctx) {
+        String outFileName = getFilePrefix + "-" + wctx.ws.workId + wctx.tix + (putFileIsText ? ".txt" : ".dat");
+        long min = maxObjects / 5;
+        long cutoff = min;
+        ObjectStore os = null;
+        ConsumerContext qConsumerCtx = null;
+        while (true) {
+            try {
+                if (os == null) {
+                    os = wctx.nc.objectStore(bucketName);
+                    qConsumerCtx = wctx.nc.getConsumerContext(queueStreamName, queueConsumerName);
+                }
+                long queueSize = getQueueSize(wctx.jsm);
+                if (queueSize < cutoff) {
+                    if (cutoff == min) { // just to avoid repeat printing when low
+                        cutoff = (long) maxObjects * 75 / 100;
+                        print(getJob, wctx, "* System is low. " + queueSize + "/" + maxObjects);
+                    }
+                }
+                else {
+                    cutoff = min;
+                    String objectName = queueNext(qConsumerCtx);
+                    if (objectName != null) {
+                        try (FileOutputStream out = new FileOutputStream(outFileName)) {
+                            os.get(objectName, out);
+                            long count = wctx.increment();
+                            if (count % getReportFrequency == 0) {
+                                log(getJob, wctx, count);
                             }
                         }
-                        else {
-                            cutoff = min;
-                            String objectName = queueNext(qConsumerCtx);
-                            if (objectName != null) {
-                                try (FileOutputStream out = new FileOutputStream(outFileName)) {
-                                    os.get(objectName, out);
-                                    long count = ws.increment();
-                                    if (count % getReportFrequency == 0) {
-                                        log(js, getJob, ws.workId, NO_TIX, count, ws.elapse());
-                                    }
-                                }
-                                catch (IOException | JetStreamApiException e) {
-                                    log(js, getJob, ws.workId, ws.elapse(), e);
-                                }
-                                finally {
-                                    try {
-                                        os.delete(objectName);
-                                    }
-                                    catch (Exception e) {
-                                        log(js, getJob, ws.workId, ws.elapse(), e);
-                                    }
-                                }
+                        catch (IOException | JetStreamApiException e) {
+                            log(getJob, wctx, e);
+                        }
+                        finally {
+                            try {
+                                os.delete(objectName);
+                            }
+                            catch (Exception e) {
+                                log(getJob, wctx, e);
                             }
                         }
                     }
-                    catch (Exception ignore) {}
-                    jitter(getJitter);
                 }
+                jitter(getJitter);
             }
-            catch (IOException | InterruptedException | JetStreamApiException e) {
-                print(getJob, ws.workId, tix, null, 0, ws.elapse(), e.getMessage());
-                System.exit(-1);
+            catch (Exception e) {
+                sleepThenLog(getJob, getJitter, wctx, e);
+                os = null; // clean start
+                qConsumerCtx = null;
             }
-        };
+        }
     }
 
     private String queueNext(ConsumerContext qConsumerCtx) throws JetStreamApiException, IOException, InterruptedException, JetStreamStatusCheckedException {

@@ -11,7 +11,7 @@ import io.nats.client.support.JsonValue;
 import io.nats.client.support.JsonValueUtils;
 import io.synadia.CommandLine;
 import io.synadia.utils.Debug;
-import io.synadia.workloads.support.WorkState;
+import io.synadia.workloads.support.WorkContext;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -19,7 +19,6 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static io.synadia.utils.Commons.NO_TIX;
 import static io.synadia.utils.Commons.generateName;
 
 public class ConsumerInfoSim extends AbstractCustomWorkload {
@@ -52,13 +51,6 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
     private int infoThreadCount;
     private long infoReportFrequency;
     private long infoJitter;
-
-    private String comboJob;
-    private int comboThreadCount;
-    private long comboReportFrequency;
-    private long comboJitter;
-    private int comboProduce;
-    private int comboConsume;
 
     @Override
     public void init(CommandLine commandLine) {
@@ -123,19 +115,6 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
         Debug.info(workLabel, "infoThreadCount", infoThreadCount);
         Debug.info(workLabel, "infoReportFrequency", infoReportFrequency);
         Debug.info(workLabel, "infoJitter", infoJitter);
-
-        comboJob = JsonValueUtils.readString(params.jv, "combo_job", "combo");
-        comboThreadCount = JsonValueUtils.readInteger(params.jv, "combo_thread_count", 3);
-        comboReportFrequency = JsonValueUtils.readLong(params.jv, "combo_report_frequency", 100);
-        comboJitter = JsonValueUtils.readLong(params.jv, "combo_jitter", 500);
-        comboProduce = JsonValueUtils.readInteger(params.jv, "combo_produce", 1);
-        comboConsume = JsonValueUtils.readInteger(params.jv, "combo_produce", 2);
-        Debug.info(workLabel, "comboJob", comboJob);
-        Debug.info(workLabel, "comboThreadCount", comboThreadCount);
-        Debug.info(workLabel, "comboReportFrequency", comboReportFrequency);
-        Debug.info(workLabel, "comboJitter", comboJitter);
-        Debug.info(workLabel, "comboProduce", comboProduce);
-        Debug.info(workLabel, "comboConsume", comboConsume);
     }
 
     @Override
@@ -144,7 +123,6 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
             case "list"    -> doListConsumers();
             case "produce" -> doWorker(produceJob, produceThreadCount, this::produceWorker);
             case "consume" -> doWorker(consumeJob, consumeThreadCount, this::consumeWorker);
-            case "combo"   -> doWorker(comboJob, comboThreadCount, this::comboWorker);
             case "info"    -> doWorker(infoJob, infoThreadCount, this::infoWorker);
             case "clear"   -> doClearConsumers();
             default        -> { return false; }
@@ -172,22 +150,22 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
     }
 
     private void doListConsumers() throws IOException, JetStreamApiException, InterruptedException {
-        runAdminCommand((nc, jsm) -> {
+        doAdmin(wctx -> {
             startProgressJob("List Consumers");
-            List<String> consumerNames = jsm.getConsumerNames(dataStreamName);
+            List<String> consumerNames = wctx.jsm.getConsumerNames(dataStreamName);
             consumerNames.forEach(cn -> System.out.println("Consumer: " + cn));
             System.out.println("Total: " + consumerNames.size());
         });
     }
 
     private void doClearConsumers() throws IOException, JetStreamApiException, InterruptedException {
-        runAdminCommand((nc, jsm) -> {
+        doAdmin(wctx -> {
             startProgressJob("Clear Consumers");
-            List<String> list = jsm.getConsumerNames(dataStreamName);
+            List<String> list = wctx.jsm.getConsumerNames(dataStreamName);
             int index = 0;
             while (index < list.size()) {
                 String cn = list.get(index);
-                jsm.deleteConsumer(dataStreamName, cn);
+                wctx.jsm.deleteConsumer(dataStreamName, cn);
                 showProgressMaybe(++index, "Clear Consumers");
             }
             endProgress(index);
@@ -232,123 +210,104 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
-    private Runnable produceWorker(Options options, int tix, WorkState ws) {
-        return () -> {
-            try (Connection nc = Nats.connect(options)) {
-                JetStreamManagement jsm = nc.jetStreamManagement();
-                JetStream js = nc.jetStream();
-                printConnect(nc, produceJob, ws.workId, tix);
-                jitter(produceJitter / 10);
-                AtomicInteger cutoff = new AtomicInteger(maxConsumers);
-                int jitterCountdown = maxConsumers / produceThreadCount;
-                while (true) {
-                    if (_produce(jsm, js, tix, ws, cutoff, produceJob, produceReportFrequency)) {
-                        jitterCountdown = 0; // was full
+    private void produceWorker(WorkContext wctx) {
+        AtomicInteger cutoff = new AtomicInteger(maxConsumers);
+        boolean doJitter = false;
+        while (true) {
+            try {
+                StreamInfo si = wctx.jsm.getStreamInfo(dataStreamName);
+                long siCount = si.getStreamState().getConsumerCount();
+                int co = cutoff.get();
+                if (siCount >= co) {
+                    if (co == maxConsumers) { // just to avoid repeat printing when full
+                        cutoff.set(maxConsumers * 10 / 100); // 10 percent
+                        print(produceJob, wctx, "* System is full. " + siCount + "/" + maxConsumers);
                     }
-                    jitterCountdown = jitterCountdown(jitterCountdown, produceJitter);
+                    doJitter = true;
+                }
+                else {
+                    cutoff.set(maxConsumers);
+                    String consumerName = generateName();
+                    String dataSubject = toDataSubject(consumerName);
+                    int messageCount = ThreadLocalRandom.current().nextInt(produceMessageMin, produceMessageMax + 1);
+
+                    // 1. create the consumer
+                    wctx.jsm.createConsumer(dataStreamName, ConsumerConfiguration.builder()
+                        .durable(consumerName)
+                        .filterSubject(dataSubject)
+                        .build());
+
+                    // 2. publish messages
+                    for (int i = 0; i < messageCount; i++) {
+                        wctx.js.publish(dataSubject, null);
+                    }
+
+                    // 3. put a record in the queue last so it's not used until messages are published
+                    wctx.js.publish(queueSubject, new QueueData(consumerName, dataSubject, messageCount).serialize());
+
+                    long count = wctx.increment();
+                    if (count % produceReportFrequency == 0) {
+                        log(produceJob, wctx, count);
+                    }
+                }
+                if (doJitter) {
+                    jitter(produceJitter);
                 }
             }
-            catch (InterruptedException | IOException e) {
-                throw new RuntimeException(e);
-            }
-        };
-    }
-
-    private boolean _produce(JetStreamManagement jsm, JetStream js, int tix, WorkState ws, AtomicInteger cutoff, String job, long reportFrequency) {
-        try {
-            StreamInfo si = jsm.getStreamInfo(dataStreamName);
-            long siCount = si.getStreamState().getConsumerCount();
-            int co = cutoff.get();
-            if (siCount >= co) {
-                if (co == maxConsumers) { // just to avoid repeat printing when full
-                    cutoff.set(maxConsumers * 10 / 100); // 10 percent
-                    print(job, ws.workId, tix, null, 0, ws.elapse(), "* System is full. " + siCount + "/" + maxConsumers);
-                }
-                return true; // full
-            }
-            cutoff.set(maxConsumers);
-            String consumerName = generateName();
-            String dataSubject = toDataSubject(consumerName);
-            int messageCount = ThreadLocalRandom.current().nextInt(produceMessageMin, produceMessageMax + 1);
-
-            // 1. create the consumer
-            jsm.createConsumer(dataStreamName, ConsumerConfiguration.builder()
-                .durable(consumerName)
-                .filterSubject(dataSubject)
-                .build());
-
-            // 2. publish messages
-            for (int i = 0; i < messageCount; i++) {
-                js.publish(dataSubject, null);
-            }
-
-            // 3. put a record in the queue last so it's not used until messages are published
-            js.publish(queueSubject, new QueueData(consumerName, dataSubject, messageCount).serialize());
-
-            long count = ws.increment();
-            if (count % reportFrequency == 0) {
-                log(js, job, ws.workId, NO_TIX, count, ws.elapse());
+            catch (IOException | JetStreamApiException e) {
+                sleepThenLog(produceJob, produceJitter, wctx, e);
             }
         }
-        catch (IOException | JetStreamApiException e) {
-            log(js, produceJob, ws.workId, ws.elapse(), e);
-        }
-        return false; // not full
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
-    private Runnable consumeWorker(Options options, int tix, WorkState ws) {
-        return () -> {
-            try (Connection nc = Nats.connect(options)) {
-                JetStreamManagement jsm = nc.jetStreamManagement();
-                JetStream js = nc.jetStream();
-                printConnect(nc, consumeJob, ws.workId, tix);
-                jitter(consumeJitter / 10);
-                ConsumerContext qConsumerCtx = nc.getConsumerContext(queueStreamName, queueConsumerName);
-                while (true) {
-                    _consume(nc, jsm, js, ws, qConsumerCtx, consumeJob, consumeReportFrequency);
-                    jitter(consumeJitter);
+    private void consumeWorker(WorkContext wctx) {
+        ConsumerContext qConsumerCtx = null;
+        while (true) {
+            try {
+                if (qConsumerCtx == null) {
+                    qConsumerCtx = wctx.nc.getConsumerContext(queueStreamName, queueConsumerName);
                 }
+                QueueData qd = queueNext(qConsumerCtx);
+                if (qd != null) {
+                    StreamContext sctx = wctx.nc.getStreamContext(dataStreamName);
+                    ConsumerContext cctx = sctx.getConsumerContext(qd.consumerName);
+                    try (FetchConsumer fc = cctx.fetch(FetchConsumeOptions.builder().maxMessages(consumeBatch).noWait().build())) {
+                        Message m = fc.nextMessage();
+                        while (m != null) {
+                            m.ack();
+                            m = fc.nextMessage();
+                        }
+                        long count = wctx.increment();
+                        if (count % consumeReportFrequency == 0) {
+                            log(consumeJob, wctx, count);
+                        }
+                    }
+                    catch (IOException | JetStreamApiException e) {
+                        log(consumeJob, wctx, e);
+                    }
+                    finally {
+                        try {
+                            wctx.jsm.deleteConsumer(dataStreamName, qd.consumerName);
+                        }
+                        catch (Exception e) {
+                            log(consumeJob, wctx, e);
+                        }
+                        try {
+                            wctx.jsm.purgeStream(dataStreamName, PurgeOptions.subject(qd.dataSubject));
+                        }
+                        catch (Exception e) {
+                            log(consumeJob, wctx, e);
+                        }
+                    }
+                }
+                jitter(consumeJitter);
             }
-            catch (IOException | InterruptedException | JetStreamApiException e) {
-                throw new RuntimeException(e);
-            }
-        };
-    }
-
-    private void _consume(Connection nc, JetStreamManagement jsm, JetStream js, WorkState ws, ConsumerContext qConsumerCtx, String job, long reportFrequency) {
-        try {
-            QueueData qd = queueNext(qConsumerCtx);
-            if (qd != null) {
-                StreamContext sctx = nc.getStreamContext(dataStreamName);
-                ConsumerContext cctx = sctx.getConsumerContext(qd.consumerName);
-                try (FetchConsumer fc = cctx.fetch(FetchConsumeOptions.builder().maxMessages(consumeBatch).noWait().build())) {
-                    Message m = fc.nextMessage();
-                    while (m != null) {
-                        m.ack();
-                        m = fc.nextMessage();
-                    }
-                    long count = ws.increment();
-                    if (count % reportFrequency == 0) {
-                        log(js, job, ws.workId, NO_TIX, count, ws.elapse());
-                    }
-                }
-                catch (IOException | JetStreamApiException e) {
-                    log(js, job, ws.workId, ws.elapse(), e);
-                }
-                finally {
-                    try {
-                        jsm.deleteConsumer(dataStreamName, qd.consumerName);
-                    }
-                    catch (Exception ignore) {}
-                    try {
-                        jsm.purgeStream(dataStreamName, PurgeOptions.subject(qd.dataSubject));
-                    }
-                    catch (Exception ignore) {}
-                }
+            catch (Exception e) {
+                sleepThenLog(consumeJob, consumeJitter, wctx, e);
+                qConsumerCtx = null; // clean start
             }
         }
-        catch (Exception ignore) {}
     }
 
     private QueueData queueNext(ConsumerContext qConsumerCtx) throws JetStreamApiException, IOException, InterruptedException, JetStreamStatusCheckedException {
@@ -361,72 +320,35 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
-    private Runnable comboWorker(Options options, int tix, WorkState ws) {
-        return () -> {
-            try (Connection nc = Nats.connect(options)) {
-                JetStreamManagement jsm = nc.jetStreamManagement();
-                JetStream js = nc.jetStream();
-                printConnect(nc, comboJob, ws.workId, tix);
-                ConsumerContext qConsumerCtx = nc.getConsumerContext(queueStreamName, queueConsumerName);
-                AtomicInteger produceCutoff = new AtomicInteger(maxConsumers);
-                jitter(comboJitter / 10);
-                String pJob = comboJob + ":" + produceJob;
-                String cJob = comboJob + ":" + consumeJob;
-                while (true) {
-                    for (int x = 0; x < comboConsume; x++) {
-                        _consume(nc, jsm, js, ws, qConsumerCtx, cJob, comboReportFrequency);
-                        jitter(comboJitter);
-                    }
-                    for (int x = 0; x < comboProduce; x++) {
-                        _produce(jsm, js, tix, ws, produceCutoff, pJob, comboReportFrequency);
-                        jitter(comboJitter);
-                    }
-                }
-            }
-            catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        };
-    }
-
-    @SuppressWarnings("InfiniteLoopStatement")
-    private Runnable infoWorker(Options options, int tix, WorkState ws) {
-        return () -> {
-            while (true) {
-                try (Connection nc = Nats.connect(options)) {
-                    JetStreamManagement jsm = nc.jetStreamManagement();
-                    JetStream js = nc.jetStream();
-                    printConnect(nc, infoJob, ws.workId, tix);
-                    jitter(infoJitter / 10);
-                    long ownCount = 0;
-                    while (true) {
-                        List<String> consumerNames = jsm.getConsumerNames(dataStreamName);
-                        Collections.shuffle(consumerNames);
-                        for (String consumerName : consumerNames) {
-                            try {
-                                jsm.getConsumerInfo(dataStreamName, consumerName);
-                                long groupCount = ws.increment();
-                                if (groupCount % infoReportFrequency == 0) {
-                                    log(js, infoJob, ws.workId, NO_TIX, groupCount, ws.elapse());
-                                }
-                                if (++ownCount % infoReportFrequency == 0) {
-                                    logNoConsole(js, infoJob, ws.workId, tix, ownCount, ws.elapse());
-                                }
-                            }
-                            catch (IOException | JetStreamApiException e) {
-                                if (!e.getMessage().contains("10014")) { // it's fine the consumer is missing
-                                    log(js, infoJob, ws.workId, ws.elapse(), e);
-                                }
-                            }
+    private void infoWorker(WorkContext wctx) {
+        long ownCount = 0;
+        while (true) {
+            try {
+                List<String> consumerNames = wctx.jsm.getConsumerNames(dataStreamName);
+                Collections.shuffle(consumerNames);
+                for (String consumerName : consumerNames) {
+                    try {
+                        wctx.jsm.getConsumerInfo(dataStreamName, consumerName);
+                        long groupCount = wctx.ws.increment();
+                        if (groupCount % infoReportFrequency == 0) {
+                            log(infoJob, wctx, groupCount);
                         }
-                        jitter(infoJitter);
+                        if (++ownCount % infoReportFrequency == 0) {
+                            logNoConsole(infoJob, wctx, ownCount);
+                        }
+                    }
+                    catch (IOException | JetStreamApiException e) {
+                        if (!e.getMessage().contains("10014")) { // it's fine the consumer is missing
+                            log(infoJob, wctx, e);
+                        }
                     }
                 }
-                catch (IOException | InterruptedException | JetStreamApiException e) {
-                    print(infoJob, ws.workId, ws.elapse(), e);
-                }
+                jitter(infoJitter);
             }
-        };
+            catch (IOException | JetStreamApiException e) {
+                sleepThenLog(infoJob, infoJitter, wctx, e);
+            }
+        }
     }
 
     private String toDataSubject(String consumerName) {

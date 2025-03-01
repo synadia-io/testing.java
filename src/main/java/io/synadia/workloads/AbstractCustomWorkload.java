@@ -7,8 +7,7 @@ import io.nats.client.support.NatsObjectStoreUtil;
 import io.synadia.Workload;
 import io.synadia.utils.Debug;
 import io.synadia.workloads.support.Event;
-import io.synadia.workloads.support.MultiThreadedWorker;
-import io.synadia.workloads.support.SingleThreadedWorker;
+import io.synadia.workloads.support.WorkContext;
 import io.synadia.workloads.support.WorkState;
 
 import java.io.IOException;
@@ -104,6 +103,10 @@ public abstract class AbstractCustomWorkload extends Workload {
         commandHelp = sb.toString();
     }
 
+    protected void exit(String label, Exception e) {
+        exit(label + ": " + e.getMessage());
+    }
+
     protected void exit(String reason) {
         Debug.info(workLabel, reason);
         Debug.info(workLabel, "Commands", commandHelp);
@@ -135,41 +138,28 @@ public abstract class AbstractCustomWorkload extends Workload {
     }
 
     // ----------------------------------------------------------------------------------------------------
-    // COMMANDS
-    // ----------------------------------------------------------------------------------------------------
-    protected interface AdminCommand {
-        void run(Connection nc, JetStreamManagement jsm) throws IOException, JetStreamApiException, InterruptedException;
-    }
-
-    protected void runAdminCommand(AdminCommand cmd) throws IOException, JetStreamApiException, InterruptedException {
-        try (Connection nc = Nats.connect(getAdminOptions())) {
-            cmd.run(nc, nc.jetStreamManagement());
-        }
-    }
-
-    // ----------------------------------------------------------------------------------------------------
     // COMMAND: SETUP
     // ----------------------------------------------------------------------------------------------------
     @SuppressWarnings("SameParameterValue")
     protected void doSetup() throws IOException, JetStreamApiException, InterruptedException {
-        runAdminCommand((nc, jsm) -> {
+        doAdmin(wctx -> {
             startJob("Setup");
             startJob("Creating Streams");
-            List<String> streamNames = jsm.getStreamNames();
+            List<String> streamNames = wctx.jsm.getStreamNames();
             for (String streamName : streamNames) {
-                jsm.deleteStream(streamName);
+                wctx.jsm.deleteStream(streamName);
             }
-            addStream(jsm, StreamConfiguration.builder()
+            addStream(wctx.jsm, StreamConfiguration.builder()
                 .name(logStreamName)
                 .subjects(logStreamSubject)
                 .retentionPolicy(RetentionPolicy.Limits)
                 .maxAge(Duration.ofMinutes(60))
                 .build());
-            addStream(jsm, StreamConfiguration.builder()
+            addStream(wctx.jsm, StreamConfiguration.builder()
                 .name(exStreamName)
                 .subjects(exStreamSubject)
                 .build());
-            subDoSetup(nc, jsm);
+            subDoSetup(wctx.nc, wctx.jsm);
         });
     }
 
@@ -207,15 +197,15 @@ public abstract class AbstractCustomWorkload extends Workload {
     // COMMAND: PURGE
     // ----------------------------------------------------------------------------------------------------
     protected void doPurge(String streamName) throws IOException, JetStreamApiException, InterruptedException {
-        runAdminCommand((nc, jsm) -> {
+        doAdmin(wctx -> {
             String filter = getStringArgFromPosition(2);
             if (filter == null || filter.isEmpty()) {
                 startJob("Purge " + streamName);
-                nc.jetStreamManagement().purgeStream(streamName);
+                wctx.nc.jetStreamManagement().purgeStream(streamName);
             }
             else {
                 startJob("Purge " + streamName + " (" + filter + ")");
-                jsm.purgeStream(logStreamName, PurgeOptions.builder().subject(filter).build());
+                wctx.jsm.purgeStream(logStreamName, PurgeOptions.builder().subject(filter).build());
             }
         });
     }
@@ -259,7 +249,7 @@ public abstract class AbstractCustomWorkload extends Workload {
 
     @SuppressWarnings("InfiniteLoopStatement")
     protected void doWatch() throws IOException, JetStreamApiException, InterruptedException {
-        runAdminCommand((nc, jsm) -> {
+        doAdmin(wctx -> {
             startJob("Watch");
             Map<String, Event> watchMap = new HashMap<>();
             List<String> objectStreams = new ArrayList<>();
@@ -282,19 +272,19 @@ public abstract class AbstractCustomWorkload extends Workload {
                     System.out.println(SUMMARY_HEADER);
                     System.out.println(SUMMARY_SEP);
                     for (String stream : customStreams) {
-                        summarize(jsm, stream);
+                        summarize(wctx.jsm, stream);
                     }
                     System.out.println(SUMMARY_SEP);
-                    StreamState exSs = summarize(jsm, exStreamName);
-                    StreamState logSs = summarize(jsm, logStreamName);
+                    StreamState exSs = summarize(wctx.jsm, exStreamName);
+                    StreamState logSs = summarize(wctx.jsm, logStreamName);
                     System.out.println(SUMMARY_FOOT);
 
-                    watchStream(jsm, watchMap, true, exStreamName, exSs, v -> {
+                    watchStream(wctx.jsm, watchMap, true, exStreamName, exSs, v -> {
                         System.out.println(EX_START);
                         System.out.println(EX_DESC);
                     });
 
-                    watchStream(jsm, watchMap, false, logStreamName, logSs, v -> {
+                    watchStream(wctx.jsm, watchMap, false, logStreamName, logSs, v -> {
                         System.out.println(LOG_START);
                         System.out.println(LOG_DESC);
                     });
@@ -308,7 +298,7 @@ public abstract class AbstractCustomWorkload extends Workload {
                         System.out.println(OBJ_HEADER);
                         System.out.println(OBJ_SEP_LINE);
                         for (String stream : objectStreams) {
-                            summarizeObjectStream(nc, stream);
+                            summarizeObjectStream(wctx.nc, stream);
                         }
                         System.out.println(OBJ_FOOT_LINE);
                     }
@@ -330,9 +320,9 @@ public abstract class AbstractCustomWorkload extends Workload {
 
     protected static void summarizeObjectStream(Connection nc, String bucketStreamName) throws IOException, JetStreamApiException {
         String bucketName = NatsObjectStoreUtil.extractBucketName(bucketStreamName);
-        StreamContext ctx = nc.getStreamContext(bucketStreamName);
+        StreamContext streamContext = nc.getStreamContext(bucketStreamName);
         String filter = NatsObjectStoreUtil.toMetaStreamSubject(bucketName);
-        OrderedConsumerContext occ = ctx.createOrderedConsumer(
+        OrderedConsumerContext occ = streamContext.createOrderedConsumer(
             new OrderedConsumerConfiguration().filterSubject(filter));
 
         System.out.printf(OBJ_LINE_FMT_1, bucketName);
@@ -435,15 +425,15 @@ public abstract class AbstractCustomWorkload extends Workload {
 
     @SuppressWarnings("InfiniteLoopStatement")
     protected void doStream(String streamName) throws IOException, JetStreamApiException, InterruptedException {
-        runAdminCommand((nc, jsm) -> {
-            StreamInfo si = jsm.getStreamInfo(streamName);
+        doAdmin(wctx -> {
+            StreamInfo si = wctx.jsm.getStreamInfo(streamName);
             long seq = si.getStreamState().getFirstSequence();
             seq = getLongArgFromPosition(3, seq);
             long last = si.getStreamState().getLastSequence();
             int tracker = 0;
             while (true) {
                 if (seq > last) {
-                    si = jsm.getStreamInfo(streamName);
+                    si = wctx.jsm.getStreamInfo(streamName);
                     long currentLast = si.getStreamState().getLastSequence();
                     last = si.getStreamState().getLastSequence();
                     if (currentLast <= last) {
@@ -452,7 +442,7 @@ public abstract class AbstractCustomWorkload extends Workload {
                     }
                 }
                 try {
-                    MessageInfo mi = jsm.getNextMessage(streamName, seq, ">");
+                    MessageInfo mi = wctx.jsm.getNextMessage(streamName, seq, ">");
                     seq = mi.getSeq() + 1;
                     byte[] data = mi.getData();
                     String sdata = "<no data>";
@@ -511,15 +501,15 @@ public abstract class AbstractCustomWorkload extends Workload {
     }
 
     protected void doUniqueExceptions(String streamName) throws JetStreamApiException, IOException, InterruptedException {
-        runAdminCommand((nc, jsm) -> {
+        doAdmin(wctx -> {
             Map<String, Unex> map = new HashMap<>();
-            StreamContext ctx = nc.getStreamContext(streamName);
-            StreamInfo si = ctx.getStreamInfo();
+            StreamContext streamContext = wctx.nc.getStreamContext(streamName);
+            StreamInfo si = streamContext.getStreamInfo();
             long currentlyAvailable = si.getStreamState().getMsgCount();
             long red = 0;
             long failsLeft = 10;
             long count = 0;
-            OrderedConsumerContext occ = ctx.createOrderedConsumer(new OrderedConsumerConfiguration());
+            OrderedConsumerContext occ = streamContext.createOrderedConsumer(new OrderedConsumerConfiguration());
             try (IterableConsumer it = occ.iterate()) {
                 while (red < currentlyAvailable && failsLeft > 0) {
                     Message m = it.nextMessage(1000);
@@ -559,7 +549,7 @@ public abstract class AbstractCustomWorkload extends Workload {
                 System.out.println(UN_FOOT);
             }
             catch (Exception e) {
-                exit("INTERNAL ERROR: " + e);
+                exit("Unable to complete", e);
             }
         });
     }
@@ -574,18 +564,73 @@ public abstract class AbstractCustomWorkload extends Workload {
     public static final int UN_WIDTH = 75;
 
     // ----------------------------------------------------------------------------------------------------
-    // COMMAND: WORKER
+    // RUNNERS
     // ----------------------------------------------------------------------------------------------------
-    protected void doWorker(String job, SingleThreadedWorker worker) throws InterruptedException {
+    protected interface WorkContextRunner {
+        void run(WorkContext wctx) throws IOException, JetStreamApiException, InterruptedException;
+    }
+
+    protected void doAdmin(WorkContextRunner runner) throws IOException, JetStreamApiException, InterruptedException {
+        Options ao = getAdminOptions();
+        try (Connection nc = Nats.connect(ao)) {
+            runner.run(new WorkContext(ao, nc));
+        }
+    }
+
+    public interface Worker {
+        void doWork(WorkContext wctx);
+    }
+
+    protected Runnable workerRunnable(
+        String job,
+        Options options,
+        int tix,
+        WorkState ws,
+        WorkContextRunner runner)
+    {
+        return () -> {
+            boolean connected = false;
+            while (!connected) {
+                Connection nc = null;
+                try {
+                    try {
+                        nc = Nats.connect(options);
+                        connected = true;
+                    }
+                    catch (IOException e) {
+                        print(job, ws.workId, ws.elapse(), e);
+                        sleep(1000);
+                    }
+                    if (connected) {
+                        printConnect(nc, job, ws.workId, tix);
+                        try {
+                            runner.run(new WorkContext(options, nc, tix, ws));
+                            nc.close();
+                        }
+                        catch (IOException | JetStreamApiException e) {
+                            print(job, ws.workId, ws.elapse(), e);
+                            throw new RuntimeException(e);
+                        }
+                    }
+                }
+                catch (InterruptedException e) {
+                    print(job, ws.workId, ws.elapse(), e);
+                }
+            }
+        };
+    }
+
+    protected void doWorker(String job, Worker worker) throws InterruptedException {
         startJob(job);
+        Options options = allOptionsShuffled().getFirst();
         WorkState ws = new WorkState();
-        Thread t = new Thread(worker.getWork(allOptionsShuffled().getFirst(), ws));
+        Thread t = new Thread(workerRunnable(job, options, NO_TIX, ws, worker::doWork));
         t.setName(job);
         t.start();
         t.join();
     }
 
-    protected void doWorker(String job, int threadCount, MultiThreadedWorker worker) throws InterruptedException {
+    protected void doWorker(String job, int threadCount, Worker worker) throws InterruptedException {
         startJob(job);
         List<Options> optionsList = allOptionsShuffled();
         List<Thread> threads = new ArrayList<>(threadCount);
@@ -595,7 +640,8 @@ public abstract class AbstractCustomWorkload extends Workload {
             if (++option == optionsList.size()) {
                 option = 0;
             }
-            Thread t = new Thread(worker.getWork(optionsList.get(option), tix, ws));
+            Options options = optionsList.get(option);
+            Thread t = new Thread(workerRunnable(job, options, tix, ws, worker::doWork));
             t.setName(job + " " + tix + " ");
             t.start();
             threads.add(t);
@@ -608,10 +654,10 @@ public abstract class AbstractCustomWorkload extends Workload {
     // ----------------------------------------------------------------------------------------------------
     // LOG HELPERS
     // ----------------------------------------------------------------------------------------------------
-    protected void log(JetStream js, String job, String workId, int tix, long count, long elapsed) {
-        Event event = new Event(this, job, workId, tix, null, count, elapsed, null);
+    protected void log(String job, WorkContext wctx, long count) {
+        Event event = new Event(this, job, wctx.ws.workId, wctx.tix, null, count, wctx.elapse(), null);
         Debug.info(event.ident(), event.extras());
-        publish(js, event);
+        publish(wctx.js, event);
     }
 
     protected void log(JetStream js, String job, String workId, int tix, String qualifier, long count, long elapsed) {
@@ -620,26 +666,29 @@ public abstract class AbstractCustomWorkload extends Workload {
         publish(js, event);
     }
 
-    protected void logNoConsole(JetStream js, String job, String workId, int tix, long count, long elapsed) {
-        publish(js, new Event(this, job, workId, tix, null, count, elapsed, null));
+    protected void logNoConsole(String job, WorkContext wctx, long count) {
+        publish(wctx.js, new Event(this, job, wctx.ws.workId, wctx.tix, null, count, wctx.elapse(), null));
     }
 
-    protected void log(JetStream js, String job, String workId, long elapsed, Exception exception) {
+    protected void log(String job, WorkContext wctx, Exception exception) {
         String qualifier = exception.getClass().getSimpleName().replace("Exception", "");
-        Event event = new Event(this, job, workId, NO_TIX, qualifier, 0, elapsed, exception);
+        Event event = new Event(this, job, wctx.ws.workId, NO_TIX, qualifier, 0, wctx.elapse(), exception);
         Debug.info(event.ident(), event.extras());
-        publish(js, event);
+        publish(wctx.js, event);
     }
 
-    protected void log(JetStream js, String job, String workId, String qualifier, long elapsed, Exception exception) {
-        Event event = new Event(this, job, workId, NO_TIX, qualifier, 0, elapsed, exception);
-        Debug.info(event.ident(), event.extras());
-        publish(js, event);
+    protected void sleepThenLog(String job, long sleep, WorkContext wctx, Exception exception) {
+        sleep(sleep);
+        log(job, wctx, exception);
     }
 
     protected void print(String job, String workId, int tix, String qualifier, long count, long elapsed, String message) {
         Event event = new Event(this, job, workId, tix, qualifier, count, elapsed, null);
         Debug.info(event.ident(), event.extras(message));
+    }
+
+    protected void print(String job, WorkContext wctx, String message) {
+        print(job, wctx.ws.workId, wctx.tix, null, 0, wctx.elapse(), message);
     }
 
     protected void print(String job, String workId, long elapsed, Exception exception) {

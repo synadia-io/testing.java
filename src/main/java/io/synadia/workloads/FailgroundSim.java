@@ -6,13 +6,10 @@ import io.nats.client.support.JsonValueUtils;
 import io.nats.jsmulti.shared.FailureException;
 import io.synadia.CommandLine;
 import io.synadia.utils.Debug;
-import io.synadia.workloads.support.WorkState;
+import io.synadia.workloads.support.WorkContext;
 
 import java.io.IOException;
 import java.util.concurrent.ThreadLocalRandom;
-
-import static io.nats.jsmulti.shared.Utils.sleep;
-import static io.synadia.utils.Commons.NO_TIX;
 
 public class FailgroundSim extends AbstractCustomWorkload {
     private String dataStreamName;
@@ -95,93 +92,71 @@ public class FailgroundSim extends AbstractCustomWorkload {
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
-    private Runnable pubWorker(Options options, WorkState ws) {
-        return () -> {
-            try (Connection nc = Nats.connect(options)) {
-                JetStream js = nc.jetStream();
-                printConnect(nc, publishJob, ws.workId, NO_TIX);
-                jitter(publishJitter / 10);
-                long lastSeq = -1;
-                while (true) {
-                    try {
-                        String pubId = NUID.nextGlobal();
-                        PublishOptions po = lastSeq == -1
-                            ? PublishOptions.builder().build()
-                            : PublishOptions.builder().expectedLastSequence(lastSeq).build();
-                        PublishAck pa = js.publish(dataSubject, getData(pubId), po);
-                        lastSeq = pa.getSeqno();
+    private void pubWorker(WorkContext wctx) {
+        long lastSeq = -1;
+        while (true) {
+            try {
+                String pubId = NUID.nextGlobal();
+                PublishOptions po = lastSeq == -1
+                    ? PublishOptions.builder().build()
+                    : PublishOptions.builder().expectedLastSequence(lastSeq).build();
+                PublishAck pa = wctx.js.publish(dataSubject, getData(pubId), po);
+                lastSeq = pa.getSeqno();
 
-                        long count = ws.increment();
-                        if (count % publishReportFrequency == 0) {
-                            log(js, publishJob, ws.workId, NO_TIX, count, ws.elapse());
-                        }
-                        jitter(publishJitter);
-                    }
-                    catch (IOException | JetStreamApiException e) {
-                        sleep(publishJitter);
-                        lastSeq = -1;
-                        log(js, publishJob, ws.workId, ws.elapse(), e);
-                    }
+                long count = wctx.ws.increment();
+                if (count % publishReportFrequency == 0) {
+                    log(publishJob, wctx, count);
                 }
+                jitter(publishJitter);
             }
-            catch (InterruptedException | IOException e) {
-                throw new RuntimeException(e);
+            catch (IOException | JetStreamApiException e) {
+                sleepThenLog(publishJob, publishJitter, wctx, e);
+                lastSeq = -1; // clean start
             }
-        };
+        }
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
-    private Runnable orderedWorker(Options options, WorkState ws) {
-        return () -> {
-            try (Connection nc = Nats.connect(options)) {
-                JetStream js = nc.jetStream();
-                printConnect(nc, orderedJob, ws.workId, NO_TIX);
-                jitter(orderedJitter / 10);
-                while (true) {
-                    try {
-                        StreamContext ctx = nc.getStreamContext(dataStreamName);
-                        StreamInfo si = ctx.getStreamInfo(StreamInfoOptions.builder().filterSubjects(dataSubject).build());
-                        long available = si.getStreamState().getSubjectMap().get(dataSubject);
-                        OrderedConsumerContext occ = ctx.createOrderedConsumer(new OrderedConsumerConfiguration());
-                        long nextExpectedSequence = -1;
-                        try (IterableConsumer it = occ.iterate()) {
-                            Message m = it.nextMessage(1000);
-                            while (m != null) {
-                                long seq = m.metaData().streamSequence();
-                                if (nextExpectedSequence != -1) {
-                                    if (nextExpectedSequence != seq) {
-                                        throw new FailureException("Ordered consumer returned incorrect sequence");
-                                    }
-                                }
-                                nextExpectedSequence = seq + 1;
-                                long count = ws.increment();
-                                if (--available < 1) {
-                                    log(js, orderedJob, ws.workId, NO_TIX, count, ws.elapse());
-                                    break;
-                                }
-                                if (count % orderedReportFrequency == 0) {
-                                    log(js, orderedJob, ws.workId, NO_TIX, count, ws.elapse());
-                                }
-                                m = it.nextMessage(1000);
+    private void orderedWorker(WorkContext wctx) {
+        while (true) {
+            try {
+                StreamContext ctx = wctx.nc.getStreamContext(dataStreamName);
+                StreamInfo si = ctx.getStreamInfo(StreamInfoOptions.builder().filterSubjects(dataSubject).build());
+                long available = si.getStreamState().getSubjectMap().get(dataSubject);
+                OrderedConsumerContext occ = ctx.createOrderedConsumer(new OrderedConsumerConfiguration());
+                long nextExpectedSequence = -1;
+                try (IterableConsumer it = occ.iterate()) {
+                    Message m = it.nextMessage(1000);
+                    while (m != null) {
+                        long seq = m.metaData().streamSequence();
+                        if (nextExpectedSequence != -1) {
+                            if (nextExpectedSequence != seq) {
+                                throw new FailureException("Ordered consumer returned incorrect sequence");
                             }
                         }
-                        catch (IOException | JetStreamApiException | FailureException e) {
-                            throw e; // rethrow this
+                        nextExpectedSequence = seq + 1;
+                        long count = wctx.ws.increment();
+                        if (--available < 1) {
+                            log(orderedJob, wctx, count);
+                            break;
                         }
-                        catch (Exception e) {
-                            // auto closeable problem, ignore
+                        if (count % orderedReportFrequency == 0) {
+                            log(orderedJob, wctx, count);
                         }
-                        jitter(orderedJitter);
-                    }
-                    catch (IOException | JetStreamApiException | FailureException e) {
-                        sleep(orderedJitter);
-                        log(js, orderedJob, ws.workId, ws.elapse(), e);
+                        m = it.nextMessage(1000);
                     }
                 }
+                catch (IOException | JetStreamApiException | FailureException e) {
+                    throw e; // rethrow this
+                }
+                catch (Exception e) {
+                    // auto closeable problem, ignore
+                }
+                jitter(orderedJitter);
             }
-            catch (InterruptedException | IOException e) {
-                throw new RuntimeException(e);
+            catch (IOException | JetStreamApiException | FailureException e) {
+                sleepThenLog(orderedJob, orderedJitter, wctx, e);
             }
-        };
+        }
     }
 }

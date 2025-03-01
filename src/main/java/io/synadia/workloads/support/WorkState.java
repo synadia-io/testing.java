@@ -7,7 +7,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public class WorkState {
     public final String workId;
     private final ReentrantLock iLock;
-    private final ReentrantLock uLock;
+    private final ReentrantLock eLock;
     private long groupCount;
     private long elapsed;
     private final long startTime;
@@ -15,7 +15,7 @@ public class WorkState {
     public WorkState() {
         this.workId = Commons.generateWorkId();
         this.iLock = new ReentrantLock();
-        this.uLock = new ReentrantLock();
+        this.eLock = new ReentrantLock();
         this.groupCount = 0;
         this.startTime = System.currentTimeMillis();
         this.elapsed = 0;
@@ -32,14 +32,13 @@ public class WorkState {
     }
 
     public long elapse() {
-        uLock.lock();
+        eLock.lock();
         try {
             elapsed = System.currentTimeMillis() - startTime;
         }
         finally {
-            uLock.unlock();
+            eLock.unlock();
         }
         return elapsed;
     }
-
 }

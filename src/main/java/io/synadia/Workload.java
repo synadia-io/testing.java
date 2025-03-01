@@ -45,16 +45,6 @@ public abstract class Workload {
         }
     }
 
-    protected static int jitterCountdown(int jitterCountdown, long jitter) {
-        if (jitterCountdown == 0) {
-            jitter(jitter);
-        }
-        else {
-            jitterCountdown--;
-        }
-        return jitterCountdown;
-    }
-
     protected String getArg(String name) {
         String key = name + "=";
         for (String arg : commandLine.args) {
