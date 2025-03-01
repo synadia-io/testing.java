@@ -269,6 +269,7 @@ public abstract class AbstractCustomWorkload extends Workload {
                 }
             }
             boolean hasObjectStreams = !objectStreams.isEmpty();
+            long freq = getLongArgFromPosition(2, watchFrequency);
 
             while (true) {
                 try {
@@ -313,7 +314,7 @@ public abstract class AbstractCustomWorkload extends Workload {
                     }
                 }
                 catch (Exception ignore) {}
-                sleep(watchFrequency);
+                sleep(freq);
             }
         });
     }
@@ -639,6 +640,11 @@ public abstract class AbstractCustomWorkload extends Workload {
     protected void print(String job, String workId, int tix, String qualifier, long count, long elapsed, String message) {
         Event event = new Event(this, job, workId, tix, qualifier, count, elapsed, null);
         Debug.info(event.ident(), event.extras(message));
+    }
+
+    protected void print(String job, String workId, long elapsed, Exception exception) {
+        Event event = new Event(this, job, workId, NO_TIX, null, -1, elapsed, exception);
+        Debug.info(event.ident(), event.extras());
     }
 
     protected void printConnect(Connection nc, String job, String workId, int tix) {

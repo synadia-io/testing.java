@@ -392,37 +392,39 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
     @SuppressWarnings("InfiniteLoopStatement")
     private Runnable infoWorker(Options options, int tix, WorkState ws) {
         return () -> {
-            try (Connection nc = Nats.connect(options)) {
-                JetStreamManagement jsm = nc.jetStreamManagement();
-                JetStream js = nc.jetStream();
-                printConnect(nc, infoJob, ws.workId, tix);
-                jitter(infoJitter / 10);
-                long ownCount = 0;
-                while (true) {
-                    List<String> consumerNames = jsm.getConsumerNames(dataStreamName);
-                    Collections.shuffle(consumerNames);
-                    for (String consumerName : consumerNames) {
-                        try {
-                            jsm.getConsumerInfo(dataStreamName, consumerName);
-                            long groupCount = ws.increment();
-                            if (groupCount % infoReportFrequency == 0) {
-                                log(js, infoJob, ws.workId, NO_TIX, groupCount, ws.elapse());
+            while (true) {
+                try (Connection nc = Nats.connect(options)) {
+                    JetStreamManagement jsm = nc.jetStreamManagement();
+                    JetStream js = nc.jetStream();
+                    printConnect(nc, infoJob, ws.workId, tix);
+                    jitter(infoJitter / 10);
+                    long ownCount = 0;
+                    while (true) {
+                        List<String> consumerNames = jsm.getConsumerNames(dataStreamName);
+                        Collections.shuffle(consumerNames);
+                        for (String consumerName : consumerNames) {
+                            try {
+                                jsm.getConsumerInfo(dataStreamName, consumerName);
+                                long groupCount = ws.increment();
+                                if (groupCount % infoReportFrequency == 0) {
+                                    log(js, infoJob, ws.workId, NO_TIX, groupCount, ws.elapse());
+                                }
+                                if (++ownCount % infoReportFrequency == 0) {
+                                    logNoConsole(js, infoJob, ws.workId, tix, ownCount, ws.elapse());
+                                }
                             }
-                            if (++ownCount % infoReportFrequency == 0) {
-                                logNoConsole(js, infoJob, ws.workId, tix, ownCount, ws.elapse());
+                            catch (IOException | JetStreamApiException e) {
+                                if (!e.getMessage().contains("10014")) { // it's fine the consumer is missing
+                                    log(js, infoJob, ws.workId, ws.elapse(), e);
+                                }
                             }
                         }
-                        catch (IOException | JetStreamApiException e) {
-                            if (!e.getMessage().contains("10014")) { // it's fine the consumer is missing
-                                log(js, infoJob, ws.workId, ws.elapse(), e);
-                            }
-                        }
+                        jitter(infoJitter);
                     }
-                    jitter(infoJitter);
                 }
-            }
-            catch (IOException | InterruptedException | JetStreamApiException e) {
-                throw new RuntimeException(e);
+                catch (IOException | InterruptedException | JetStreamApiException e) {
+                    print(infoJob, ws.workId, ws.elapse(), e);
+                }
             }
         };
     }
