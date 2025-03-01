@@ -254,7 +254,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
 
                     long groupCount = wctx.ws.increment();
                     if (groupCount % produceReportFrequency == 0) {
-                        log(produceJob, wctx, groupCount);
+                        logNoTix(produceJob, wctx, groupCount);
                     }
                     if (++ownCount % produceReportFrequency == 0) {
                         logNoConsole(produceJob, wctx, ownCount);
@@ -291,7 +291,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                         }
                         long groupCount = wctx.increment();
                         if (groupCount % consumeReportFrequency == 0) {
-                            log(consumeJob, wctx, groupCount);
+                            logNoTix(consumeJob, wctx, groupCount);
                         }
                         if (++ownCount % consumeReportFrequency == 0) {
                             logNoConsole(consumeJob, wctx, ownCount);
@@ -345,7 +345,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                         wctx.jsm.getConsumerInfo(dataStreamName, consumerName);
                         long groupCount = wctx.ws.increment();
                         if (groupCount % infoReportFrequency == 0) {
-                            log(infoJob, wctx, groupCount);
+                            logNoTix(infoJob, wctx, groupCount);
                         }
                         if (++ownCount % infoReportFrequency == 0) {
                             logNoConsole(infoJob, wctx, ownCount);

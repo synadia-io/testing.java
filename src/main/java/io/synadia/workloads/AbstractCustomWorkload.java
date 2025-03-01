@@ -677,6 +677,10 @@ public abstract class AbstractCustomWorkload extends Workload {
         publish(wctx.js, new Event(this, job, wctx.ws.workId, wctx.tix, null, count, wctx.elapse(), null));
     }
 
+    protected void logNoConsoleNoTix(String job, WorkContext wctx, long count) {
+        publish(wctx.js, new Event(this, job, wctx.ws.workId, NO_TIX, null, count, wctx.elapse(), null));
+    }
+
     protected void log(String job, WorkContext wctx, Exception exception) {
         String qualifier = exception.getClass().getSimpleName().replace("Exception", "");
         Event event = new Event(this, job, wctx.ws.workId, NO_TIX, qualifier, 0, wctx.elapse(), exception);
