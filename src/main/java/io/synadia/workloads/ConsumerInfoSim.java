@@ -222,7 +222,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                 long siCount = si.getStreamState().getConsumerCount();
                 int co = cutoff.get();
                 if (siCount >= co) {
-                    if (co == maxConsumers) { // just to avoid repeat printing when full
+                    if (!reachedCutoff || co == maxConsumers) { // just to avoid repeat printing when full
                         cutoff.set(maxConsumers * 10 / 100); // 10 percent
                         print(produceJob, wctx, "* System is full. " + siCount + "/" + maxConsumers);
                     }
