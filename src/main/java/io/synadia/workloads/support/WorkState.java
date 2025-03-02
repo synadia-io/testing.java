@@ -40,6 +40,20 @@ public class WorkState {
         }
     }
 
+    public boolean owed(int tix) {
+        oLock.lock();
+        try {
+            if (owed[tix]) {
+                owed[tix] = false;
+                return true;
+            }
+            return false;
+        }
+        finally {
+            oLock.unlock();
+        }
+    }
+
     public long get() {
         iLock.lock();
         try {

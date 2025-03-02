@@ -38,7 +38,7 @@ public class WorkContext {
             ws.markOthersOwed(tix);
             return true;
         }
-        return false;
+        return ws.owed(tix);
     }
 
     public long get() {
