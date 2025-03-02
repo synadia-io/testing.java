@@ -6,48 +6,37 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class WorkState {
     public final String workId;
-    private final int[] owedLogsCount;
+    private final boolean[] owed;
     private final ReentrantLock iLock;
     private final ReentrantLock eLock;
-    private final ReentrantLock lLock;
+    private final ReentrantLock oLock;
     private long groupCount;
     private long elapsed;
     private final long startTime;
 
     public WorkState(int threadCount) {
         this.workId = Commons.generateWorkId();
-        owedLogsCount = new int[threadCount];
+        owed = new boolean[threadCount];
         this.iLock = new ReentrantLock();
         this.eLock = new ReentrantLock();
-        this.lLock = new ReentrantLock();
+        this.oLock = new ReentrantLock();
         this.groupCount = 0;
         this.startTime = System.currentTimeMillis();
         this.elapsed = 0;
     }
 
-    public void markGroupAsLogged() {
-        lLock.lock();
+    public void markOthersOwed(int tix) {
+        oLock.lock();
         try {
-            for (int x = 0; x < owedLogsCount.length; x++) {
-                owedLogsCount[x]++;
+            owed[tix] = false;
+            for (int x = 0; x < owed.length; x++) {
+                if (x != tix) {
+                    owed[x] = true;
+                }
             }
         }
         finally {
-            lLock.unlock();
-        }
-    }
-
-    public boolean shouldLogOwn(int tix) {
-        lLock.lock();
-        try {
-            boolean should = owedLogsCount[tix] > 0;
-            if (--owedLogsCount[tix] < 1) {
-                owedLogsCount[tix] = 0;
-            }
-            return should;
-        }
-        finally {
-            lLock.unlock();
+            oLock.unlock();
         }
     }
 

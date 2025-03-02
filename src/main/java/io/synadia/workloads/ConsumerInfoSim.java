@@ -251,10 +251,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                     // 3. put a record in the queue last so it's not used until messages are published
                     wctx.js.publish(queueSubject, new QueueData(consumerName, dataSubject, messageCount).serialize());
 
-                    if (wctx.groupLog(produceReportFrequency)) {
-                        logNoTix(produceJob, wctx, wctx.groupCount);
-                    }
-                    if (wctx.ownLog(produceReportFrequency)) {
+                    if (wctx.shouldLog(produceReportFrequency)) {
                         log(produceJob, wctx, wctx.ownCount);
                     }
                 }
@@ -270,7 +267,6 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
 
     @SuppressWarnings("InfiniteLoopStatement")
     private void consumeWorker(WorkContext wctx) {
-        long ownCount = 0;
         ConsumerContext qConsumerCtx = null;
         while (true) {
             try {
@@ -287,10 +283,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                             m.ack();
                             m = fc.nextMessage();
                         }
-                        if (wctx.groupLog(consumeReportFrequency)) {
-                            logNoTix(consumeJob, wctx, wctx.groupCount);
-                        }
-                        if (wctx.ownLog(consumeReportFrequency)) {
+                        if (wctx.shouldLog(consumeReportFrequency)) {
                             log(consumeJob, wctx, wctx.ownCount);
                         }
                     }
@@ -332,7 +325,6 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
 
     @SuppressWarnings("InfiniteLoopStatement")
     private void infoWorker(WorkContext wctx) {
-        long ownCount = 0;
         while (true) {
             try {
                 List<String> consumerNames = wctx.jsm.getConsumerNames(dataStreamName);
@@ -340,10 +332,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                 for (String consumerName : consumerNames) {
                     try {
                         wctx.jsm.getConsumerInfo(dataStreamName, consumerName);
-                        if (wctx.groupLog(infoReportFrequency)) {
-                            logNoTix(infoJob, wctx, wctx.groupCount);
-                        }
-                        if (wctx.ownLog(infoReportFrequency)) {
+                        if (wctx.shouldLog(infoReportFrequency)) {
                             log(infoJob, wctx, wctx.ownCount);
                         }
                     }
