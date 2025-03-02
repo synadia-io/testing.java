@@ -259,7 +259,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                         logNoTix(produceJob, wctx, groupCount);
                     }
                     if (++ownCount % produceReportFrequency == 0 || printedGroup) {
-                        logNoConsole(produceJob, wctx, ownCount);
+                        log(produceJob, wctx, ownCount);
                     }
                 }
                 if (reachedCutoff) {
@@ -298,7 +298,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                             logNoTix(consumeJob, wctx, groupCount);
                         }
                         if (++ownCount % consumeReportFrequency == 0 || printedGroup) {
-                            logNoConsole(consumeJob, wctx, ownCount);
+                            log(consumeJob, wctx, ownCount);
                         }
                     }
                     catch (IOException | JetStreamApiException e) {
@@ -354,7 +354,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                             logNoTix(infoJob, wctx, groupCount);
                         }
                         if (++ownCount % infoReportFrequency == 0 || printedGroup) {
-                            logNoConsole(infoJob, wctx, ownCount);
+                            log(infoJob, wctx, ownCount);
                         }
                     }
                     catch (IOException | JetStreamApiException e) {
