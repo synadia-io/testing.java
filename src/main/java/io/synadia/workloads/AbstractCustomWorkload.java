@@ -590,32 +590,15 @@ public abstract class AbstractCustomWorkload extends Workload {
         WorkContextRunner runner)
     {
         return () -> {
-            boolean connected = false;
-            while (!connected) {
-                Connection nc = null;
-                try {
-                    try {
-                        nc = Nats.connect(options);
-                        connected = true;
-                    }
-                    catch (IOException e) {
-                        print(job, ws.workId, ws.elapse(), e);
-                        sleep(1000);
-                    }
-                    if (connected) {
-                        printConnect(nc, job, ws.workId, tix);
-                        try {
-                            runner.run(new WorkContext(options, nc, tix, ws));
-                            nc.close();
-                        }
-                        catch (IOException | JetStreamApiException e) {
-                            print(job, ws.workId, ws.elapse(), e);
-                            throw new RuntimeException(e);
-                        }
-                    }
+            //noinspection InfiniteLoopStatement
+            while (true) {
+                try (Connection nc = Nats.connect(options)) {
+                    printConnect(nc, job, ws.workId, tix);
+                    runner.run(new WorkContext(options, nc, tix, ws));
                 }
-                catch (InterruptedException e) {
+                catch (IOException | JetStreamApiException | InterruptedException e) {
                     print(job, ws.workId, ws.elapse(), e);
+                    sleep(1000);
                 }
             }
         };
