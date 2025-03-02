@@ -213,13 +213,13 @@ public abstract class AbstractCustomWorkload extends Workload {
     // ----------------------------------------------------------------------------------------------------
     // COMMAND: WATCH
     // ----------------------------------------------------------------------------------------------------
-    public static final String SUMMARY_START   = "┌────────────────────────────────────────────────────────────────────────────────────────────┐";
-    public static final String SUMMARY_DESC    = "│ Stream Information                                                     " + Debug.rfcTime() + " │";
-    public static final String SUMMARY_TOP_SEP = "├──────────────┬────────────┬────────────┬────────────┬────────────┬────────────┬────────────┤";
-    public static final String SUMMARY_HEADER  = "│ Stream       │   Messages │   Subjects │  Consumers │  First Seq │   Last Seq │      Bytes │";
-    public static final String SUMMARY_SEP     = "├──────────────┼────────────┼────────────┼────────────┼────────────┼────────────┼────────────┤";
-    public static final String SUMMARY_FOOT    = "└──────────────┴────────────┴────────────┴────────────┴────────────┴────────────┴────────────┘";
-    public static final String SUMMARY_DATA    = "│ %-12s │ %,10d │ %,10d │ %,10d │ %,10d │ %,10d │ %10s │\n";
+    public static final String SUMMARY_START   = "┌──────────────────────────────────────────────────────────────────────────────────────────────┐";
+    public static final String SUMMARY_DESC    = "│ Stream Information                                                       " + Debug.rfcTime() + " │";
+    public static final String SUMMARY_TOP_SEP = "├────────────────┬────────────┬────────────┬────────────┬────────────┬────────────┬────────────┤";
+    public static final String SUMMARY_HEADER  = "│ ? Stream       │   Messages │   Subjects │  Consumers │  First Seq │   Last Seq │      Bytes │";
+    public static final String SUMMARY_SEP     = "├────────────────┼────────────┼────────────┼────────────┼────────────┼────────────┼────────────┤";
+    public static final String SUMMARY_FOOT    = "└────────────────┴────────────┴────────────┴────────────┴────────────┴────────────┴────────────┘";
+    public static final String SUMMARY_DATA    = "│ %-14s │ %,10d │ %,10d │ %,10d │ %,10d │ %,10d │ %10s │\n";
 
     public static final String EX_START   = "┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐";
     public static final String EX_DESC    = "│ Exceptions                                                                                                                                               │";
@@ -251,6 +251,7 @@ public abstract class AbstractCustomWorkload extends Workload {
     protected void doWatch() throws IOException, JetStreamApiException, InterruptedException {
         doAdmin(wctx -> {
             startJob("Watch");
+            Map<String, String> summaryMap = new HashMap<>();
             Map<String, Event> watchMap = new HashMap<>();
             List<String> objectStreams = new ArrayList<>();
             for (String stream : customStreams) {
@@ -263,7 +264,7 @@ public abstract class AbstractCustomWorkload extends Workload {
 
             while (true) {
                 try {
-                    System.out.println("\n\n\n\n");
+                    System.out.println("\n\n\n");
                     System.out.println(SUMMARY_START);
                     System.out.println(SUMMARY_DESC);
 
@@ -272,18 +273,20 @@ public abstract class AbstractCustomWorkload extends Workload {
                     System.out.println(SUMMARY_HEADER);
                     System.out.println(SUMMARY_SEP);
                     for (String stream : customStreams) {
-                        summarize(wctx.jsm, stream);
+                        summarize(wctx.jsm, stream, summaryMap);
                     }
                     System.out.println(SUMMARY_SEP);
-                    StreamState exSs = summarize(wctx.jsm, exStreamName);
-                    StreamState logSs = summarize(wctx.jsm, logStreamName);
+                    StreamState exSs = summarize(wctx.jsm, exStreamName, summaryMap);
+                    StreamState logSs = summarize(wctx.jsm, logStreamName, summaryMap);
                     System.out.println(SUMMARY_FOOT);
 
+                    // EXCEPTIONS
                     watchStream(wctx.jsm, watchMap, true, exStreamName, exSs, v -> {
                         System.out.println(EX_START);
                         System.out.println(EX_DESC);
                     });
 
+                    // LOG
                     watchStream(wctx.jsm, watchMap, false, logStreamName, logSs, v -> {
                         System.out.println(LOG_START);
                         System.out.println(LOG_DESC);
@@ -309,12 +312,20 @@ public abstract class AbstractCustomWorkload extends Workload {
         });
     }
 
-    protected static StreamState summarize(JetStreamManagement jsm, String stream) throws IOException, JetStreamApiException {
+    protected static StreamState summarize(JetStreamManagement jsm, String stream, Map<String, String> summaryMap) throws IOException, JetStreamApiException {
         StreamInfo si = jsm.getStreamInfo(stream, StreamInfoOptions.allSubjects());
         StreamState ss = si.getStreamState();
         long fseq = si.getStreamState().getFirstSequence();
         long lseq = si.getStreamState().getLastSequence();
-        System.out.printf(SUMMARY_DATA, stream, ss.getMsgCount(), ss.getSubjectCount(), ss.getConsumerCount(), fseq, lseq, humanBytes(ss.getByteCount()));
+        String lastText = summaryMap.get(stream);
+        String newText = String.format(SUMMARY_DATA, "  " + stream, ss.getMsgCount(), ss.getSubjectCount(), ss.getConsumerCount(), fseq, lseq, humanBytes(ss.getByteCount()));
+        if (newText.equals(lastText)) {
+            System.out.printf(lastText);
+        }
+        else {
+            summaryMap.put(stream, newText);
+            System.out.printf(SUMMARY_DATA, "* " + stream, ss.getMsgCount(), ss.getSubjectCount(), ss.getConsumerCount(), fseq, lseq, humanBytes(ss.getByteCount()));
+        }
         return ss;
     }
 
