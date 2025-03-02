@@ -16,9 +16,11 @@ public class WorkContext {
     public final Connection nc;
     public final JetStreamManagement jsm;
     public final JetStream js;
+    public long groupCount;
+    public long ownCount;
 
     public WorkContext(Options options, Connection nc) throws IOException {
-        this(options, nc, NO_TIX, new WorkState());
+        this(options, nc, NO_TIX, new WorkState(1));
     }
 
     public WorkContext(Options options, Connection nc, int tix, WorkState ws) throws IOException {
@@ -28,6 +30,20 @@ public class WorkContext {
         this.options = options;
         jsm = nc.jetStreamManagement();
         js = nc.jetStream();
+    }
+
+    public boolean groupLog(long reportFrequency) {
+        groupCount = ws.increment();
+        if (groupCount % reportFrequency == 0) {
+            ws.markGroupAsLogged();
+            return true;
+        }
+        return false;
+    }
+
+    public boolean ownLog(long reportFrequency) {
+        ++ownCount;
+        return ws.shouldLogOwn(tix) || ownCount % reportFrequency == 0;
     }
 
     public long get() {

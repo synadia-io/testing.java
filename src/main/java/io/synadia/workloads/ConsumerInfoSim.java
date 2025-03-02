@@ -214,7 +214,6 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
 
     @SuppressWarnings("InfiniteLoopStatement")
     private void produceWorker(WorkContext wctx) {
-        long ownCount = 0;
         AtomicInteger cutoff = new AtomicInteger(maxConsumers);
         boolean reachedCutoff = false;
         while (true) {
@@ -252,14 +251,11 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                     // 3. put a record in the queue last so it's not used until messages are published
                     wctx.js.publish(queueSubject, new QueueData(consumerName, dataSubject, messageCount).serialize());
 
-                    boolean printedGroup = false;
-                    long groupCount = wctx.ws.increment();
-                    if (groupCount % produceReportFrequency == 0) {
-                        printedGroup = true;
-                        logNoTix(produceJob, wctx, groupCount);
+                    if (wctx.groupLog(produceReportFrequency)) {
+                        logNoTix(produceJob, wctx, wctx.groupCount);
                     }
-                    if (++ownCount % produceReportFrequency == 0 || printedGroup) {
-                        log(produceJob, wctx, ownCount);
+                    if (wctx.ownLog(produceReportFrequency)) {
+                        log(produceJob, wctx, wctx.ownCount);
                     }
                 }
                 if (reachedCutoff) {
@@ -291,14 +287,11 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                             m.ack();
                             m = fc.nextMessage();
                         }
-                        boolean printedGroup = false;
-                        long groupCount = wctx.ws.increment();
-                        if (groupCount % consumeReportFrequency == 0) {
-                            printedGroup = true;
-                            logNoTix(consumeJob, wctx, groupCount);
+                        if (wctx.groupLog(consumeReportFrequency)) {
+                            logNoTix(consumeJob, wctx, wctx.groupCount);
                         }
-                        if (++ownCount % consumeReportFrequency == 0 || printedGroup) {
-                            log(consumeJob, wctx, ownCount);
+                        if (wctx.ownLog(consumeReportFrequency)) {
+                            log(consumeJob, wctx, wctx.ownCount);
                         }
                     }
                     catch (IOException | JetStreamApiException e) {
@@ -347,14 +340,11 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                 for (String consumerName : consumerNames) {
                     try {
                         wctx.jsm.getConsumerInfo(dataStreamName, consumerName);
-                        boolean printedGroup = false;
-                        long groupCount = wctx.ws.increment();
-                        if (groupCount % infoReportFrequency == 0) {
-                            printedGroup = true;
-                            logNoTix(infoJob, wctx, groupCount);
+                        if (wctx.groupLog(infoReportFrequency)) {
+                            logNoTix(infoJob, wctx, wctx.groupCount);
                         }
-                        if (++ownCount % infoReportFrequency == 0 || printedGroup) {
-                            log(infoJob, wctx, ownCount);
+                        if (wctx.ownLog(infoReportFrequency)) {
+                            log(infoJob, wctx, wctx.ownCount);
                         }
                     }
                     catch (IOException | JetStreamApiException e) {

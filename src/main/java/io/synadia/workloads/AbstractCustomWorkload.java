@@ -624,7 +624,7 @@ public abstract class AbstractCustomWorkload extends Workload {
     protected void doWorker(String job, Worker worker) throws InterruptedException {
         startJob(job);
         Options options = allOptionsShuffled().getFirst();
-        WorkState ws = new WorkState();
+        WorkState ws = new WorkState(1);
         Thread t = new Thread(workerRunnable(job, options, NO_TIX, ws, worker::doWork));
         t.setName(job);
         t.start();
@@ -635,7 +635,7 @@ public abstract class AbstractCustomWorkload extends Workload {
         startJob(job);
         List<Options> optionsList = allOptionsShuffled();
         List<Thread> threads = new ArrayList<>(threadCount);
-        WorkState ws = new WorkState();
+        WorkState ws = new WorkState(threadCount);
         int option = optionsList.size() - 1;
         for (int tix = 0; tix < threadCount; tix++) {
             if (++option == optionsList.size()) {
