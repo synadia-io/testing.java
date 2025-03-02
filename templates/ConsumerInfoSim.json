@@ -22,6 +22,7 @@
   "produce_jitter": 500,
   "produce_message_min": 10,
   "produce_message_max": 100,
+  "produce_cutoff_amount": 6500,
   "consume_job": "Consume",
   "consume_thread_count": 3,
   "consume_report_frequency": 1000,

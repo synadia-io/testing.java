@@ -21,7 +21,6 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.nats.jsmulti.shared.Utils.sleep;
-import static io.synadia.utils.Commons.NO_TIX;
 import static io.synadia.utils.Commons.generateName;
 
 public class ConsumerInfoSim extends AbstractCustomWorkload {
@@ -43,6 +42,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
     private long produceJitter;
     private int produceMessageMin;
     private int produceMessageMax;
+    private int produceCutoffAmount;
 
     private String consumeJob;
     private int consumeThreadCount;
@@ -92,12 +92,14 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
         produceJitter = JsonValueUtils.readLong(params.jv, "produce_jitter", 1000);
         produceMessageMin = JsonValueUtils.readInteger(params.jv, "produce_message_min", 10);
         produceMessageMax = JsonValueUtils.readInteger(params.jv, "produce_message_max", 100);
+        produceCutoffAmount = JsonValueUtils.readInteger(params.jv, "produce_cutoff_amount", 6500);
         Debug.info(workLabel, "produceJob", produceJob);
         Debug.info(workLabel, "produceThreadCount", produceThreadCount);
         Debug.info(workLabel, "produceReportFrequency", produceReportFrequency);
         Debug.info(workLabel, "produceJitter", produceJitter);
         Debug.info(workLabel, "produceMessageMin", produceMessageMin);
         Debug.info(workLabel, "produceMessageMax", produceMessageMax);
+        Debug.info(workLabel, "produceCutoffAmount", produceCutoffAmount);
 
         consumeJob = JsonValueUtils.readString(params.jv, "consume_job", "Consume");
         consumeThreadCount = JsonValueUtils.readInteger(params.jv, "consume_thread_count", 3);
@@ -223,10 +225,10 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                 int co = cutoff.get();
                 if (siCount >= co) {
                     if (!reachedCutoff || co == maxConsumers) { // just to avoid repeat printing when full
-                        cutoff.set(maxConsumers / 2); // 50 percent
+                        cutoff.set(produceCutoffAmount);
                         print(produceJob, wctx, "* System is full. " + siCount + "/" + maxConsumers);
                     }
-                    Event event = new Event(this, produceJob, wctx.ws.workId, NO_TIX, null, -wctx.get(), wctx.elapse(), null);
+                    Event event = new Event(this, produceJob, wctx.ws.workId, wctx.tix, null, -wctx.get(), wctx.elapse(), null);
                     publish(wctx.js, event);
                     sleep(produceJitter); // extra full sleep since it's full
                     reachedCutoff = true;
