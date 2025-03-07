@@ -77,6 +77,14 @@ public abstract class Workload {
         return arg == null ? dflt : Long.parseLong(arg);
     }
 
+    protected List<String> getAllArgs() {
+        List<String> args = new ArrayList<>();
+        for (int i = 1; i < commandLine.args.size(); i++) {
+            args.add(commandLine.args.get(i));
+        }
+        return args;
+    }
+
     protected Options getAdminOptions() {
         return getOptions(params.adminServer);
     }

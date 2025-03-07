@@ -3,6 +3,7 @@ package io.synadia.workloads;
 import io.nats.client.*;
 import io.nats.client.api.*;
 import io.nats.client.support.JsonValueUtils;
+import io.nats.client.support.NatsJetStreamConstants;
 import io.nats.client.support.NatsObjectStoreUtil;
 import io.synadia.Workload;
 import io.synadia.utils.Debug;
@@ -250,6 +251,7 @@ public abstract class AbstractCustomWorkload extends Workload {
     @SuppressWarnings("InfiniteLoopStatement")
     protected void doWatch() throws IOException, JetStreamApiException, InterruptedException {
         doAdmin(wctx -> {
+
             startJob("Watch");
             Map<String, String> summaryMap = new HashMap<>();
             Map<String, Event> watchMap = new HashMap<>();
@@ -260,7 +262,10 @@ public abstract class AbstractCustomWorkload extends Workload {
                 }
             }
             boolean hasObjectStreams = !objectStreams.isEmpty();
-            long freq = getLongArgFromPosition(2, watchFrequency);
+
+            List<String> allArgs = getAllArgs();
+            boolean showEx = !allArgs.contains("-ex");
+            long freq = watchFrequency; // getLongArgFromPosition(2, watchFrequency);
 
             while (true) {
                 try {
@@ -280,11 +285,13 @@ public abstract class AbstractCustomWorkload extends Workload {
                     StreamState logSs = summarize(wctx.jsm, logStreamName, summaryMap);
                     System.out.println(SUMMARY_FOOT);
 
-                    // EXCEPTIONS
-                    watchStream(wctx.jsm, watchMap, true, exStreamName, exSs, v -> {
-                        System.out.println(EX_START);
-                        System.out.println(EX_DESC);
-                    });
+                    if (showEx) {
+                        // EXCEPTIONS
+                        watchStream(wctx.jsm, watchMap, true, exStreamName, exSs, v -> {
+                            System.out.println(EX_START);
+                            System.out.println(EX_DESC);
+                        });
+                    }
 
                     // LOG
                     watchStream(wctx.jsm, watchMap, false, logStreamName, logSs, v -> {
@@ -435,6 +442,8 @@ public abstract class AbstractCustomWorkload extends Workload {
         doStream(streamName);
     }
 
+    static String NO_MESSAGE_FOUND = "" + NatsJetStreamConstants.JS_NO_MESSAGE_FOUND_ERR;
+
     @SuppressWarnings("InfiniteLoopStatement")
     protected void doStream(String streamName) throws IOException, JetStreamApiException, InterruptedException {
         doAdmin(wctx -> {
@@ -468,7 +477,7 @@ public abstract class AbstractCustomWorkload extends Workload {
                     tracker = 0;
                 }
                 catch (JetStreamApiException e) {
-                    if (e.getMessage().contains("10037")) { // it's fine the message is gone
+                    if (e.getMessage().contains(NO_MESSAGE_FOUND)) { // it's fine the message is gone
                         if (++tracker % progressFrequency == 0) {
                             System.out.println();
                         }

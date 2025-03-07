@@ -275,8 +275,10 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                 if (qConsumerCtx == null) {
                     qConsumerCtx = wctx.nc.getConsumerContext(queueStreamName, queueConsumerName);
                 }
+                print(consumeJob, wctx, "About to get a record from the queue");
                 QueueData qd = queueNext(qConsumerCtx);
                 if (qd != null) {
+                    print(consumeJob, wctx, qd.toString());
                     StreamContext sctx = wctx.nc.getStreamContext(dataStreamName);
                     ConsumerContext cctx = sctx.getConsumerContext(qd.consumerName);
                     try (FetchConsumer fc = cctx.fetch(FetchConsumeOptions.builder().maxMessages(consumeBatch).noWait().build())) {
@@ -285,6 +287,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                             m.ack();
                             m = fc.nextMessage();
                         }
+                        print(consumeJob, wctx, "Message read complete.");
                         if (wctx.shouldLog(consumeReportFrequency)) {
                             log(consumeJob, wctx, wctx.ownCount);
                         }
@@ -300,6 +303,8 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                             log(consumeJob, wctx, e);
                         }
                         try {
+                            print(consumeJob, wctx, "About to purge");
+
                             wctx.jsm.purgeStream(dataStreamName, PurgeOptions.subject(qd.dataSubject));
                         }
                         catch (Exception e) {
