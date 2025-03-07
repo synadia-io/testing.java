@@ -452,7 +452,17 @@ public abstract class AbstractCustomWorkload extends Workload {
             seq = getLongArgFromPosition(3, seq);
             long last = si.getStreamState().getLastSequence();
             int tracker = 0;
+            Character trackerType = null;
             while (true) {
+                if (trackerType != null) {
+                    // this shows progress in case a BIG gap / many timeouts / combination
+                    System.out.print(trackerType);
+                    if (++tracker % progressFrequency == 0) {
+                        System.out.println();
+                    }
+                    trackerType = null;
+                }
+
                 if (seq > last) {
                     // this accounts for messages were added to the stream after the initial check
                     si = wctx.jsm.getStreamInfo(streamName);
@@ -477,14 +487,18 @@ public abstract class AbstractCustomWorkload extends Workload {
                     System.out.println(mi.getSeq() + " | " + mi.getSubject() + " | " + sdata);
                     tracker = 0;
                 }
+                catch (IOException ioe) {
+                    if (ioe.getMessage().contains("Timeout")) {
+                        trackerType = '!';
+                        sleep(1000);
+                    }
+                    else {
+                        throw ioe;
+                    }
+                }
                 catch (JetStreamApiException e) {
                     if (e.getMessage().contains(NO_MESSAGE_FOUND)) { // it's fine the message is gone
-                        if (++tracker % progressFrequency == 0) {    // this shows progress in case a BIG gap
-                            System.out.println();
-                        }
-                        else {
-                            System.out.print('x');
-                        }
+                        trackerType = '-';
                     }
                     else {
                         throw e;
