@@ -479,7 +479,7 @@ public abstract class AbstractCustomWorkload extends Workload {
                 }
                 catch (JetStreamApiException e) {
                     if (e.getMessage().contains(NO_MESSAGE_FOUND)) { // it's fine the message is gone
-                        if (++tracker % progressFrequency == 0) {
+                        if (++tracker % progressFrequency == 0) {    // this shows progress in case a BIG gap
                             System.out.println();
                         }
                         else {
