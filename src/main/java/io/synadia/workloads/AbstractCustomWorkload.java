@@ -454,6 +454,7 @@ public abstract class AbstractCustomWorkload extends Workload {
             int tracker = 0;
             while (true) {
                 if (seq > last) {
+                    // this accounts for messages were added to the stream after the initial check
                     si = wctx.jsm.getStreamInfo(streamName);
                     long currentLast = si.getStreamState().getLastSequence();
                     last = si.getStreamState().getLastSequence();
