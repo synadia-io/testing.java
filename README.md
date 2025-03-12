@@ -31,7 +31,10 @@ A "Produce" process does the following repeatedly until stopped:
 * Each round (Steps 1-4) counts as 1 in the log.
 * 6 individual full threads each ran the process. 
 * Failure at any step is logged, but ignored, meaning for instance if it fails at step 3, the consumer is not removed.
-* The process pauses if there are 11,000 or more consumers. It then waits until the Consume process removed consumers and would resume once there were 6,500 or fewer consumers.
+* The process pauses if there are 11,000 or more consumers. This is considered _Full_. It then waits until the Consume process removed consumers and would resume once there were 6,500 or fewer consumers.
+* The process sleeps if it's _Full_ of consumers.
+* The process does not jitter until it reaches the cutoff / full state once. This helps load the system on startup.
+* The process jitters after a success. It sleeps after a failure.
 * [Produce Source Code](src/main/java/io/synadia/workloads/ConsumerInfoSim.java#L218)
 
 #### Client Instance 2
@@ -42,6 +45,7 @@ An "Info" process does the following repeatedly until stopped:
     2. Any success is counted. Any failure is logged.
 
 * 8 individual full threads each ran the process.
+* The process jitters after a success. It sleeps after a failure.
 * [Info Source Code](src/main/java/io/synadia/workloads/ConsumerInfoSim.java#L333)
 
 #### Client Instance 3
@@ -53,6 +57,7 @@ A "Consume" process does the following repeatedly until stopped:
 
 * Each round (Steps 1-4) counts as 1 in the log.
 * 3 individual full threads each ran the process.
+* The process jitters after a success. It sleeps after a failure.
 * [Consume Source Code](src/main/java/io/synadia/workloads/ConsumerInfoSim.java#L271)
 
 ### Streams
