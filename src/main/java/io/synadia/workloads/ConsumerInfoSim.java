@@ -304,7 +304,6 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                         }
                         try {
                             print(consumeJob, wctx, "About to purge");
-
                             wctx.jsm.purgeStream(dataStreamName, PurgeOptions.subject(qd.dataSubject));
                         }
                         catch (Exception e) {

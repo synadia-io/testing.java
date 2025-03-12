@@ -16,7 +16,7 @@ The main complaint was that timeouts stack up and eventually bring the system do
     | Failground | t3.xlarge | Ubuntu 24.04.2 LTS  | 16              | Up to 5                       |
     | Client     | t3.large  | Amazon Linux 2023   | 8               | Up to 5                       |
 
-The instances/processes are as follows:
+The instances/processes are as follows. (The clients notes have links to code.)
 
 #### Failground Instance
 The Failground setup running mayhem. Mayhem automatically kills and restarts servers periodically.
@@ -31,7 +31,7 @@ A "Produce" process does the following repeatedly until stopped:
 * Each round (Steps 1-4) counts as 1 in the log.
 * 6 individual full threads each ran the process. 
 * Failure at any step is logged, but ignored, meaning for instance if it fails at step 3, the consumer is not removed.
-* The processes paused once there were 11,000 consumers. It then waited until the Consume process removed consumers and would resume once there were 6,500 or less consumers.
+* The process pausees if there are 11,000 or more consumers. It then waited until the Consume process removed consumers and would resume once there were 6,500 or fewer consumers.
 * [Produce Source Code](src/main/java/io/synadia/workloads/ConsumerInfoSim.java#L218)
 
 #### Client Instance 2
@@ -42,7 +42,7 @@ An "Info" process does the following repeatedly until stopped:
     2. Any success is counted. Any failure is logged.
 
 * 8 individual full threads each ran the process.
-* [Info Source Code](src/main/java/io/synadia/workloads/ConsumerInfoSim.java#L334)
+* [Info Source Code](src/main/java/io/synadia/workloads/ConsumerInfoSim.java#L333)
 
 #### Client Instance 3
 A "Consume" process does the following repeatedly until stopped:
