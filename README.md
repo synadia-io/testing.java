@@ -10,7 +10,7 @@ More than a real system, but a lot of random outages.
 
 ### Machine 2.
 A "Produce" process, which does the following. Each round counts as 1 in the log.
-[produceWorker][src/main/java/io/synadia/workloads/ConsumerInfoSim.java#L218]
+[produceWorker](src/main/java/io/synadia/workloads/ConsumerInfoSim.java#L218)
 1. Generates a unique consumer name and subject on the `data` stream in the form `data.<consumer_name>`
 2. Creates the consumer.
 3. Publishes from 10-100 messages on a unique subject \[segment\].
