@@ -44,7 +44,7 @@ An "Info" process does the following repeatedly until stopped:
 * 8 individual full threads each ran the process.
 * [Info Source Code](src/main/java/io/synadia/workloads/ConsumerInfoSim.java#L334)
 
-#### Instance 4.
+#### Client Instance 3
 A "Consume" process does the following repeatedly until stopped:
 1. Use a shared consumer against the `queue` stream, read 1 record. This record contains a consumer name, subject and number of messages published.
 2. Start a simplified consumer and fetch a fixed number of messages (not necessarily all messages for that subject).
