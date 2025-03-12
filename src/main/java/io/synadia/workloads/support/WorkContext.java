@@ -31,7 +31,7 @@ public class WorkContext {
         js = nc.jetStream();
     }
 
-    public boolean shouldLog(long reportFrequency) {
+    public boolean countThenReturnTrueIfShouldLog(long reportFrequency) {
         ++ownCount;
         long groupCount = ws.increment();
         if (groupCount % reportFrequency == 0) {

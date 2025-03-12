@@ -253,7 +253,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                     // 3. put a record in the queue last so it's not used until messages are published
                     wctx.js.publish(queueSubject, new QueueData(consumerName, dataSubject, messageCount).serialize());
 
-                    if (wctx.shouldLog(produceReportFrequency)) {
+                    if (wctx.countThenReturnTrueIfShouldLog(produceReportFrequency)) {
                         log(produceJob, wctx, wctx.ownCount);
                     }
                 }
@@ -288,7 +288,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                             m = fc.nextMessage();
                         }
                         print(consumeJob, wctx, "Message read complete.");
-                        if (wctx.shouldLog(consumeReportFrequency)) {
+                        if (wctx.countThenReturnTrueIfShouldLog(consumeReportFrequency)) {
                             log(consumeJob, wctx, wctx.ownCount);
                         }
                     }
@@ -339,7 +339,7 @@ public class ConsumerInfoSim extends AbstractCustomWorkload {
                 for (String consumerName : consumerNames) {
                     try {
                         wctx.jsm.getConsumerInfo(dataStreamName, consumerName);
-                        if (wctx.shouldLog(infoReportFrequency)) {
+                        if (wctx.countThenReturnTrueIfShouldLog(infoReportFrequency)) {
                             log(infoJob, wctx, wctx.ownCount);
                         }
                     }

@@ -1,37 +1,75 @@
 # testing.java
 Java Client Testing Programs
 
-### ConsumerInfoSim
+## Consumer Info Sim
 
+As described to me, the problem app was doing about 10,000 consumer info calls periodically and repeatedly spread between 8 threads.
+The main complaint was that timeouts stack up and eventually bring the system down. So I built a system to replicate as best I can.
 
-### Machine 1.
-A 5 cluster Failground with mayhem random-hard-kill running with an interval of 30-120 seconds.
-More than a real system, but a lot of random outages.
+* The run shown at the end ran for 46 hours.
+* The servers were run on one instance with a 5 node Failground cluster (containerized servers) with mayhem random-hard-kill running with an interval of 30-120 seconds.
+* The client processes were each run on their own instance
+* All Java processes were built and run with Java 21 using the 2.20.5 version of JNats.
 
-### Machine 2.
-A "Produce" process, which does the following. Each round counts as 1 in the log.
-[produceWorker](src/main/java/io/synadia/workloads/ConsumerInfoSim.java#L218)
+    | Type       | Instance  | OS                  | vCPU* Mem (GiB) | Network Performance (Gbps)*** |
+    |------------|-----------|---------------------|-----------------|-------------------------------|
+    | Failground | t3.xlarge | Ubuntu 24.04.2 LTS  | 16              | Up to 5                       |
+    | Client     | t3.large  | Amazon Linux 2023   | 8               | Up to 5                       |
+
+The instances/processes are as follows:
+
+#### Failground Instance
+The Failground setup running mayhem. Mayhem automatically kills and restarts servers periodically.
+
+#### Client Instance 1
+A "Produce" process does the following repeatedly until stopped:
 1. Generates a unique consumer name and subject on the `data` stream in the form `data.<consumer_name>`
 2. Creates the consumer.
-3. Publishes from 10-100 messages on a unique subject \[segment\].
+3. Publishes from 10-100 messages on the subject.
 4. Publishes a message to the `queue` stream containing the consumer name, subject and number of messages published.
 
-### Machine 3.
-An "Info" process, which does the following.
-1. Generates a unique consumer name and subject on the `data` stream in the form `data.<consumer_name>`
-2. Creates the consumer.
-3. Publishes from 10-100 messages on a unique subject \[segment\].
-4. Publishes a message to the `queue` stream containing the consumer name, subject and number of messages published.
+* Each round (Steps 1-4) counts as 1 in the log.
+* 6 individual full threads each ran the process. 
+* Failure at any step is logged, but ignored, meaning for instance if it fails at step 3, the consumer is not removed.
+* The processes paused once there were 11,000 consumers. It then waited until the Consume process removed consumers and would resume once there were 6,500 or less consumers.
+* [Produce Source Code](src/main/java/io/synadia/workloads/ConsumerInfoSim.java#L218)
 
+#### Client Instance 2
+An "Info" process does the following repeatedly until stopped:
+1. Read a list of consumer names from the stream. Shuffle the list.
+2. For each consumer in the list...
+    1. Make a consumer info call.
+    2. Any success is counted. Any failure is logged.
 
-### Instance Details
-| Type       | Instance  | OS                  | JDK                      | vCPU* Mem (GiB) | Network Performance (Gbps)*** |
-|------------|-----------|---------------------|--------------------------|-----------------|-------------------------------|
-| Client     | t3.large  | Amazon Linux 2023   | openjdk version "21.0.5" | 8               | Up to 5                       |
-| Failground | t3.xlarge | Ubuntu 24.04.2 LTS  | N/A                      | 16              | Up to 5                       |
-  
+* 8 individual full threads each ran the process.
+* [Info Source Code](src/main/java/io/synadia/workloads/ConsumerInfoSim.java#L334)
 
+#### Instance 4.
+A "Consume" process does the following repeatedly until stopped:
+1. Use a shared consumer against the `queue` stream, read 1 record. This record contains a consumer name, subject and number of messages published.
+2. Start a simplified consumer and fetch a fixed number of messages (not necessarily all messages for that subject).
+3. Delete the consumer
+4. Purge the subject
 
+* Each round (Steps 1-4) counts as 1 in the log.
+* 3 individual full threads each ran the process.
+* [Consume Source Code](src/main/java/io/synadia/workloads/ConsumerInfoSim.java#L271)
+
+### Streams
+
+| Stream | Description                                                           |
+|--------|-----------------------------------------------------------------------|
+| data   | A stream used the processes to have subjects, consumers and messages. |
+| queue  | A stream user for interprocess communication.                         |
+| ex     | A stream to log info on exceptions.                                   |
+| log    | A stream to log counts.                                               |
+
+### Example Run Snapshot
+There is another process that watches the streams and displays the state. 
+Every so often it gathers info. Here is the info just before I stopped all processes. 
+An asterix on a line item shows that that particular items was updated since the last gather.
+
+1\. Basic stream information
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────────────────┐
 │ Stream Information                                                       2025-03-04T13:06:19 │
@@ -44,6 +82,10 @@ An "Info" process, which does the following.
 │   ex           │     33,552 │          8 │          0 │          1 │     33,552 │    8.02 mb │
 │ * log          │      1,320 │         17 │          0 │    352,161 │    353,480 │  174.20 kb │
 └────────────────┴────────────┴────────────┴────────────┴────────────┴────────────┴────────────┘
+```
+
+2\. A more specific breakdown of exceptions caught by the processes.
+```
 ┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 │ Exceptions                                                                                                                                               │
 ├────────────────┬───────────────────────────┬─────────────────────┬─────────┬─────────────────────────────────────────────────────────────────────────────┤
@@ -58,6 +100,10 @@ An "Info" process, which does the following.
 │   Produce      │ IO                        │ 2025-03-04T13:12:18 │  12,082 │ Timeout or no response waiting for NATS JetStream server                    │
 │   Produce      │ JetStreamApi              │ 2025-03-04T13:12:15 │     291 │ stream is offline [10118]                                                   │
 └────────────────┴───────────────────────────┴─────────────────────┴─────────┴─────────────────────────────────────────────────────────────────────────────┘
+```
+
+3\. The counts, by thread. Elapsed time was about 46 hours.
+```
 ┌────────────────────────────────────────────────────┐
 │ Log                                                │
 ├───────────────────┬────────────────┬───────────────┤
