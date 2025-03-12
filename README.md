@@ -31,7 +31,7 @@ A "Produce" process does the following repeatedly until stopped:
 * Each round (Steps 1-4) counts as 1 in the log.
 * 6 individual full threads each ran the process. 
 * Failure at any step is logged, but ignored, meaning for instance if it fails at step 3, the consumer is not removed.
-* The process pauses if there are 11,000 or more consumers. It then waited until the Consume process removed consumers and would resume once there were 6,500 or fewer consumers.
+* The process pauses if there are 11,000 or more consumers. It then waits until the Consume process removed consumers and would resume once there were 6,500 or fewer consumers.
 * [Produce Source Code](src/main/java/io/synadia/workloads/ConsumerInfoSim.java#L218)
 
 #### Client Instance 2
