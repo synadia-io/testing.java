@@ -1,4 +1,4 @@
-gen/setup-tracking.sh
+gen/setup-tracking
 for i in 1 2 3 4 5
 do
     gen/setup-testing-unlimited
