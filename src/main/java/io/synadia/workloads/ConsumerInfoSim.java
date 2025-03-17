@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static io.nats.jsmulti.shared.Utils.sleep;
 import static io.synadia.utils.Commons.generateName;
 
-public class ConsumerInfoSim extends AbstractCustomWorkload {
+public class ConsumerInfoSim extends CustomWorkload {
     private String dataStreamName;
     private String dataSubjectPrefix;
     private String dataStreamSubject;

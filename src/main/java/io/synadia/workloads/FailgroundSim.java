@@ -11,7 +11,7 @@ import io.synadia.workloads.support.WorkContext;
 import java.io.IOException;
 import java.util.concurrent.ThreadLocalRandom;
 
-public class FailgroundSim extends AbstractCustomWorkload {
+public class FailgroundSim extends CustomWorkload {
     private String dataStreamName;
     private String dataSubject;
     private long dataMaxMessages;

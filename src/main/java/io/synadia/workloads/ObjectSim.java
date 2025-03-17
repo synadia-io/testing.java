@@ -22,7 +22,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import static io.nats.client.support.JsonUtils.printFormatted;
 import static io.nats.jsmulti.shared.Utils.sleep;
 
-public class ObjectSim extends AbstractCustomWorkload {
+public class ObjectSim extends CustomWorkload {
     private String bucketName;
     private String bucketStreamName;
     private boolean bucketCompression;

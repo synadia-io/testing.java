@@ -1,7 +1,7 @@
 gen/setup-tracking.sh
 for i in 1 2 3 4 5
 do
-    gen/setup-testing-unlimited.sh
+    gen/setup-testing-unlimited
     java -cp "build/libs/*" io.synadia.Runner --workload Multi --action publish --params params<PathSep>params.json --params params<PathSep>bench-publish.json
     java -cp "build/libs/*" io.synadia.Runner --workload Multi --action fetch --params params<PathSep>params.json --params params<PathSep>bench-fetch.json
     java -cp "build/libs/*" io.synadia.Runner --workload Multi --action iterate --params params<PathSep>params.json --params params<PathSep>bench-iterate.json

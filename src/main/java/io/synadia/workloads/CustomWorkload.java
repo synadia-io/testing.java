@@ -5,6 +5,7 @@ import io.nats.client.api.*;
 import io.nats.client.support.JsonValueUtils;
 import io.nats.client.support.NatsJetStreamConstants;
 import io.nats.client.support.NatsObjectStoreUtil;
+import io.synadia.CommandLine;
 import io.synadia.Workload;
 import io.synadia.utils.Debug;
 import io.synadia.workloads.support.Event;
@@ -23,7 +24,7 @@ import static io.nats.jsmulti.shared.Utils.sleep;
 import static io.synadia.utils.Commons.*;
 
 @SuppressWarnings("SameParameterValue")
-public abstract class AbstractCustomWorkload extends Workload {
+public class CustomWorkload extends Workload {
 
     public boolean optionsVirtualThreads;
     public String logStreamName;
@@ -38,6 +39,12 @@ public abstract class AbstractCustomWorkload extends Workload {
 
     public List<String> customStreams;
     public String commandHelp;
+
+    @Override
+    public void init(CommandLine commandLine) {
+        init("CustomWorkload (Generic)", commandLine);
+        initCustom(new String[0], new String[0]);
+    }
 
     // ----------------------------------------------------------------------------------------------------
     // INITIALIZATION
@@ -100,6 +107,7 @@ public abstract class AbstractCustomWorkload extends Workload {
         sb.append("\n- watch");
         sb.append("\n- stream ").append(ssb);
         sb.append("\n- purge ").append(ssb).append(" [<subject-filter-start>] (defaults to all subjects)");
+        sb.append("\n- remove");
         sb.append("\n- unex");
         commandHelp = sb.toString();
     }
@@ -126,6 +134,7 @@ public abstract class AbstractCustomWorkload extends Workload {
             case "stream" -> doStream();
             case "purge"  -> doPurge();
             case "unex"   -> doUniqueExceptions();
+            case "remove" -> doRemoveAllStreams();
             default -> {
                 if (!subRunWorkload(arg)) {
                     exit("Unknown custom workload command: '" + arg + "'");
@@ -145,11 +154,8 @@ public abstract class AbstractCustomWorkload extends Workload {
     protected void doSetup() throws IOException, JetStreamApiException, InterruptedException {
         doAdmin(wctx -> {
             startJob("Setup");
+            doRemoveAllStreams(wctx);
             startJob("Creating Streams");
-            List<String> streamNames = wctx.jsm.getStreamNames();
-            for (String streamName : streamNames) {
-                wctx.jsm.deleteStream(streamName);
-            }
             addStream(wctx.jsm, StreamConfiguration.builder()
                 .name(logStreamName)
                 .subjects(logStreamSubject)
@@ -162,6 +168,18 @@ public abstract class AbstractCustomWorkload extends Workload {
                 .build());
             subDoSetup(wctx.nc, wctx.jsm);
         });
+    }
+
+    protected void doRemoveAllStreams() throws IOException, JetStreamApiException, InterruptedException {
+        doAdmin(this::doRemoveAllStreams);
+    }
+
+    protected void doRemoveAllStreams(WorkContext wctx) throws IOException, JetStreamApiException {
+        startJob("Removing Existing Streams");
+        List<String> streamNames = wctx.jsm.getStreamNames();
+        for (String streamName : streamNames) {
+            wctx.jsm.deleteStream(streamName);
+        }
     }
 
     protected void subDoSetup(Connection nc, JetStreamManagement jsm) throws IOException, JetStreamApiException, InterruptedException {}
@@ -522,7 +540,7 @@ public abstract class AbstractCustomWorkload extends Workload {
         long count;
         ZonedDateTime time;
 
-        Unex(AbstractCustomWorkload acw, Message m) {
+        Unex(CustomWorkload acw, Message m) {
             event = new Event(acw, m.getData());
             count = 1;
             time = m.metaData().timestamp();

@@ -2,7 +2,7 @@ package io.synadia.workloads;
 
 import io.synadia.CommandLine;
 
-public class DebugWorkload extends AbstractCustomWorkload {
+public class DebugWorkload extends CustomWorkload {
 
     @Override
     public void init(CommandLine commandLine) {

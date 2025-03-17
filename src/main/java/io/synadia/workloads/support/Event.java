@@ -4,7 +4,7 @@ import io.nats.client.support.JsonParser;
 import io.nats.client.support.JsonSerializable;
 import io.nats.client.support.JsonValue;
 import io.nats.client.support.JsonValueUtils;
-import io.synadia.workloads.AbstractCustomWorkload;
+import io.synadia.workloads.CustomWorkload;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,7 +15,7 @@ import static io.synadia.utils.Commons.*;
 
 public class Event implements JsonSerializable {
 
-    private final AbstractCustomWorkload abstractCustomWorkload;
+    private final CustomWorkload customWorkload;
     public final String job;
     public final String workId;
     public final int tix;
@@ -26,8 +26,8 @@ public class Event implements JsonSerializable {
     public final String exceptionClass;
     public final String exceptionMessage;
 
-    public Event(AbstractCustomWorkload abstractCustomWorkload, byte[] jsonBytes) {
-        this.abstractCustomWorkload = abstractCustomWorkload;
+    public Event(CustomWorkload customWorkload, byte[] jsonBytes) {
+        this.customWorkload = customWorkload;
         JsonValue jv = JsonParser.parseUnchecked(jsonBytes);
         this.job = JsonValueUtils.readString(jv, "job");
         this.workId = JsonValueUtils.readString(jv, "work_id");
@@ -41,8 +41,8 @@ public class Event implements JsonSerializable {
         this.exceptionMessage = JsonValueUtils.readString(jv, "exception_message");
     }
 
-    public Event(AbstractCustomWorkload abstractCustomWorkload, String job, String workId, int tix, String qualifier, long count, long elapsed, Exception exception) {
-        this.abstractCustomWorkload = abstractCustomWorkload;
+    public Event(CustomWorkload customWorkload, String job, String workId, int tix, String qualifier, long count, long elapsed, Exception exception) {
+        this.customWorkload = customWorkload;
         this.job = job;
         this.workId = workId;
         this.tix = tix;
@@ -116,7 +116,7 @@ public class Event implements JsonSerializable {
     }
 
     public String subject() {
-        return (exceptionClass == null ? abstractCustomWorkload.logSubjectPrefix : abstractCustomWorkload.exSubjectPrefix)
+        return (exceptionClass == null ? customWorkload.logSubjectPrefix : customWorkload.exSubjectPrefix)
             + segments(DEFAULT_SEGMENT);
     }
 
