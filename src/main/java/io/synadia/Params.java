@@ -102,7 +102,7 @@ public class Params implements JsonSerializable {
         for (String paramsFile : paramsFiles) {
             try {
                 byte[] bytes = Files.readAllBytes(Paths.get(paramsFile));
-                jv.map.putAll(JsonParser.parse(bytes).map);
+                merge(jv, JsonParser.parse(bytes));
             }
             catch (IOException e) {
                 Debug.info(PARAMS_LABEL, "Unable to load params file '" + paramsFile + "', " + e);
@@ -110,6 +110,28 @@ public class Params implements JsonSerializable {
             }
         }
         return jv;
+    }
+
+    private static void merge(JsonValue jvTarget, JsonValue jvNew) {
+        for (String newKey : jvNew.map.keySet()) {
+            JsonValue newValue = jvNew.map.get(newKey);
+            if (newValue.map == null) {
+                // just an ordinary key, put might override, fine last in wins
+                jvTarget.map.put(newKey, newValue);
+            }
+            else {
+                // a key to a map
+                JsonValue targetValue = jvTarget.map.get(newKey);
+                if (targetValue == null) {
+                    // key didn't exist in old map
+                    jvTarget.map.put(newKey, newValue);
+                }
+                else {
+                    merge(targetValue, newValue);
+                }
+            }
+        }
+
     }
 
     public void debug() {
