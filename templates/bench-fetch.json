@@ -9,5 +9,5 @@
     "connection_strategy": "individual",
     "report_frequency": 50000
   },
-  "options_virtual_threads": false
+  "options_virtual_threads": true
 }

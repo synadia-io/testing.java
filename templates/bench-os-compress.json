@@ -12,5 +12,5 @@
   "compression": true,
   "gzip": false,
   "cleanup": 100,
-  "options_virtual_threads": false
+  "options_virtual_threads": true
 }

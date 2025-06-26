@@ -10,5 +10,5 @@
     "report_frequency": 50000,
     "round_size": 100
   },
-  "options_virtual_threads": false
+  "options_virtual_threads": true
 }
