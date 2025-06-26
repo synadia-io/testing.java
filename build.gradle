@@ -18,7 +18,7 @@ if (jnatsv == null || jnatsv.equals("")) {
     }
     catch (Exception ignore) {}
     if (jnatsv == null || jnatsv.equals("")) {
-        jnatsv = "2.21.1"
+        jnatsv = "2.21.2"
     }
 }
 System.out.println("JNats ${jnatsv}");
