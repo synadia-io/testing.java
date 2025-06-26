@@ -7,8 +7,12 @@ group = 'synadia'
 
 repositories {
     mavenCentral()
-    maven { url "https://oss.sonatype.org/content/repositories/releases/" }
-    maven { url "https://repo1.maven.org/maven2/" }
+    maven {
+        url "https://repo1.maven.org/maven2/"
+    }
+    maven {
+        url "https://central.sonatype.com/repository/maven-snapshots"
+    }
 }
 
 def jnatsv = System.getenv("JNATS_VERSION")
