@@ -6,3 +6,5 @@ do
     java -cp "build/libs/*" io.synadia.Runner --id $i --workload Multi --action fetch --params params<PathSep>params.json --params params<PathSep>bench-fetch.json
     java -cp "build/libs/*" io.synadia.Runner --id $i --workload Multi --action iterate --params params<PathSep>params.json --params params<PathSep>bench-iterate.json
 done
+cat stats*.txt > stats.txt
+rm stats_*.txt
