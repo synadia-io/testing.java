@@ -27,6 +27,8 @@ public class CommandLine {
     // ----------------------------------------------------------------------------------------------------
     // DRIVER COMMAND LINE
     // ----------------------------------------------------------------------------------------------------
+    // ### --id <ID>
+    //     --id A1B2C3
     // ### --workload <WORKLOAD_NAME>
     //     --workload stay-connected
     // ### --action <workload action>
@@ -36,6 +38,7 @@ public class CommandLine {
     // ### --arg <command line arg>
     //     --arg foo
     // ----------------------------------------------------------------------------------------------------
+    public final String id;
     public final String workload;
     public final String action;
     public final List<String> paramsFiles;
@@ -53,6 +56,7 @@ public class CommandLine {
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder("Client Test Config: ");
+        appendToString(sb, "id", id, id != null);
         appendToString(sb, "workload", workload, true);
         appendToString(sb, "action", action, action != null);
         appendToString(sb, "paramsFile", paramsFiles, true);
@@ -72,6 +76,7 @@ public class CommandLine {
             ab.add(pf);
         }
         JsonValueUtils.MapBuilder b = JsonValueUtils.mapBuilder();
+        appendToJv(b, "id", id, id != null);
         appendToJv(b, "workload", workload, true);
         appendToJv(b, "action", action, action != null);
         appendToJv(b, "paramsFile", ab, true);
@@ -80,6 +85,9 @@ public class CommandLine {
     }
 
     public void debug() {
+        if (id != null) {
+            Debug.info(COMMAND_LINE, "id", id);
+        }
         Debug.info(COMMAND_LINE, "workload", workload);
         if (action != null) {
             Debug.info(COMMAND_LINE, "action", action);
@@ -94,6 +102,7 @@ public class CommandLine {
     // Construction
     // ----------------------------------------------------------------------------------------------------
     public CommandLine(String[] args) {
+        String _id = null;
         String _workload = null;
         String _action = null;
         List<String> _paramsFiles = new ArrayList<>();
@@ -106,6 +115,9 @@ public class CommandLine {
                     switch (arg) {
                         case "--action":
                             _action = asString(args[++ix]);
+                            break;
+                        case "--id":
+                            _id = asString(args[++ix]);
                             break;
                         case "--workload":
                             _workload = asString(args[++ix]);
@@ -136,6 +148,7 @@ public class CommandLine {
             }
         }
 
+        this.id = _id;
         this.workload = _workload;
         this.action = _action;
         this.paramsFiles = _paramsFiles;

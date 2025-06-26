@@ -8,7 +8,6 @@
     "threads": 1,
     "connection_strategy": "individual",
     "report_frequency": 100,
-    "options_factory_class_name": "io.synadia.utils.VirtualExecutorOptionsFactory",
     "jitter": 1500
   },
   "log_stream_name": "log",
@@ -39,5 +38,6 @@
   "get_thread_count": 3,
   "get_report_frequency": 10,
   "get_jitter": 1000,
-  "get_file_prefix" : "objectsim-get"
+  "get_file_prefix" : "objectsim-get",
+  "options_virtual_threads": false
 }

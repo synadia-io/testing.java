@@ -1,5 +1,4 @@
 {
-  "options_virtual_threads": true,
   "log_stream_name": "log",
   "log_subject_prefix": "log.",
   "log_stream_subject": "log.>",
@@ -17,5 +16,6 @@
   "publish_max_message_size": 1000,
   "ordered_job": "Ordered",
   "ordered_report_frequency": 10000,
-  "ordered_jitter": 1000
+  "ordered_jitter": 1000,
+  "options_virtual_threads": false
 }

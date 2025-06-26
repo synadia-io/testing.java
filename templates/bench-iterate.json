@@ -7,7 +7,7 @@
     "threads": 1,
     "batch_size": 100,
     "connection_strategy": "individual",
-    "report_frequency": 50000,
-    "options_factory_class_name": "io.synadia.utils.VirtualExecutorOptionsFactory"
-  }
+    "report_frequency": 50000
+  },
+  "options_virtual_threads": false
 }
