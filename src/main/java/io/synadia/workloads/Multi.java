@@ -1,5 +1,9 @@
 package io.synadia.workloads;
 
+import io.nats.client.Connection;
+import io.nats.client.KeyValue;
+import io.nats.client.Nats;
+import io.nats.client.Options;
 import io.nats.jsmulti.JsMulti;
 import io.nats.jsmulti.settings.Arguments;
 import io.nats.jsmulti.settings.Context;
@@ -25,6 +29,20 @@ public class Multi extends Workload {
 
         TestingOptionsFactory.COMMAND_LINE = commandLine;
         TestingOptionsFactory.PARAMS = params;
+
+        Options options = getAdminOptions();
+        try (Connection nc = Nats.connect(options)) {
+            KeyValue kv = nc.keyValue(params.statsBucket);
+            String cv = System.getenv("JNATS_VERSION");
+            if (cv == null) {
+                kv.put("CV", cv);
+                kv.put("CV_SOURCE", "Env JNATS_VERSION");
+            }
+            else {
+                kv.put("CV", Nats.CLIENT_VERSION);
+                kv.put("CV_SOURCE", "Nats.CLIENT_VERSION");
+            }
+        }
 
         Arguments a = Arguments.instance().addJsonConfig(params.jvMultiConfig.toJson());
         a.appClass(TestingApplication.class);
