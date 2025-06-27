@@ -24,8 +24,15 @@ import static io.synadia.utils.Reporting.*;
 
 public class Watch extends Workload {
 
+    public static final String CV_SOURCE = "CV_SOURCE";
+    public static final String CV = "CV";
+
     private Which which;
     private String bucket;
+
+    private boolean keyIsStats(KeyValueEntry kve) {
+        return !kve.getKey().startsWith(CV);
+    }
 
     public void init(CommandLine commandLine) {
         init(commandLine.action, commandLine);
@@ -57,8 +64,8 @@ public class Watch extends Workload {
             kv.watchAll(watcher);
 
             if (which == Which.ReportStats) {
-                String cvs = kv.get("CV_SOURCE").getValueAsString();
-                String cv = kv.get("CV").getValueAsString();
+                String cvs = kv.get(CV_SOURCE).getValueAsString();
+                String cv = kv.get(CV).getValueAsString();
                 System.out.println(cv + "[" + cvs + "]");
                 watcher.report();
                 return;
@@ -142,10 +149,12 @@ public class Watch extends Workload {
             try {
                 rwLock.lock();
                 try {
-                    reportNextTime = true;
-                    ParsedEntry p = new ParsedEntry(kve);
-                    p.targetAndLabel(extractTarget(p.jv), targetContextOnly);
-                    peMap.put(p.label, p);
+                    if (keyIsStats(kve)) {
+                        reportNextTime = true;
+                        ParsedEntry p = new ParsedEntry(kve);
+                        p.targetAndLabel(extractTarget(p.jv), targetContextOnly);
+                        peMap.put(p.label, p);
+                    }
                 }
                 finally {
                     rwLock.unlock();

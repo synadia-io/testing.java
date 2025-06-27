@@ -32,6 +32,8 @@ public class Generator {
     public static final String SERVER_SETUP_OUTPUT_DIR = "gen-bin-server";
     public static final String DOT_JSON = ".json";
     public static final String SH_BAT_DOT_TXT = "-sh-bat.txt";
+    public static final String SH_DOT_TXT = "-sh.txt";
+    public static final String BAT_DOT_TXT = "-bat.txt";
 
     public static final String PARAMS_JSON = "params.json";
     public static final String START_CLIENTS_BAT = "start-clients.bat";
@@ -153,6 +155,12 @@ public class Generator {
                     else if (filename.endsWith(SH_BAT_DOT_TXT)) {
                         script(filename, gen);
                     }
+                    else if (filename.endsWith(SH_DOT_TXT)) {
+                        scriptUnix(filename, gen);
+                    }
+                    else if (filename.endsWith(BAT_DOT_TXT)) {
+                        scriptWindows(filename, gen);
+                    }
                 }
             }
         }
@@ -174,6 +182,22 @@ public class Generator {
         String scriptTemplate = readTemplate(filename, gen);
         String genName = gen.unix ? name + gen.shellExt : name + ".bat";
         generate(genName, scriptTemplate, SCRIPT_OUTPUT_DIR);
+    }
+
+    private static void scriptUnix(String filename, Gen gen) throws IOException {
+        if (gen.unix) {
+            String genName = filename.replace(SH_DOT_TXT, "") + gen.shellExt;
+            String scriptTemplate = readTemplate(filename, gen);
+            generate(genName, scriptTemplate, SCRIPT_OUTPUT_DIR);
+        }
+    }
+
+    private static void scriptWindows(String filename, Gen gen) throws IOException {
+        if (gen.windows) {
+            String genName = filename.replace(BAT_DOT_TXT, ".bat");
+            String scriptTemplate = readTemplate(filename, gen);
+            generate(genName, scriptTemplate, SCRIPT_OUTPUT_DIR);
+        }
     }
 
     private static Kind printInstance(Kind lastKind, Kind thisKind, Instance instance, String extra) {
@@ -204,6 +228,9 @@ public class Generator {
                 + gen.keyFile + " "
                 + user
                 + "@" + current.publicDnsName;
+            if (gen.windows) {
+                System.out.print("start ");
+            }
             System.out.println(cmd);
             return cmd;
         }
