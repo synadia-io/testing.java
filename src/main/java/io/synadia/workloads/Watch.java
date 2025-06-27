@@ -64,10 +64,10 @@ public class Watch extends Workload {
             kv.watchAll(watcher);
 
             if (which == Which.ReportStats) {
+                watcher.report();
                 String cvs = kv.get(CV_SOURCE).getValueAsString();
                 String cv = kv.get(CV).getValueAsString();
-                System.out.println(cv + "[" + cvs + "]");
-                watcher.report();
+                System.out.println(cv + " [" + cvs + "]");
                 return;
             }
 
