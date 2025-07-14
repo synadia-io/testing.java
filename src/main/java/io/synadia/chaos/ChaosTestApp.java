@@ -117,7 +117,6 @@ public class ChaosTestApp {
             e.printStackTrace();
         }
         finally {
-            Output.dumpControl();
             System.exit(0);
         }
     }

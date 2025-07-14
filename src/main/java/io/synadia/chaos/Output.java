@@ -17,10 +17,6 @@ import io.nats.client.support.JsonSerializable;
 import io.nats.client.support.JsonValue;
 import io.synadia.chaos.support.CommandLine;
 
-import javax.swing.*;
-import javax.swing.text.BadLocationException;
-import javax.swing.text.Document;
-import java.awt.*;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -29,54 +25,19 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.locks.ReentrantLock;
 
-public class Output extends JPanel {
-    public enum Screen {Left, Main, Console}
-
+public class Output {
     static final ReentrantLock workLock = new ReentrantLock();
     static final ReentrantLock controlLock = new ReentrantLock();
     static final ReentrantLock debugLock = new ReentrantLock();
 
-    static boolean console;
     static boolean work;
     static boolean debug;
 
     static boolean started;
-    static Output workInstance;
-    static Output controlInstance;
-    static Output debugInstance;
     static PrintStream workLog;
     static PrintStream controlLog;
     static PrintStream debugLog;
     static String controlConsoleAreaLabel = null;
-
-    static final int HEIGHT_REDUCTION = 45;
-
-    static final Font DISPLAY_FONT;
-    static final int SCREEN_AVAILABLE_WIDTH;
-    static final int SCREEN_AVAILABLE_HEIGHT;
-    static final int ROWS;
-
-    JTextArea area;
-
-    static {
-        // figure UI_FONT
-        String fontName = Font.MONOSPACED;
-        GraphicsEnvironment localEnv;
-        localEnv= GraphicsEnvironment.getLocalGraphicsEnvironment();
-        String allfonts[] = localEnv.getAvailableFontFamilyNames();
-        for (String allfont : allfonts) {
-            if (allfont.equals("JetBrains Mono")) {
-                fontName = allfont;
-                break;
-            }
-        }
-        DISPLAY_FONT = new Font(fontName, Font.PLAIN, 14);
-        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-        SCREEN_AVAILABLE_WIDTH = (int)screenSize.getWidth();
-        SCREEN_AVAILABLE_HEIGHT = (int)screenSize.getHeight() - HEIGHT_REDUCTION;
-
-        ROWS = SCREEN_AVAILABLE_HEIGHT / 21;
-    }
 
     public static void start(CommandLine cmd) {
         if (started) {
@@ -84,11 +45,10 @@ public class Output extends JPanel {
         }
 
         started = true;
-        console = cmd.uiScreen == Screen.Console;
         work = cmd.work;
         debug = cmd.debug;
 
-        if (console && (work || debug)) {
+        if (work || debug) {
             controlConsoleAreaLabel = "CTRL";
         }
 
@@ -122,78 +82,6 @@ public class Output extends JPanel {
                 System.exit(-1);
             }
         }
-
-        // SCREEN
-        int debugWidth = (int)(SCREEN_AVAILABLE_WIDTH * 0.42);
-        int workWidth =  (int)(SCREEN_AVAILABLE_WIDTH * 0.24);
-        int controlWidth = SCREEN_AVAILABLE_WIDTH - debugWidth - workWidth;
-        int offset = 0;
-        if (cmd.uiScreen == Screen.Left) {
-            if (debug || work) {
-                if (debug) {
-                    debugInstance = newUi("Debug", -debugWidth, debugWidth, SCREEN_AVAILABLE_HEIGHT);
-                    offset = -debugWidth;
-                }
-                if (work) {
-                    offset -= controlWidth;
-                    controlInstance = newUi("Control", offset, controlWidth, SCREEN_AVAILABLE_HEIGHT);
-                    workInstance = newUi("Work", offset - workWidth, workWidth, SCREEN_AVAILABLE_HEIGHT);
-                }
-                else {
-                    offset -= debugWidth;
-                    controlInstance = newUi("Control", offset, debugWidth, SCREEN_AVAILABLE_HEIGHT);
-                }
-            }
-            else {
-                offset = -SCREEN_AVAILABLE_WIDTH / 2;
-                controlInstance = newUi("Control", offset, -offset, SCREEN_AVAILABLE_HEIGHT);
-            }
-        }
-        else if (cmd.uiScreen == Screen.Main) {
-            if (debug || work) {
-                if (debug) {
-                    debugInstance = newUi("Debug", 0, debugWidth, SCREEN_AVAILABLE_HEIGHT);
-                    offset = debugWidth;
-                }
-                if (work) {
-                    controlInstance = newUi("Control", offset, controlWidth, SCREEN_AVAILABLE_HEIGHT);
-                    offset += controlWidth;
-                    workInstance = newUi("Work", offset, workWidth, SCREEN_AVAILABLE_HEIGHT);
-                }
-                else {
-                    controlInstance = newUi("Control", offset, debugWidth, SCREEN_AVAILABLE_HEIGHT);
-                }
-            }
-            else {
-                offset = SCREEN_AVAILABLE_WIDTH / 2;
-                controlInstance = newUi("Control", 0, offset, SCREEN_AVAILABLE_HEIGHT);
-            }
-        }
-    }
-
-    private static Output newUi(String name, int xLoc, int width, int height) {
-        //Create and set up the window.
-        JFrame frame = new JFrame(name);
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-
-        //Add contents to the window.
-        Output output = new Output();
-        frame.add(output);
-
-        //Display the window.
-        frame.setLocation(xLoc, 0);
-        frame.setPreferredSize(new Dimension(width, height));
-        frame.pack();
-        frame.setVisible(true);
-        return output;
-    }
-
-    private Output() {
-        super(new GridLayout(1, 1));
-        area = new JTextArea(ROWS, 40);
-        area.setEditable(false);
-        area.setFont(DISPLAY_FONT);
-        add(new JScrollPane(area));
     }
 
     private static String time() {
@@ -205,12 +93,7 @@ public class Output extends JPanel {
         if (work) {
             workLock.lock();
             try {
-                if (console) {
-                    consoleMessage("WORK", label, s);
-                }
-                else {
-                    append(label, s, workInstance.area);
-                }
+                consoleMessage("WORK", label, s);
                 if (workLog != null) {
                     consoleMessage(null, label, s, workLog);
                 }
@@ -232,12 +115,7 @@ public class Output extends JPanel {
     public static void controlMessage(String label, String s) {
         controlLock.lock();
         try {
-            if (console) {
-                consoleMessage(controlConsoleAreaLabel, label, s);
-            }
-            else {
-                append(label, s, controlInstance.area);
-            }
+            consoleMessage(controlConsoleAreaLabel, label, s);
             if (workLog != null) {
                 consoleMessage(null, label, s, controlLog);
             }
@@ -247,36 +125,11 @@ public class Output extends JPanel {
         }
     }
 
-    public static void dumpControl() {
-        dump("Control", controlInstance.area.getDocument());
-    }
-
-    private static void dump(String label, Document document) {
-        try {
-            System.out.println("----------------------------------------------------------------------------------------------------");
-            System.out.println("UI-" + label);
-            System.out.println("----------------------------------------------------------------------------------------------------");
-            System.out.println(document.getText(0, document.getLength()));
-            System.out.println("----------------------------------------------------------------------------------------------------");
-        }
-        catch (BadLocationException e) {
-            e.printStackTrace();
-            throw new RuntimeException(e);
-        }
-    }
-
     public static void debugMessage(String label, String s) {
         if (debug) {
             debugLock.lock();
             try {
-                if (console) {
-                    consoleMessage("DEBUG", label, s);
-                }
-                else {
-                    debugInstance.area.append(s);
-                    debugInstance.area.append("\n");
-                    afterAppend(debugInstance.area);
-                }
+                consoleMessage("DEBUG", label, s);
                 if (debugLog != null) {
                     consoleMessage("DEBUG", label, s + "\n", controlLog);
                 }
@@ -288,25 +141,6 @@ public class Output extends JPanel {
     }
 
     static final String NLINDENT = "\n    ";
-    private static void append(String label, String s, JTextArea area) {
-        if (s.contains("\n")) {
-            String timeLabel = time() + " | " + label;
-            area.append(timeLabel);
-            if (!s.startsWith("\n")) {
-                area.append(" | ");
-            }
-            area.append(s.replace("\n", NLINDENT));
-        }
-        else {
-            area.append(time());
-            area.append(" | ");
-            area.append(label);
-            area.append(" | ");
-            area.append(s);
-        }
-        area.append("\n");
-        afterAppend(area);
-    }
 
     public static void errorMessage(String label, String s) {
         consoleMessage("ERROR", label, s, System.out);
@@ -336,20 +170,6 @@ public class Output extends JPanel {
             out.print(s);
         }
         out.println();
-    }
-
-    private static void afterAppend(JTextArea area) {
-        int c = area.getLineCount();
-        while (c > ROWS) {
-            try {
-                int end = area.getLineEndOffset(1);
-                area.getDocument().remove(0, end);
-                c = area.getLineCount();
-            }
-            catch (BadLocationException e) {
-                throw new RuntimeException(e);
-            }
-        }
     }
 
     public static String FN = "\n  ";
