@@ -1,2 +1,2 @@
-java -cp "build/libs/*" io.synadia.chaos.Chaos --servers 3 --delay 10000 --initial 60000
+java -cp "build/libs/*" io.synadia.chaos.HealthChecker --servers 3 --delay 10000 --initial 60000
 
