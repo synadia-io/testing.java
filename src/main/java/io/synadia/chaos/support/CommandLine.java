@@ -16,7 +16,6 @@ package io.synadia.chaos.support;
 import io.nats.client.ConnectionListener;
 import io.nats.client.ErrorListener;
 import io.nats.client.Options;
-import io.synadia.chaos.Output;
 import io.synadia.chaos.OutputConnectionListener;
 import io.synadia.chaos.OutputErrorListener;
 
@@ -83,7 +82,6 @@ public class CommandLine {
     public final boolean publish;
     public final boolean debug;
     public final boolean work;
-    public final Output.Screen uiScreen;
     public final List<CommandLineConsumer> commandLineConsumers;
 
     public final int crServers;
@@ -133,7 +131,6 @@ public class CommandLine {
         append(sb, "pubjitter", pubjitter, publish);
         append(sb, "debug", debug, debug);
         append(sb, "work", work, work);
-        append(sb, "screen", uiScreen, uiScreen != Output.Screen.Console);
         for (CommandLineConsumer cc : commandLineConsumers) {
             append(sb, "consumer", cc, true);
         }
@@ -162,7 +159,6 @@ public class CommandLine {
             boolean _r3 = false;
             boolean _publish = false;
             boolean _work = false;
-            Output.Screen _uiScreen = Output.Screen.Console;
             List<CommandLineConsumer> _commandLineConsumers = new ArrayList<>();
             int _crServers = 1;
             String _crWorkDirectory = null;
@@ -211,18 +207,6 @@ public class CommandLine {
                                 break;
                             case "--work":
                                 _work = true;
-                                break;
-                            case "--screen":
-                                String screen = asString(args[++x]).toLowerCase();
-                                if (screen.equals("left")) {
-                                    _uiScreen = Output.Screen.Left;
-                                }
-                                else if (screen.equals("center")) {
-                                    _uiScreen = Output.Screen.Main;
-                                }
-                                else {
-                                    throw new IllegalArgumentException("Unknown Screen");
-                                }
                                 break;
                             case "--simple":
                             case "--fetch":
@@ -293,7 +277,6 @@ public class CommandLine {
             pubjitter = _publishJitter;
             debug = _debug;
             work = _work;
-            uiScreen = _uiScreen;
             commandLineConsumers = _commandLineConsumers;
 
             crServers = _crServers;
