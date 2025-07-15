@@ -31,12 +31,10 @@ public class Publisher implements Runnable {
     final long pubDelay;
     final AtomicLong lastSeqno = new AtomicLong(-1);
     final AtomicLong errorRun = new AtomicLong(0);
-    final OutputReducer reducer;
 
     public Publisher(CommandLine cmd, long pubDelay) {
         this.cmd = cmd;
         this.pubDelay = pubDelay;
-        reducer = new OutputReducer(LABEL);
     }
 
     public long getLastSeqno() {
@@ -60,20 +58,20 @@ public class Publisher implements Runnable {
             //noinspection InfiniteLoopStatement
             while (true) {
                 if (lastSeqno.get() == -1) {
-                    reducer.output("Starting Publish");
+                    Output.message(LABEL, "Starting Publish");
                     lastSeqno.set(0);
                 }
                 try {
                     PublishAck pa = js.publish(cmd.subject, null);
                     lastSeqno.set(pa.getSeqno());
                     if (errorRun.get() > 0) {
-                        reducer.output("Restarting Publish");
+                        Output.message(LABEL, "Restarting Publish");
                     }
                     errorRun.set(0);
                 }
                 catch (Exception e) {
                     if (errorRun.incrementAndGet() == 1) {
-                        reducer.output(e.getMessage());
+                        Output.message(LABEL, e.getMessage());
                     }
                 }
                 try {

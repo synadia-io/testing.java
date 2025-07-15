@@ -51,8 +51,7 @@ public class ChaosTestApp {
         Monitor monitor;
 
         try {
-            Output.start(cmd);
-            Output.controlMessage(APP_LABEL, cmd.toString().replace(" --", "    \n--"));
+            Output.message(APP_LABEL, cmd.toString().replace(" --", "    \n--"));
             CountDownLatch waiter = new CountDownLatch(1);
 
             ChaosArguments chaosArgs = new ChaosArguments()
@@ -74,7 +73,7 @@ public class ChaosTestApp {
             if (cmd.create) {
                 Options options = cmd.makeManagmentOptions(MANAGE_LABEL);
                 try (Connection nc = Nats.connect(options)) {
-                    Output.controlMessage(MANAGE_LABEL, nc.getServerInfo().toString());
+                    Output.message(MANAGE_LABEL, nc.getServerInfo().toString());
                     JetStreamManagement jsm = nc.jetStreamManagement();
                     createOrReplaceStream(cmd, jsm);
                 }
@@ -92,7 +91,7 @@ public class ChaosTestApp {
                         case Simple -> new SimpleConsumer(cmd, clc.consumerKind, clc.batchSize, clc.expiresIn);
                         case Fetch -> new SimpleFetchConsumer(cmd, clc.consumerKind, clc.batchSize, clc.expiresIn);
                     };
-                    Output.controlMessage(APP_LABEL, con.label);
+                    Output.message(APP_LABEL, con.label);
                     cons.add(con);
                 }
             }
@@ -134,7 +133,7 @@ public class ChaosTestApp {
                 .replicas(cmd.r3 ? 3 : 1)
                 .build();
             StreamInfo si = jsm.addStream(sc);
-            Output.controlMessage(APP_LABEL, "Create Stream\n" + Output.formatted(si.getConfiguration()));
+            Output.message(APP_LABEL, "Create Stream\n" + Output.formatted(si.getConfiguration()));
         }
         catch (Exception e) {
             Output.fatalMessage(APP_LABEL, "Failed creating stream: '" + cmd.stream + "' " + e);

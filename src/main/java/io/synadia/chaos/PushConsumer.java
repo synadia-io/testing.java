@@ -40,7 +40,7 @@ public class PushConsumer extends ConnectableConsumer {
             .build();
 
         sub = js.subscribe(cmd.subject, d, handler, false, pso);
-        Output.controlMessage(label, sub.getConsumerName());
+        Output.message(label, sub.getConsumerName());
     }
 
     @Override

@@ -14,180 +14,100 @@
 package io.synadia.chaos;
 
 import io.nats.client.support.JsonSerializable;
-import io.nats.client.support.JsonValue;
-import io.synadia.chaos.support.CommandLine;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.PrintStream;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class Output {
-    static final ReentrantLock workLock = new ReentrantLock();
-    static final ReentrantLock controlLock = new ReentrantLock();
-    static final ReentrantLock debugLock = new ReentrantLock();
+    public static final DateTimeFormatter TIME_FORMATTER
+        = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
 
-    static boolean work;
-    static boolean debug;
+    private static final long MESSAGE_DUPE_AGE = 2_000;
 
-    static boolean started;
-    static PrintStream workLog;
-    static PrintStream controlLog;
-    static PrintStream debugLog;
-    static String controlConsoleAreaLabel = null;
+    static final ReentrantLock lock = new ReentrantLock();
+    static final Map<Integer, Long> map = new HashMap<>();
+    static final ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(1);
 
-    public static void start(CommandLine cmd) {
-        if (started) {
-            return;
-        }
-
-        started = true;
-        work = cmd.work;
-        debug = cmd.debug;
-
-        if (work || debug) {
-            controlConsoleAreaLabel = "CTRL";
-        }
-
-        // LOG FILES
-        if (cmd.logdir != null) {
-            File f = new File(cmd.logdir);
-            if (!f.exists() && !f.mkdirs()) {
-                errorMessage("OUTPUT", "Unable to create logdir: " + cmd.logdir);
-                System.exit(-1);
-            }
-            try {
-                String template = "chaos-app-which-log.txt";
-                String fn = template.replace("which", "control");
-                Path p = Paths.get(f.getAbsolutePath(), fn);
-                controlLog = new PrintStream(new FileOutputStream(p.toFile()));
-
-                if (debug) {
-                    fn = template.replace("which", "debug");
-                    p = Paths.get(f.getAbsolutePath(), fn);
-                    debugLog = new PrintStream(new FileOutputStream(p.toFile()));
-                }
-
-                if (work) {
-                    fn = template.replace("which", "work");
-                    p = Paths.get(f.getAbsolutePath(), fn);
-                    workLog = new PrintStream(new FileOutputStream(p.toFile()));
-                }
-            }
-            catch (FileNotFoundException e) {
-                errorMessage("OUTPUT", "Unable to create log file: " + e);
-                System.exit(-1);
-            }
-        }
+    static {
+        executor.scheduleAtFixedRate(Output::cleanReducer, 5, 5, TimeUnit.MINUTES);
     }
 
-    private static String time() {
-        String t = "" + System.currentTimeMillis();
-        return t.substring(t.length() - 9);
-    }
-
-    public static void workMessage(String label, String s) {
-        if (work) {
-            workLock.lock();
-            try {
-                consoleMessage("WORK", label, s);
-                if (workLog != null) {
-                    consoleMessage(null, label, s, workLog);
-                }
-            }
-            finally {
-                workLock.unlock();
-            }
-        }
-    }
-
-    public static void controlMessage(String label, JsonSerializable j) {
-        controlMessage(label, formatted(j));
-    }
-
-    public static void controlMessage(String label, String jvLabel, JsonValue jv) {
-        controlMessage(label, formatted(jv).replace("JsonValue", jvLabel));
-    }
-
-    public static void controlMessage(String label, String s) {
-        controlLock.lock();
+    static void cleanReducer() {
+        lock.lock();
         try {
-            consoleMessage(controlConsoleAreaLabel, label, s);
-            if (workLog != null) {
-                consoleMessage(null, label, s, controlLog);
+            List<Integer> toRemove = new ArrayList<>();
+            long now = System.currentTimeMillis();
+            for (Map.Entry<Integer, Long> entry : map.entrySet()) {
+                long time = entry.getValue();
+                long elapsed = now - time;
+                if (elapsed > MESSAGE_DUPE_AGE) {
+                    toRemove.add(entry.getKey());
+                }
+            }
+            for (Integer key : toRemove) {
+                map.remove(key);
             }
         }
         finally {
-            controlLock.unlock();
-        }
-    }
-
-    public static void debugMessage(String label, String s) {
-        if (debug) {
-            debugLock.lock();
-            try {
-                consoleMessage("DEBUG", label, s);
-                if (debugLog != null) {
-                    consoleMessage("DEBUG", label, s + "\n", controlLog);
-                }
-            }
-            finally {
-                debugLock.unlock();
-            }
+            lock.unlock();
         }
     }
 
     static final String NLINDENT = "\n    ";
+    public static void message(String... strings) {
+        lock.lock();
+        try {
+            StringBuilder sb = new StringBuilder(TIME_FORMATTER.format(ZonedDateTime.now()));
+            for (String s : strings) {
+                if (s.contains("\n")) {
+                    if (!s.startsWith("\n")) {
+                        sb.append(" | ");
+                    }
+                    sb.append(s.replace("\n", NLINDENT));
+                }
+                else {
+                    sb.append(" | ");
+                    sb.append(s);
+                }
+            }
+
+            String s = sb.toString();
+            int hash = s.hashCode();
+            Long time = map.get(hash);
+            long now = System.currentTimeMillis();
+            long elapsed = time == null ? Long.MAX_VALUE : now - time;
+            if (elapsed > MESSAGE_DUPE_AGE) {
+                System.out.println(s);
+                map.put(hash, now);
+            }
+        }
+        finally {
+            lock.unlock();
+        }
+    }
 
     public static void errorMessage(String label, String s) {
-        consoleMessage("ERROR", label, s, System.out);
+        message("ERROR", label, s);
     }
 
     public static void fatalMessage(String label, String s) {
-        consoleMessage("FATAL", label, s, System.out);
-    }
-
-    public static void consoleMessage(String area, String label, String s) {
-        consoleMessage(area, label, s, System.out);
-    }
-
-    public static void consoleMessage(String area, String label, String s, PrintStream out) {
-        out.print(time());
-        String llabel = label == null ? "" : " | " + label;
-        out.print(area == null ? llabel : " | " + area + llabel);
-
-        if (s.contains("\n")) {
-            if (!s.startsWith("\n")) {
-                out.print(" | ");
-            }
-            out.print(s.replace("\n", NLINDENT));
-        }
-        else {
-            out.print(" | ");
-            out.print(s);
-        }
-        out.println();
+        message("FATAL", label, s);
     }
 
     public static String FN = "\n  ";
     public static String FBN = "{\n  ";
     public static String formatted(JsonSerializable j) {
-        return j.getClass().getSimpleName() + j.toJson()
-            .replace("{\"", FBN + "\"").replace(",", "," + FN);
+        return flat(j).replace("{\"", FBN + "\"").replace(",", "," + FN);
     }
 
     public static String flat(JsonSerializable j) {
         return j.getClass().getSimpleName() + j.toJson();
-    }
-
-    public static String formatted(Object o) {
-        return formatted(o.toString());
-    }
-
-    public static String formatted(String s) {
-        return s.replace("{", FBN).replace(", ", "," + FN);
     }
 }

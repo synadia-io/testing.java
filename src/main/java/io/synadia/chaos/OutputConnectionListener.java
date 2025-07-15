@@ -20,7 +20,6 @@ public class OutputConnectionListener implements ConnectionListener {
     };
 
     private final String outputLabel;
-    private final OutputReducer reducer;
     private final AfterFunction afterFunction;
 
     interface AfterFunction {
@@ -33,13 +32,12 @@ public class OutputConnectionListener implements ConnectionListener {
 
     public OutputConnectionListener(String outputLabel, AfterFunction afterFunction) {
         this.outputLabel = outputLabel;
-        reducer = new OutputReducer(outputLabel);
         this.afterFunction = afterFunction;
     }
 
     @Override
     public void connectionEvent(Connection conn, Events type) {
-        reducer.output("CL/" + message(type));
+        Output.message(outputLabel, "CL/" + message(type));
         afterFunction.afterOutput(conn, type);
     }
 }

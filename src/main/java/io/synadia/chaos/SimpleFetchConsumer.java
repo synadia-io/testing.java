@@ -40,7 +40,7 @@ public class SimpleFetchConsumer extends ConnectableConsumer implements Runnable
         sc = nc.getStreamContext(cmd.stream);
 
         cc = sc.createOrUpdateConsumer(newCreateConsumer().build());
-        Output.controlMessage(label, cc.getConsumerName());
+        Output.message(label, cc.getConsumerName());
         t = new Thread(this);
         t.start();
     }
@@ -48,7 +48,7 @@ public class SimpleFetchConsumer extends ConnectableConsumer implements Runnable
     @Override
     public void run() {
         FetchConsumeOptions fco = FetchConsumeOptions.builder().maxMessages(batchSize).expiresIn(expiresIn).build();
-        Output.controlMessage(label, toString(fco));
+        Output.message(label, toString(fco));
 
         //noinspection InfiniteLoopStatement
         while (true) {
@@ -66,7 +66,6 @@ public class SimpleFetchConsumer extends ConnectableConsumer implements Runnable
 
             // simulating some work to be done between fetches
             try {
-                Output.workMessage(label, "Fetch Batch Completed, Last Received Seq: " + lastReceivedSequence.get());
                 //noinspection BusyWait
                 Thread.sleep(10);
             }

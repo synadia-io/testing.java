@@ -74,7 +74,6 @@ public abstract class ConnectableConsumer {
         long seq = m.metaData().streamSequence();
         long lastSeq = lastReceivedSequence.get();
         lastReceivedSequence.set(seq);
-        Output.workMessage(label, "Last Received Seq: " + seq + "(" + lastSeq + ")");
     }
 
     public abstract void refreshInfo();

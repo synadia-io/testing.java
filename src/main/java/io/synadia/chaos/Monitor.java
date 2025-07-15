@@ -36,14 +36,12 @@ public class Monitor implements Runnable, java.util.function.Consumer<String> {
     final Publisher publisher;
     final List<ConnectableConsumer> consumers;
     final AtomicBoolean reportFull;
-    final OutputReducer reducer;
 
     public Monitor(CommandLine cmd, Publisher publisher, List<ConnectableConsumer> consumers) {
         this.cmd = cmd;
         this.publisher = publisher;
         this.consumers = consumers;
         reportFull = new AtomicBoolean(true);
-        reducer = new OutputReducer(MONITOR_LABEL);
     }
 
     @Override
@@ -73,12 +71,12 @@ public class Monitor implements Runnable, java.util.function.Consumer<String> {
                     if (reportFull.get()) {
                         StreamInfo si = jsm.getStreamInfo(cmd.stream);
                         if (si == null) {
-                            reducer.output("Stream info not available (" + cmd.stream + ")");
+                            Output.message(MONITOR_LABEL, "Stream info not available (" + cmd.stream + ")");
                         }
                         else {
-                            Output.controlMessage(MONITOR_LABEL, flat(si.getConfiguration()).replace("StreamConfiguration{", "Stream {"));
+                            Output.message(MONITOR_LABEL, flat(si.getConfiguration()).replace("StreamConfiguration{", "Stream {"));
                             if (cmd.crServers > 1 && si.getClusterInfo() != null) {
-                                Output.controlMessage(MONITOR_LABEL, si.getClusterInfo().toString().replace("ClusterInfo{ ", "Cluster {"));
+                                Output.message(MONITOR_LABEL, si.getClusterInfo().toString().replace("ClusterInfo{ ", "Cluster {"));
                             }
                         }
                         reportFull.set(false);
@@ -113,10 +111,10 @@ public class Monitor implements Runnable, java.util.function.Consumer<String> {
                         pubReport = " | Publisher: " + publisher.getLastSeqno() +
                             (publisher.isInErrorState() ? " (Paused)" : " (Running)");
                     }
-                    Output.controlMessage(MONITOR_LABEL, "Uptime: " + uptime(started) + pubReport + conReport);
+                    Output.message(MONITOR_LABEL, "Uptime: " + uptime(started) + pubReport + conReport);
                 }
                 catch (Exception e) {
-                    reducer.output(e.getMessage());
+                    Output.message(MONITOR_LABEL, e.getMessage());
                     reportFull.set(true);
                 }
             }
