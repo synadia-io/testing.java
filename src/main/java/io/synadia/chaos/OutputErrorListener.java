@@ -16,28 +16,26 @@ package io.synadia.chaos;
 import io.nats.client.*;
 import io.nats.client.support.Status;
 
+import java.lang.ref.WeakReference;
+import java.util.Map;
+
 public class OutputErrorListener implements ErrorListener {
-    String outputLabel;
-    java.util.function.Consumer<String> watcher;
+    private static long MESSAGE_DUPE_AGE = 20_000;
+
+    public static void setMessageDupeAge(long messageDupeAge) {
+        MESSAGE_DUPE_AGE = messageDupeAge;
+    }
+
+    final String outputLabel;
+    final Map<String, WeakReference<Long>> map;
 
     public OutputErrorListener(String outputLabel) {
-        this(outputLabel, null);
-    }
-
-    public OutputErrorListener(String outputLabel, java.util.function.Consumer<String> watcher) {
         this.outputLabel = outputLabel;
-        this.watcher = watcher;
+        map = new java.util.WeakHashMap<>();
     }
 
-    @Override
-    public String supplyMessage(String eventLabel, Connection conn, Consumer consumer, Subscription sub, Object... pairs) {
+    private void output(String eventLabel, Connection conn, Consumer consumer, Subscription sub, Object... pairs) {
         StringBuilder sb = new StringBuilder("EL/").append(eventLabel);
-//        if (conn != null) {
-//            ServerInfo si = conn.getServerInfo();
-//            if (si != null) {
-//                sb.append(", CONN: ").append(conn.getServerInfo().getClientId());
-//            }
-//        }
         if (consumer != null) {
             sb.append(", CON: ").append(consumer.hashCode());
         }
@@ -50,10 +48,16 @@ public class OutputErrorListener implements ErrorListener {
         for (int x = 0; x < pairs.length; x++) {
             sb.append(", ").append(pairs[x]).append(pairs[++x]);
         }
-        if (watcher != null) {
-            watcher.accept(sb.toString());
+
+        String message = sb.toString();
+        long now = System.currentTimeMillis();
+        WeakReference<Long> timeRef = map.get(message);
+        Long time = timeRef == null ? null : timeRef.get();
+        long elapsed = time == null ? 0 : now - time;
+        if (elapsed > MESSAGE_DUPE_AGE) {
+            map.put(message, new WeakReference<>(now));
+            Output.controlMessage(outputLabel, message);
         }
-        return sb.toString();
     }
 
     /**
@@ -61,7 +65,7 @@ public class OutputErrorListener implements ErrorListener {
      */
     @Override
     public void errorOccurred(final Connection conn, final String error) {
-        Output.controlMessage(outputLabel, supplyMessage("SEVERE errorOccurred", conn, null, null, "Error: ", error));
+        output("SEVERE errorOccurred", conn, null, null, "Error: ", error);
     }
 
     /**
@@ -69,7 +73,7 @@ public class OutputErrorListener implements ErrorListener {
      */
     @Override
     public void exceptionOccurred(final Connection conn, final Exception exp) {
-        Output.controlMessage(outputLabel, supplyMessage("SEVERE exceptionOccurred", conn, null, null, "EX: ", exp));
+        output("SEVERE exceptionOccurred", conn, null, null, "EX: ", exp);
     }
 
     /**
@@ -77,7 +81,7 @@ public class OutputErrorListener implements ErrorListener {
      */
     @Override
     public void slowConsumerDetected(final Connection conn, final Consumer consumer) {
-        Output.controlMessage(outputLabel, supplyMessage("WARN slowConsumerDetected", conn, consumer, null));
+        output("WARN slowConsumerDetected", conn, consumer, null);
     }
 
     /**
@@ -85,7 +89,7 @@ public class OutputErrorListener implements ErrorListener {
      */
     @Override
     public void messageDiscarded(final Connection conn, final Message msg) {
-        Output.controlMessage(outputLabel, supplyMessage("INFO messageDiscarded", conn, null, null, "Message: ", msg));
+        output("INFO messageDiscarded", conn, null, null, "Message: ", msg);
     }
 
     /**
@@ -94,7 +98,7 @@ public class OutputErrorListener implements ErrorListener {
     @Override
     public void heartbeatAlarm(final Connection conn, final JetStreamSubscription sub,
                                final long lastStreamSequence, final long lastConsumerSequence) {
-        Output.controlMessage(outputLabel, supplyMessage("SEVERE HB Alarm", conn, null, sub, "lastStreamSeq: ", lastStreamSequence, "lastConsumerSeq: ", lastConsumerSequence));
+        output("SEVERE HB Alarm", conn, null, sub, "lastStreamSeq: ", lastStreamSequence, "lastConsumerSeq: ", lastConsumerSequence);
     }
 
     /**
@@ -102,7 +106,7 @@ public class OutputErrorListener implements ErrorListener {
      */
     @Override
     public void unhandledStatus(final Connection conn, final JetStreamSubscription sub, final Status status) {
-        Output.controlMessage(outputLabel, supplyMessage("WARN unhandledStatus", conn, null, sub, "Status:", status));
+        output("WARN unhandledStatus", conn, null, sub, "Status:", status);
     }
 
     /**
@@ -110,7 +114,6 @@ public class OutputErrorListener implements ErrorListener {
      */
     @Override
     public void pullStatusWarning(Connection conn, JetStreamSubscription sub, Status status) {
-//        Output.controlMessage(id, supplyMessage("WARN pullStatusWarning", conn, null, sub, "Status:", status));
     }
 
     /**
@@ -118,7 +121,7 @@ public class OutputErrorListener implements ErrorListener {
      */
     @Override
     public void pullStatusError(Connection conn, JetStreamSubscription sub, Status status) {
-        Output.controlMessage(outputLabel, supplyMessage("SEVERE pullStatusError", conn, null, sub, "Status:", status));
+        output("SEVERE pullStatusError", conn, null, sub, "Status:", status);
     }
 
     /**
@@ -126,11 +129,11 @@ public class OutputErrorListener implements ErrorListener {
      */
     @Override
     public void flowControlProcessed(Connection conn, JetStreamSubscription sub, String id, FlowControlSource source) {
-        Output.controlMessage(this.outputLabel, supplyMessage("INFO flowControlProcessed", conn, null, sub, "FlowControlSource:", source));
+        output("INFO flowControlProcessed", conn, null, sub, "FlowControlSource:", source);
     }
 
     @Override
     public void socketWriteTimeout(Connection conn) {
-        Output.controlMessage(this.outputLabel, supplyMessage("SEVERE socketWriteTimeout", conn, null, null));
+        output("SEVERE socketWriteTimeout", conn, null, null);
     }
 }

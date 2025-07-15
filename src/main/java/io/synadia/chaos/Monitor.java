@@ -58,7 +58,7 @@ public class Monitor implements Runnable, java.util.function.Consumer<String> {
                 reportFull.set(true);
                 ocl.connectionEvent(c, t);
             })
-            .errorListener(new OutputErrorListener(MONITOR_LABEL, this))
+            .errorListener(new OutputErrorListener(MONITOR_LABEL))
             .maxReconnects(-1)
             .build();
 
