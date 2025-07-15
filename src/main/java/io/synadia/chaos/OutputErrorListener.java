@@ -19,11 +19,11 @@ import io.nats.client.support.Status;
 public class OutputErrorListener implements ErrorListener {
 
     final String outputLabel;
-    final OutputListenerReducer reducer;
+    final OutputReducer reducer;
 
     public OutputErrorListener(String outputLabel) {
         this.outputLabel = outputLabel;
-        reducer = new OutputListenerReducer(outputLabel);
+        reducer = new OutputReducer(outputLabel);
     }
 
     private void output(String eventLabel, Connection conn, Consumer consumer, Subscription sub, Object... pairs) {

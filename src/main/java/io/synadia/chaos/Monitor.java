@@ -51,13 +51,9 @@ public class Monitor implements Runnable, java.util.function.Consumer<String> {
 
     @Override
     public void run() {
-        final OutputConnectionListener ocl = new OutputConnectionListener(MONITOR_LABEL);
         Options options = new Options.Builder()
             .servers(cmd.servers)
-            .connectionListener((c, t) -> {
-                reportFull.set(true);
-                ocl.connectionEvent(c, t);
-            })
+            .connectionListener(new OutputConnectionListener(MONITOR_LABEL, (c, t) -> reportFull.set(true)))
             .errorListener(new OutputErrorListener(MONITOR_LABEL))
             .maxReconnects(-1)
             .build();

@@ -20,15 +20,26 @@ public class OutputConnectionListener implements ConnectionListener {
     };
 
     private final String outputLabel;
-    final OutputListenerReducer reducer;
+    private final OutputReducer reducer;
+    private final AfterFunction afterFunction;
+
+    interface AfterFunction {
+        void afterOutput(Connection conn, Events type);
+    }
 
     public OutputConnectionListener(String outputLabel) {
+        this(outputLabel, (c, t) -> {});
+    }
+
+    public OutputConnectionListener(String outputLabel, AfterFunction afterFunction) {
         this.outputLabel = outputLabel;
-        reducer = new OutputListenerReducer(outputLabel);
+        reducer = new OutputReducer(outputLabel);
+        this.afterFunction = afterFunction;
     }
 
     @Override
     public void connectionEvent(Connection conn, Events type) {
         reducer.output("CL/" + message(type));
+        afterFunction.afterOutput(conn, type);
     }
 }

@@ -16,7 +16,7 @@ package io.synadia.chaos;
 import java.lang.ref.WeakReference;
 import java.util.Map;
 
-public class OutputListenerReducer {
+public class OutputReducer {
     private static long MESSAGE_DUPE_AGE = 20_000;
 
     public static void setMessageDupeAge(long messageDupeAge) {
@@ -26,7 +26,7 @@ public class OutputListenerReducer {
     private final String outputLabel;
     private final Map<String, WeakReference<Long>> map;
 
-    public OutputListenerReducer(String outputLabel) {
+    public OutputReducer(String outputLabel) {
         this.outputLabel = outputLabel;
         map = new java.util.WeakHashMap<>();
     }

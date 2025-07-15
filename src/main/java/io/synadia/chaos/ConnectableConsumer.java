@@ -22,11 +22,12 @@ import io.synadia.chaos.support.ConsumerKind;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;
 
-public abstract class ConnectableConsumer implements ConnectionListener {
+public abstract class ConnectableConsumer {
 
     protected final Connection nc;
     protected final JetStream js;
     protected final OutputErrorListener errorListener;
+    protected final OutputConnectionListener connectionListener;
     protected final AtomicLong lastReceivedSequence;
     protected final MessageHandler handler;
     protected final ConsumerKind consumerKind;
@@ -58,9 +59,10 @@ public abstract class ConnectableConsumer implements ConnectionListener {
         this.initials = initials;
         label = name + " (" + consumerKind.name() + ")";
 
+        connectionListener = new OutputConnectionListener(label, (c, t) -> refreshInfo());
         errorListener = new OutputErrorListener(label);
 
-        Options options = cmd.makeOptions(this, errorListener);
+        Options options = cmd.makeOptions(connectionListener, errorListener);
         nc = Nats.connect(options);
         js = nc.jetStream();
 
@@ -76,12 +78,6 @@ public abstract class ConnectableConsumer implements ConnectionListener {
     }
 
     public abstract void refreshInfo();
-
-    @Override
-    public void connectionEvent(Connection conn, Events type) {
-        Output.controlMessage(label, "Connection: " + conn.getServerInfo().getPort() + " " + type.name().toLowerCase());
-        refreshInfo();
-    }
 
     protected void updateLabel(String conName) {
         if (!name.contains(conName))
