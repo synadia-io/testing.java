@@ -14,10 +14,14 @@
 package io.synadia.chaos;
 
 import java.lang.ref.WeakReference;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class OutputReducer {
-    private static long MESSAGE_DUPE_AGE = 20_000;
+    private static final int CLEANUP_THRESHOLD = 10;
+    private static long MESSAGE_DUPE_AGE = 10_000;
 
     public static void setMessageDupeAge(long messageDupeAge) {
         MESSAGE_DUPE_AGE = messageDupeAge;
@@ -25,10 +29,12 @@ public class OutputReducer {
 
     private final String outputLabel;
     private final Map<String, WeakReference<Long>> map;
+    private final ReentrantLock lock;
 
     public OutputReducer(String outputLabel) {
         this.outputLabel = outputLabel;
         map = new java.util.WeakHashMap<>();
+        lock = new ReentrantLock();
     }
 
     public void output(String message) {
@@ -37,8 +43,28 @@ public class OutputReducer {
         Long time = timeRef == null ? null : timeRef.get();
         long elapsed = time == null ? 0 : now - time;
         if (elapsed > MESSAGE_DUPE_AGE) {
-            map.put(message, new WeakReference<>(now));
             Output.controlMessage(outputLabel, message);
+            lock.lock();
+            try {
+                if (map.size() > CLEANUP_THRESHOLD) {
+                    List<String> toRemove = new ArrayList<>();
+                    for (Map.Entry<String, WeakReference<Long>> entry : map.entrySet()) {
+                        timeRef = entry.getValue();
+                        time = timeRef == null ? null : timeRef.get();
+                        elapsed = time == null ? 0 : now - time;
+                        if (elapsed > MESSAGE_DUPE_AGE) {
+                            toRemove.add(entry.getKey());
+                        }
+                    }
+                    for (String key : toRemove) {
+                        map.remove(key);
+                    }
+                }
+                map.put(message, new WeakReference<>(now));
+            }
+            finally {
+                lock.unlock();
+            }
         }
     }
 }

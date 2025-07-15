@@ -40,10 +40,10 @@ public class ChaosTestApp {
             + " --publish"
             + " --pubjitter 100"
 //            + " --simple ordered 100 5000"
-//            + " --simple durable 100 5000"
-//            + " --fetch durable 100 5000"
+            + " --simple durable 100 5000"
+            + " --fetch durable 100 5000"
             + " --push ordered"
-//            + " --push durable"
+            + " --push durable"
     ).split(" ");
 
     public static void main(String[] args) throws Exception {

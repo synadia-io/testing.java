@@ -29,7 +29,7 @@ import static io.synadia.chaos.Output.flat;
 public class Monitor implements Runnable, java.util.function.Consumer<String> {
 
     static final String MONITOR_LABEL = "MONITOR";
-    static final long REPORT_FREQUENCY = 5000;
+    static final long REPORT_FREQUENCY = 10000;
     static final int SHORT_REPORTS = 50;
 
     final CommandLine cmd;
@@ -76,9 +76,9 @@ public class Monitor implements Runnable, java.util.function.Consumer<String> {
                             reducer.output("Stream info not available (" + cmd.stream + ")");
                         }
                         else {
-                            reducer.output(flat(si.getConfiguration()).replace("StreamConfiguration{", "Stream {"));
+                            Output.controlMessage(MONITOR_LABEL, flat(si.getConfiguration()).replace("StreamConfiguration{", "Stream {"));
                             if (cmd.crServers > 1 && si.getClusterInfo() != null) {
-                                reducer.output(si.getClusterInfo().toString().replace("ClusterInfo{ ", "Cluster {"));
+                                Output.controlMessage(MONITOR_LABEL, si.getClusterInfo().toString().replace("ClusterInfo{ ", "Cluster {"));
                             }
                         }
                         reportFull.set(false);
@@ -113,7 +113,7 @@ public class Monitor implements Runnable, java.util.function.Consumer<String> {
                         pubReport = " | Publisher: " + publisher.getLastSeqno() +
                             (publisher.isInErrorState() ? " (Paused)" : " (Running)");
                     }
-                    reducer.output("Uptime: " + uptime(started) + pubReport + conReport);
+                    Output.controlMessage(MONITOR_LABEL, "Uptime: " + uptime(started) + pubReport + conReport);
                 }
                 catch (Exception e) {
                     reducer.output(e.getMessage());
