@@ -20,13 +20,15 @@ public class OutputConnectionListener implements ConnectionListener {
     };
 
     private final String outputLabel;
+    final OutputListenerReducer reducer;
 
     public OutputConnectionListener(String outputLabel) {
         this.outputLabel = outputLabel;
+        reducer = new OutputListenerReducer(outputLabel);
     }
 
     @Override
     public void connectionEvent(Connection conn, Events type) {
-        Output.controlMessage(outputLabel, "CL/" + message(type));
+        reducer.output("CL/" + message(type));
     }
 }

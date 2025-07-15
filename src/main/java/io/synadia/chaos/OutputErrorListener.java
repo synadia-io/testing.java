@@ -16,22 +16,14 @@ package io.synadia.chaos;
 import io.nats.client.*;
 import io.nats.client.support.Status;
 
-import java.lang.ref.WeakReference;
-import java.util.Map;
-
 public class OutputErrorListener implements ErrorListener {
-    private static long MESSAGE_DUPE_AGE = 20_000;
-
-    public static void setMessageDupeAge(long messageDupeAge) {
-        MESSAGE_DUPE_AGE = messageDupeAge;
-    }
 
     final String outputLabel;
-    final Map<String, WeakReference<Long>> map;
+    final OutputListenerReducer reducer;
 
     public OutputErrorListener(String outputLabel) {
         this.outputLabel = outputLabel;
-        map = new java.util.WeakHashMap<>();
+        reducer = new OutputListenerReducer(outputLabel);
     }
 
     private void output(String eventLabel, Connection conn, Consumer consumer, Subscription sub, Object... pairs) {
@@ -49,15 +41,7 @@ public class OutputErrorListener implements ErrorListener {
             sb.append(", ").append(pairs[x]).append(pairs[++x]);
         }
 
-        String message = sb.toString();
-        long now = System.currentTimeMillis();
-        WeakReference<Long> timeRef = map.get(message);
-        Long time = timeRef == null ? null : timeRef.get();
-        long elapsed = time == null ? 0 : now - time;
-        if (elapsed > MESSAGE_DUPE_AGE) {
-            map.put(message, new WeakReference<>(now));
-            Output.controlMessage(outputLabel, message);
-        }
+        reducer.output(sb.toString());
     }
 
     /**
