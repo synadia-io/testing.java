@@ -25,11 +25,21 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
-public class Output {
-    public static final DateTimeFormatter TIME_FORMATTER
-        = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
+public class Output implements ChaosPrinter {
 
-    private static final long MESSAGE_DUPE_AGE = 2_000;
+    @Override
+    public void out(Object... objects) {
+        write(objects);
+    }
+
+    @Override
+    public void err(Object... objects) {
+        write(objects);
+    }
+
+    public static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
+
+    private static final long MESSAGE_DUPE_AGE = 5_000;
 
     static final ReentrantLock lock = new ReentrantLock();
     static final Map<Integer, Long> map = new HashMap<>();
@@ -61,11 +71,12 @@ public class Output {
     }
 
     static final String NLINDENT = "\n    ";
-    public static void message(String... strings) {
+    public static void write(Object... objects) {
         lock.lock();
         try {
             StringBuilder sb = new StringBuilder(TIME_FORMATTER.format(ZonedDateTime.now()));
-            for (String s : strings) {
+            for (Object o : objects) {
+                String s = o instanceof String ? (String) o : o.toString();
                 if (s.contains("\n")) {
                     if (!s.startsWith("\n")) {
                         sb.append(" | ");
@@ -77,7 +88,6 @@ public class Output {
                     sb.append(s);
                 }
             }
-
             String s = sb.toString();
             int hash = s.hashCode();
             Long time = map.get(hash);
@@ -94,11 +104,11 @@ public class Output {
     }
 
     public static void errorMessage(String label, String s) {
-        message("ERROR", label, s);
+        write("ERROR", label, s);
     }
 
     public static void fatalMessage(String label, String s) {
-        message("FATAL", label, s);
+        write("FATAL", label, s);
     }
 
     public static String FN = "\n  ";

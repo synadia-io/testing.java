@@ -18,7 +18,7 @@ if (jnatsv == null || jnatsv.equals("")) {
     }
     catch (Exception ignore) {}
     if (jnatsv == null || jnatsv.equals("")) {
-        jnatsv = "2.21.4"
+        jnatsv = "2.21.5-SNAPSHOT"
     }
 }
 System.out.println("JNats ${jnatsv}");
@@ -26,7 +26,7 @@ System.out.println("JNats ${jnatsv}");
 dependencies {
     implementation "io.nats:jnats:${jnatsv}"
     implementation 'org.jfree:jfreechart:1.5.5'
-    implementation 'io.synadia:chaos-runner:0.0.4-SNAPSHOT'
+    implementation 'io.synadia:chaos-runner:0.0.5'
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.9.0'
 }

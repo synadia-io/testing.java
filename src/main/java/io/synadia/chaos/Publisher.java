@@ -58,20 +58,20 @@ public class Publisher implements Runnable {
             //noinspection InfiniteLoopStatement
             while (true) {
                 if (lastSeqno.get() == -1) {
-                    Output.message(LABEL, "Starting Publish");
+                    Output.write(LABEL, "Starting Publish");
                     lastSeqno.set(0);
                 }
                 try {
                     PublishAck pa = js.publish(cmd.subject, null);
                     lastSeqno.set(pa.getSeqno());
                     if (errorRun.get() > 0) {
-                        Output.message(LABEL, "Restarting Publish");
+                        Output.write(LABEL, "Restarting Publish");
                     }
                     errorRun.set(0);
                 }
                 catch (Exception e) {
                     if (errorRun.incrementAndGet() == 1) {
-                        Output.message(LABEL, e.getMessage());
+                        Output.write(LABEL, e.getMessage());
                     }
                 }
                 try {

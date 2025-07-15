@@ -1,2 +1,1 @@
-nohup java -cp "build/libs/*" io.synadia.chaos.ChaosTestApp --crdir /home/ubuntu/chaos --stream chaos-stream --subject chaos-subject --create --publish --pubjitter 100 --simple durable 100 5000 --fetch durable 100 5000 --push ordered --push durable > chaos.txt 2> chaoserr.txt &
-# --simple ordered 100 5000
+nohup java -cp "build/libs/*" io.synadia.chaos.ChaosTestApp --crdir /home/ubuntu/chaos --stream chaos-stream --subject chaos-subject --create --publish --pubjitter 100 --simple ordered 100 5000 --simple durable 100 5000 --fetch durable 100 5000 --push ordered --push durable > chaos.txt 2> err-chaos.txt &

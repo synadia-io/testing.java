@@ -39,7 +39,7 @@ public class OutputErrorListener implements ErrorListener {
             sb.append(", ").append(pairs[x]).append(pairs[++x]);
         }
 
-        Output.message(outputLabel, sb.toString());
+        Output.write(outputLabel, sb.toString());
     }
 
     /**

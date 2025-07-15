@@ -71,12 +71,12 @@ public class Monitor implements Runnable, java.util.function.Consumer<String> {
                     if (reportFull.get()) {
                         StreamInfo si = jsm.getStreamInfo(cmd.stream);
                         if (si == null) {
-                            Output.message(MONITOR_LABEL, "Stream info not available (" + cmd.stream + ")");
+                            Output.write(MONITOR_LABEL, "Stream info not available (" + cmd.stream + ")");
                         }
                         else {
-                            Output.message(MONITOR_LABEL, flat(si.getConfiguration()).replace("StreamConfiguration{", "Stream {"));
+                            Output.write(MONITOR_LABEL, flat(si.getConfiguration()).replace("StreamConfiguration{", "Stream {"));
                             if (cmd.crServers > 1 && si.getClusterInfo() != null) {
-                                Output.message(MONITOR_LABEL, si.getClusterInfo().toString().replace("ClusterInfo{ ", "Cluster {"));
+                                Output.write(MONITOR_LABEL, si.getClusterInfo().toString().replace("ClusterInfo{ ", "Cluster {"));
                             }
                         }
                         reportFull.set(false);
@@ -111,10 +111,10 @@ public class Monitor implements Runnable, java.util.function.Consumer<String> {
                         pubReport = " | Publisher: " + publisher.getLastSeqno() +
                             (publisher.isInErrorState() ? " (Paused)" : " (Running)");
                     }
-                    Output.message(MONITOR_LABEL, "Uptime: " + uptime(started) + pubReport + conReport);
+                    Output.write(MONITOR_LABEL, "Uptime: " + uptime(started) + pubReport + conReport);
                 }
                 catch (Exception e) {
-                    Output.message(MONITOR_LABEL, e.getMessage());
+                    Output.write(MONITOR_LABEL, e.getMessage());
                     reportFull.set(true);
                 }
             }

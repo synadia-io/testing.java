@@ -54,7 +54,7 @@ public class HealthChecker implements Runnable {
                         }
                         sb.append(port).append("/").append(mport).append(" ").append(hzs[i]);
                     }
-                    Output.message("HEALTHZ", sb.toString());
+                    Output.write("HEALTHZ", sb.toString());
                 }
             }
         }

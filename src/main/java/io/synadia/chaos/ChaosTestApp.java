@@ -39,7 +39,7 @@ public class ChaosTestApp {
             + " --create"
             + " --publish"
             + " --pubjitter 100"
-//            + " --simple ordered 100 5000"
+            + " --simple ordered 100 5000"
             + " --simple durable 100 5000"
             + " --fetch durable 100 5000"
             + " --push ordered"
@@ -51,7 +51,7 @@ public class ChaosTestApp {
         Monitor monitor;
 
         try {
-            Output.message(APP_LABEL, cmd.toString().replace(" --", "    \n--"));
+            Output.write(APP_LABEL, cmd.toString().replace(" --", "    \n--"));
             CountDownLatch waiter = new CountDownLatch(1);
 
             ChaosArguments chaosArgs = new ChaosArguments()
@@ -65,7 +65,7 @@ public class ChaosTestApp {
                 chaosArgs.workDirectory(cmd.crWorkDirectory);
             }
 
-            ChaosRunner chaosRunner = ChaosRunner.start(chaosArgs, false);
+            ChaosRunner chaosRunner = ChaosRunner.start(chaosArgs, new Output());
             HealthChecker healthChecker = new HealthChecker(chaosRunner);
             Thread hcThread = new Thread(healthChecker);
             hcThread.start();
@@ -73,7 +73,7 @@ public class ChaosTestApp {
             if (cmd.create) {
                 Options options = cmd.makeManagmentOptions(MANAGE_LABEL);
                 try (Connection nc = Nats.connect(options)) {
-                    Output.message(MANAGE_LABEL, nc.getServerInfo().toString());
+                    Output.write(MANAGE_LABEL, nc.getServerInfo().toString());
                     JetStreamManagement jsm = nc.jetStreamManagement();
                     createOrReplaceStream(cmd, jsm);
                 }
@@ -91,7 +91,7 @@ public class ChaosTestApp {
                         case Simple -> new SimpleConsumer(cmd, clc.consumerKind, clc.batchSize, clc.expiresIn);
                         case Fetch -> new SimpleFetchConsumer(cmd, clc.consumerKind, clc.batchSize, clc.expiresIn);
                     };
-                    Output.message(APP_LABEL, con.label);
+                    Output.write(APP_LABEL, "Create Consumer", clc.consumerType, clc.consumerKind, con.label);
                     cons.add(con);
                 }
             }
@@ -133,7 +133,7 @@ public class ChaosTestApp {
                 .replicas(cmd.r3 ? 3 : 1)
                 .build();
             StreamInfo si = jsm.addStream(sc);
-            Output.message(APP_LABEL, "Create Stream\n" + Output.formatted(si.getConfiguration()));
+            Output.write(APP_LABEL, "Create Stream\n" + Output.formatted(si.getConfiguration()));
         }
         catch (Exception e) {
             Output.fatalMessage(APP_LABEL, "Failed creating stream: '" + cmd.stream + "' " + e);

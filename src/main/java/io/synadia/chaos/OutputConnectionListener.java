@@ -37,7 +37,7 @@ public class OutputConnectionListener implements ConnectionListener {
 
     @Override
     public void connectionEvent(Connection conn, Events type) {
-        Output.message(outputLabel, "CL/" + message(type));
+        Output.write(outputLabel, "CL/" + message(type));
         afterFunction.afterOutput(conn, type);
     }
 }
