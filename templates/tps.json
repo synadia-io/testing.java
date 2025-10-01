@@ -1,2 +1,19 @@
 {
+  "nats.target.tps": 10000,
+  "nats.subject": "tps",
+  "nats.payload.size": 12288,
+  "nats.connection.timeout.millis": 5000,
+  "nats.ping.interval.millis": 5000,
+  "nats.reconnect.wait.millis": 5000,
+  "nats.max.reconnects": -1,
+  "nats.socket.write.timeout.millis": 100,
+  "nats.socket.read.timeout.millis": 15000,
+  "nats.connection.max.ping.out": 2,
+  "nats.connection.send.buffer": 65536,
+  "nats.connection.receive.buffer": 12500000,
+  "nats.receive.buffer.enabled": false,
+  "nats.send.buffer.enabled": false,
+  "nats.connection.max.buffer": 500000000,
+  "nats.connection.io.buffer": 65536,
+  "nats.connection.outgoing.max.messages": 5000
 }

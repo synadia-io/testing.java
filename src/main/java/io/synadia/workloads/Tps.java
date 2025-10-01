@@ -2,15 +2,21 @@ package io.synadia.workloads;
 
 import io.nats.client.*;
 import io.nats.client.impl.Headers;
+import io.nats.client.support.JsonValue;
+import io.nats.client.support.JsonValueUtils;
 import io.synadia.CommandLine;
+import io.synadia.Params;
 import io.synadia.Workload;
 import io.synadia.chaos.OutputConnectionListener;
 import io.synadia.chaos.OutputErrorListener;
+import io.synadia.utils.Debug;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+
+import static io.nats.client.support.JsonValueUtils.*;
 
 public class Tps extends Workload {
     private String action;
@@ -18,15 +24,23 @@ public class Tps extends Workload {
     private static final String TPS_SENDER = "TPS Sender";
     private static final String TPS_RECEIVER = "TPS Receiver";
 
-    long targetTps = 10000;
-    String controlSubject = "control";
-    String subject = "tps";
-    int payloadSize = 12288;
+    int targetTps;
+    String subject ;
+    int payloadSize;
 
     @Override
     public void init(CommandLine commandLine) {
-        init("TPS Workload", commandLine);
+        this.workLabel = "TPS Workload";
+        this.commandLine = commandLine;
+        this.params = new Params(commandLine.paramsFiles);
+
+        Debug.info("Environment", "JNats %s", Nats.CLIENT_VERSION);
+        commandLine.debug();
+
         this.action = commandLine.action;
+        targetTps = readInteger(params.jv, "nats.target.tps", 10000);
+        subject = JsonValueUtils.readString(params.jv, "nats.subject", "tps");
+        payloadSize = readInteger(params.jv, "nats.payload.size", 12 * 1024);
     }
 
     @Override
@@ -42,18 +56,8 @@ public class Tps extends Workload {
     }
 
     private void tpsSend() throws IOException, InterruptedException {
-
-        Options.Builder builder  = new Options.Builder()
-            .server(params.servers.get(0))
-            .connectionListener(new OutputConnectionListener(TPS_SENDER))
-            .errorListener(new OutputErrorListener(TPS_SENDER))
-//            .reconnectBufferSize()
-//            .bufferSize()
-//            .maxMessagesInOutgoingQueue()
-            ;
-
-        try (Connection nc = Nats.connect(builder.build())) {
-
+        Options options = buildOptions(params, 0, TPS_SENDER);
+        try (Connection nc = Nats.connect(options)) {
             System.out.println(TPS_SENDER);
             System.out.print(action);
 
@@ -63,18 +67,10 @@ public class Tps extends Workload {
             long nextSecondStart = startNanos + 1_000_000_000L; // 1 second in nanos
 
             long messageId = 0;
-            boolean sendMessageId = true;
 
             byte[] payload = new byte[payloadSize];
             Headers h = new Headers();
             while (true) {
-                if (sendMessageId) {
-                    sendMessageId = false;
-                    System.out.printf("***** Sending Message Id seed message: %d%n", messageId);
-                    nc.publish(controlSubject, ("" + messageId).getBytes(StandardCharsets.US_ASCII));
-                    try { Thread.sleep(100); } catch (InterruptedException e) { throw new RuntimeException(e); }
-                }
-
                 long now = System.nanoTime();
                 // Check if we've moved to a new second
                 if (now >= nextSecondStart) {
@@ -96,25 +92,21 @@ public class Tps extends Workload {
                         if (remainingMessages > 0 && remainingInSecond > 0) {
                             long sleepTime = remainingInSecond / (remainingMessages + 1);
                             if (sleepTime > 100_000) { // Only sleep if more than 100 microseconds
-                                Thread.sleep(sleepTime / 1_000_000, (int) (sleepTime % 1_000_000));
+                                sleep(sleepTime / 1_000_000, (int) (sleepTime % 1_000_000));
                             }
                         }
-                    } catch (Exception e) {
-                        sendMessageId = true;
-                        messageId = bumpMessageId(messageId);
-                        System.out.printf("Error sending message during test: %s%n", e.getMessage());
-                        Thread.sleep(1000);
                     }
-                } else {
+                    catch (Exception e) {
+                        Debug.info(TPS_SENDER, "Error sending message id %s during test: %s", messageId, e.getMessage());
+                        messageId--;
+                        sleep(1000);
+                    }
+                }
+                else {
                     // Wait for next second if we've hit the target for this second
                     long sleepTime = nextSecondStart - System.nanoTime();
                     if (sleepTime > 0) {
-                        try {
-                            Thread.sleep(sleepTime / 1_000_000, (int) (sleepTime % 1_000_000));
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                            break;
-                        }
+                        sleep(sleepTime / 1_000_000, (int) (sleepTime % 1_000_000));
                     }
                 }
             }
@@ -123,24 +115,15 @@ public class Tps extends Workload {
 
     AtomicLong messagesReceived = new AtomicLong(0);
     AtomicLong lastCurrentCount = new AtomicLong(0);
+    AtomicLong lastMessageId = new AtomicLong(-1);
 
     private void tpsReceive() throws IOException, InterruptedException {
-        System.out.println("TPS Receiver !!! " + params.servers);
-        Options.Builder builder  = new Options.Builder()
-            .server(params.servers.get(1))
-            .connectionListener(new OutputConnectionListener(TPS_RECEIVER))
-            .errorListener(new OutputErrorListener(TPS_RECEIVER))
-            ;
-
-        AtomicLong lastMessageId = new AtomicLong(-1);
-
-        try (Connection nc = Nats.connect(builder.build())) {
+        Options options = buildOptions(params, 1, TPS_RECEIVER);
+        try (Connection nc = Nats.connect(options)) {
             startMetricsLogging(nc);
-            System.out.println(TPS_RECEIVER);
-            System.out.print(action);
             MessageHandler handler = msg -> {
                 if (msg.getData().length != this.payloadSize) {
-                    System.out.printf("Unexpected payload size: %d B (expected: %d B)%n", msg.getData().length, this.payloadSize);
+                    Debug.info(TPS_RECEIVER, "Unexpected payload size: %s B (expected: %s B)", msg.getData().length, this.payloadSize);
                 }
                 //noinspection DataFlowIssue // headers won't be null.
                 long mid = Long.parseLong(msg.getHeaders().getFirst("mid"));
@@ -149,22 +132,17 @@ public class Tps extends Workload {
                     lastMessageId.set(mid);
                 }
                 else if (mid != expected) {
-                    lastMessageId.set(mid);
-                    System.out.printf("***** Got Message Id: %d but expected: %d%n", mid, expected);
+                    lastMessageId.set(-1);
+                    Debug.info(TPS_RECEIVER, "*****", "Got Message Id: %s but expected: %s", mid, expected);
                 }
                 messagesReceived.incrementAndGet();
             };
 
             Dispatcher currentDispatcher = nc.createDispatcher();
-            currentDispatcher.subscribe(controlSubject, m -> {
-                long lmid = Long.parseLong(new String(m.getData()));
-                lastMessageId.set(lmid);
-                System.out.printf("***** Got Message Id seed message: %d%n", lmid);
-            });
 
             // Subscribe with high-throughput settings
             Subscription subscription = currentDispatcher.subscribe(subject, handler);//, queueGroup);
-            System.out.printf("Started continuous listening on subject: %s (target: %d TPS, payload: %d B)%n", subject, targetTps, this.payloadSize);
+            Debug.info(TPS_RECEIVER, "Started continuous listening on subject: %s (target: %s TPS, payload: %s B)", subject, targetTps, this.payloadSize);
             Thread.currentThread().join();
         }
     }
@@ -174,13 +152,96 @@ public class Tps extends Workload {
             long currentCount = messagesReceived.get();
             long previousCount = lastCurrentCount.getAndSet(currentCount);
             long currentTps = currentCount - previousCount;
-            String status = String.format(" | Subject: %s | Target: %d TPS", subject, targetTps);
-            System.out.printf("Receive TPS: %d, Total Messages: %d, Connection: %s, Connected Server: %s%s%n",
+            String status = String.format(" | Subject: %s | Target: %s TPS", subject, targetTps);
+            Debug.info(TPS_RECEIVER, "Receive TPS: %s, Total Messages: %s, Connection: %s, Connected Server: %s%s",
                 currentTps, currentCount, nc.getStatus(), nc.getConnectedUrl(), status);
             // Log performance warning if TPS is significantly below target (only if actively receiving)
             if (currentTps > 0 && currentTps < targetTps * 0.8) {
-                System.out.printf("Performance below target: %d TPS (target: %d)%n", currentTps, targetTps);
+                Debug.info(TPS_RECEIVER, "Performance below target: %s TPS (target: %s)", currentTps, targetTps);
             }
         }, 1, 1, TimeUnit.SECONDS);
+    }
+
+    @SuppressWarnings("SameParameterValue")
+    private static void sleep(long millis) {
+        try {
+            Thread.sleep(millis);
+        }
+        catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private static void sleep(long millis, int nanos) {
+        try {
+            Thread.sleep(millis, nanos);
+        }
+        catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private static Options buildOptions(Params params, int serverIx, String label) {
+        JsonValue jv = params.jv;
+        Options.Builder builder  = new Options.Builder()
+            .server(params.servers.get(serverIx))
+            .connectionListener(new OutputConnectionListener(label))
+            .errorListener(new OutputErrorListener(label))
+            .connectionTimeout(readLong(jv, "nats.connection.timeout.millis", 5000))
+            .maxReconnects(readInteger(jv, "nats.max.reconnects", -1))
+            .reconnectBufferSize(readLong(jv, "nats.connection.max.buffer", 500000000))
+            .bufferSize(readInteger(jv, "nats.connection.io.buffer", Options.DEFAULT_BUFFER_SIZE))
+            .maxMessagesInOutgoingQueue(readInteger(jv, "nats.connection.outgoing.max.messages", Options.DEFAULT_MAX_MESSAGES_IN_OUTGOING_QUEUE));
+
+        // Conditionally set receive buffer size based on separate flag
+        boolean receiveBufferEnabled = readBoolean(jv, "nats.receive.buffer.enabled", false);
+        if (receiveBufferEnabled) {
+            builder.receiveBufferSize(readInteger(jv, "nats.connection.receive.buffer", 87380));
+        }
+
+        // Conditionally set send buffer size based on separate flag
+        boolean sendBufferEnabled = readBoolean(jv, "nats.send.buffer.enabled", false);
+        if (sendBufferEnabled) {
+            builder.sendBufferSize(readInteger(jv, "nats.connection.send.buffer", 16384));
+        }
+
+        long millis = readLong(jv, "nats.reconnect.wait.millis", -1);
+        if (millis != -1) {
+            builder.reconnectWait(Duration.ofMillis(millis));
+        }
+        millis = readLong(jv, "nats.ping.interval.millis", -1);
+        if (millis != -1) {
+            builder.pingInterval(Duration.ofMillis(millis));
+        }
+
+        builder.maxPingsOut(readInteger(jv, "nats.connection.max.ping.out", 2));
+
+        millis = readLong(jv, "nats.socket.write.timeout.millis", -1);
+        if (millis != -1) {
+            builder.socketWriteTimeout(millis);
+        }
+
+        millis = readLong(jv, "nats.socket.read.timeout.millis", -1);
+        if (millis != -1) {
+            builder.socketReadTimeoutMillis((int)millis);
+        }
+
+        Options o = builder.build();
+        Debug.info(label, "servers", o.getServers());
+        Debug.info(label, "connectionTimeout", o.getConnectionTimeout());
+        Debug.info(label, "maxReconnects", o.getMaxReconnect());
+        Debug.info(label, "reconnectBufferSize", o.getReconnectBufferSize());
+        Debug.info(label, "bufferSize", o.getBufferSize());
+        Debug.info(label, "maxMessagesInOutgoingQueue", o.getMaxMessagesInOutgoingQueue());
+
+        Debug.info(label, "receiveBufferSize", o.getReceiveBufferSize());
+        Debug.info(label, "sendBufferSize", o.getSendBufferSize());
+        Debug.info(label, "reconnectWait", o.getReconnectWait());
+        Debug.info(label, "pingInterval", o.getPingInterval());
+        Debug.info(label, "maxPingsOut", o.getMaxPingsOut());
+        Debug.info(label, "socketWriteTimeout", o.getSocketWriteTimeout());
+        Debug.info(label, "socketReadTimeoutMillis", o.getSocketReadTimeoutMillis());
+
+        return o;
     }
 }
