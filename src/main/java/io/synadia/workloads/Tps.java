@@ -53,6 +53,7 @@ public class Tps extends Workload {
             ;
 
         try (Connection nc = Nats.connect(builder.build())) {
+
             System.out.println(TPS_SENDER);
             System.out.print(action);
 
@@ -102,6 +103,7 @@ public class Tps extends Workload {
                         sendMessageId = true;
                         messageId = bumpMessageId(messageId);
                         System.out.printf("Error sending message during test: %s%n", e.getMessage());
+                        Thread.sleep(1000);
                     }
                 } else {
                     // Wait for next second if we've hit the target for this second
