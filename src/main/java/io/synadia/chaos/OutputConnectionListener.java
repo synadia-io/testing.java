@@ -40,4 +40,10 @@ public class OutputConnectionListener implements ConnectionListener {
         Output.write(outputLabel, "CL/" + message(type));
         afterFunction.afterOutput(conn, type);
     }
+
+    @Override
+    public void connectionEvent(Connection conn, Events type, String uriDetails) {
+        Output.write(outputLabel, "CL/" + message(type) + "/" + uriDetails);
+        afterFunction.afterOutput(conn, type);
+    }
 }
