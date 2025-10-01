@@ -6,23 +6,14 @@ package io.synadia.chaos;
 import io.nats.client.Connection;
 import io.nats.client.ConnectionListener;
 
+import static io.synadia.chaos.ConnectionUtils.eventMessage;
+
 public class OutputConnectionListener implements ConnectionListener {
-    private static String message(Events event) {
-        return switch (event) {
-            case CONNECTED -> "Connected";
-            case CLOSED -> "Closed";
-            case DISCONNECTED -> "Disconnected";
-            case RECONNECTED -> "Re-Connected";
-            case RESUBSCRIBED -> "Subscriptions Re-Established";
-            case DISCOVERED_SERVERS -> "Servers Discovered";
-            case LAME_DUCK -> "Entering lame duck mode";
-        };
-    };
 
-    private final String outputLabel;
-    private final AfterFunction afterFunction;
+    protected final String outputLabel;
+    protected final AfterFunction afterFunction;
 
-    interface AfterFunction {
+    public interface AfterFunction {
         void afterOutput(Connection conn, Events type);
     }
 
@@ -37,13 +28,13 @@ public class OutputConnectionListener implements ConnectionListener {
 
     @Override
     public void connectionEvent(Connection conn, Events type) {
-        Output.write(outputLabel, "CL/" + message(type));
+        Output.write(outputLabel, "CL/" + eventMessage(type));
         afterFunction.afterOutput(conn, type);
     }
 
     @Override
     public void connectionEvent(Connection conn, Events type, String uriDetails) {
-        Output.write(outputLabel, "CL/" + message(type) + "/" + uriDetails);
+        Output.write(outputLabel, "CL/" + eventMessage(type) + "/" + uriDetails);
         afterFunction.afterOutput(conn, type);
     }
 }

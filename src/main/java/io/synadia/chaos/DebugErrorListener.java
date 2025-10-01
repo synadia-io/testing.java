@@ -15,34 +15,15 @@ package io.synadia.chaos;
 
 import io.nats.client.*;
 import io.nats.client.support.Status;
+import io.synadia.utils.Debug;
 
-public class OutputErrorListener implements ErrorListener {
-
-    protected final String outputLabel;
-
-    public OutputErrorListener(String outputLabel) {
-        this.outputLabel = outputLabel;
+public class DebugErrorListener extends OutputErrorListener {
+    public DebugErrorListener(String outputLabel) {
+        super(outputLabel);
     }
 
     protected void output(String eventLabel, Connection conn, Consumer consumer, Subscription sub, Object... pairs) {
-        Output.write(outputLabel, constructMessage(eventLabel, consumer, sub, pairs));
-    }
-
-    protected String constructMessage(String eventLabel, Consumer consumer, Subscription sub, Object[] pairs) {
-        StringBuilder sb = new StringBuilder("EL/").append(eventLabel);
-        if (consumer != null) {
-            sb.append(", CON: ").append(consumer.hashCode());
-        }
-        if (sub != null) {
-            sb.append(", SUB: ").append(sub.hashCode());
-            if (sub instanceof JetStreamSubscription jssub) {
-                sb.append(", CON: ").append(jssub.getConsumerName());
-            }
-        }
-        for (int x = 0; x < pairs.length; x++) {
-            sb.append(", ").append(pairs[x]).append(pairs[++x]);
-        }
-        return sb.toString();
+        Debug.info(outputLabel, constructMessage(eventLabel, consumer, sub, pairs));
     }
 
     /**
