@@ -25,8 +25,11 @@ public class Tps extends Workload {
     private static final String TPS_RECEIVER = "TPS Receiver";
 
     int targetTps;
-    String subject ;
+    String subject;
+    String messageIdKey;
     int payloadSize;
+    int sendLogRate;
+    int metricsLogRate;
 
     @Override
     public void init(CommandLine commandLine) {
@@ -38,9 +41,20 @@ public class Tps extends Workload {
         commandLine.debug();
 
         this.action = commandLine.action;
-        targetTps = readInteger(params.jv, "nats.target.tps", 10000);
-        subject = JsonValueUtils.readString(params.jv, "nats.subject", "tps");
-        payloadSize = readInteger(params.jv, "nats.payload.size", 12 * 1024);
+
+        targetTps = readInteger(params.jv, "target.tps", 10000);
+        subject = JsonValueUtils.readString(params.jv, "subject", "tps");
+        messageIdKey = JsonValueUtils.readString(params.jv, "message.id.key", "mid");
+        payloadSize = readInteger(params.jv, "payload.size", 12 * 1024);
+        sendLogRate = readInteger(params.jv, "send.log.rate", 1);
+        metricsLogRate = readInteger(params.jv, "metrics.log.rate", 1);
+
+        Debug.info(workLabel, "targetTps", targetTps);
+        Debug.info(workLabel, "subject", subject);
+        Debug.info(workLabel, "messageIdKey", messageIdKey);
+        Debug.info(workLabel, "payloadSize", payloadSize);
+        Debug.info(workLabel, "sendLogRate", sendLogRate);
+        Debug.info(workLabel, "metricsLogRate", metricsLogRate);
     }
 
     @Override
@@ -51,22 +65,15 @@ public class Tps extends Workload {
         }
     }
 
-    private static long bumpMessageId(long messageId) {
-        return ((messageId + 150) / 100) * 100;
-    }
-
+    AtomicLong sendMessageId = new AtomicLong();
     private void tpsSend() throws IOException, InterruptedException {
         Options options = buildOptions(params, 0, TPS_SENDER);
         try (Connection nc = Nats.connect(options)) {
-            System.out.println(TPS_SENDER);
-            System.out.print(action);
-
+            startSendLogging(nc);
             long startNanos = System.nanoTime();
             long currentSecond = 0;
             long messagesThisSecond = 0;
             long nextSecondStart = startNanos + 1_000_000_000L; // 1 second in nanos
-
-            long messageId = 0;
 
             byte[] payload = new byte[payloadSize];
             Headers h = new Headers();
@@ -82,7 +89,7 @@ public class Tps extends Workload {
                 // Only send if we haven't hit the target for this second
                 if (messagesThisSecond < targetTps) {
                     try {
-                        h.put("mid", ++messageId + "");
+                        h.put(messageIdKey, sendMessageId.incrementAndGet() + "");
                         nc.publish(subject, h, payload);
                         messagesThisSecond++;
 
@@ -97,8 +104,8 @@ public class Tps extends Workload {
                         }
                     }
                     catch (Exception e) {
-                        Debug.info(TPS_SENDER, "Error sending message id %s during test: %s", messageId, e.getMessage());
-                        messageId--;
+                        Debug.info(TPS_SENDER, "Error sending message id %s during test: %s", sendMessageId.get(), e.getMessage());
+                        sendMessageId.decrementAndGet();
                         sleep(1000);
                     }
                 }
@@ -113,9 +120,15 @@ public class Tps extends Workload {
         }
     }
 
-    AtomicLong messagesReceived = new AtomicLong(0);
-    AtomicLong lastCurrentCount = new AtomicLong(0);
-    AtomicLong lastMessageId = new AtomicLong(-1);
+    private void startSendLogging(Connection nc) {
+        nc.getOptions().getScheduledExecutor().scheduleAtFixedRate(() -> {
+            Debug.info(TPS_SENDER, "Last Message Id %s", sendMessageId.get());
+        }, sendLogRate, sendLogRate, TimeUnit.SECONDS);
+    }
+
+    AtomicLong receivedMessages = new AtomicLong(0);
+    AtomicLong receivedLastCurrentCount = new AtomicLong(0);
+    AtomicLong receivedLastMessageId = new AtomicLong(-1);
 
     private void tpsReceive() throws IOException, InterruptedException {
         Options options = buildOptions(params, 1, TPS_RECEIVER);
@@ -126,16 +139,16 @@ public class Tps extends Workload {
                     Debug.info(TPS_RECEIVER, "Unexpected payload size: %s B (expected: %s B)", msg.getData().length, this.payloadSize);
                 }
                 //noinspection DataFlowIssue // headers won't be null.
-                long mid = Long.parseLong(msg.getHeaders().getFirst("mid"));
-                long expected = lastMessageId.incrementAndGet();
+                long mid = Long.parseLong(msg.getHeaders().getFirst(messageIdKey));
+                long expected = receivedLastMessageId.incrementAndGet();
                 if (expected == 0) {
-                    lastMessageId.set(mid);
+                    receivedLastMessageId.set(mid);
                 }
                 else if (mid != expected) {
-                    lastMessageId.set(-1);
+                    receivedLastMessageId.set(-1);
                     Debug.info(TPS_RECEIVER, "*****", "Got Message Id: %s but expected: %s", mid, expected);
                 }
-                messagesReceived.incrementAndGet();
+                receivedMessages.incrementAndGet();
             };
 
             Dispatcher currentDispatcher = nc.createDispatcher();
@@ -149,17 +162,15 @@ public class Tps extends Workload {
 
     private void startMetricsLogging(Connection nc) {
         nc.getOptions().getScheduledExecutor().scheduleAtFixedRate(() -> {
-            long currentCount = messagesReceived.get();
-            long previousCount = lastCurrentCount.getAndSet(currentCount);
+            long currentCount = receivedMessages.get();
+            long previousCount = receivedLastCurrentCount.getAndSet(currentCount);
             long currentTps = currentCount - previousCount;
-            String status = String.format(" | Subject: %s | Target: %s TPS", subject, targetTps);
-            Debug.info(TPS_RECEIVER, "Receive TPS: %s, Total Messages: %s, Connection: %s, Connected Server: %s%s",
-                currentTps, currentCount, nc.getStatus(), nc.getConnectedUrl(), status);
+            Debug.info(TPS_RECEIVER, "Receive TPS: %s/%s", currentTps, targetTps, "Total Messages %s", currentCount, "%s%s", nc.getStatus(), nc.getConnectedUrl());
             // Log performance warning if TPS is significantly below target (only if actively receiving)
             if (currentTps > 0 && currentTps < targetTps * 0.8) {
-                Debug.info(TPS_RECEIVER, "Performance below target: %s TPS (target: %s)", currentTps, targetTps);
+                Debug.info(TPS_RECEIVER, "Performance below target: %s/%s", currentTps, targetTps);
             }
-        }, 1, 1, TimeUnit.SECONDS);
+        }, metricsLogRate, metricsLogRate, TimeUnit.SECONDS);
     }
 
     @SuppressWarnings("SameParameterValue")
@@ -227,7 +238,7 @@ public class Tps extends Workload {
         }
 
         Options o = builder.build();
-        Debug.info(label, "servers", o.getServers());
+        Debug.info(label, "server", o.getServers());
         Debug.info(label, "connectionTimeout", o.getConnectionTimeout());
         Debug.info(label, "maxReconnects", o.getMaxReconnect());
         Debug.info(label, "reconnectBufferSize", o.getReconnectBufferSize());

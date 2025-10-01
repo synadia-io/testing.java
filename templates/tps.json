@@ -1,7 +1,10 @@
 {
-  "nats.target.tps": 10000,
-  "nats.subject": "tps",
-  "nats.payload.size": 12288,
+  "target.tps": 10000,
+  "subject": "tps",
+  "message.id.key": "mid",
+  "payload.size": 12288,
+  "send.log.rate": 1,
+  "metrics.log.rate": 1,
   "nats.connection.timeout.millis": 5000,
   "nats.ping.interval.millis": 5000,
   "nats.reconnect.wait.millis": 5000,
