@@ -129,14 +129,14 @@ public class Tps extends Workload {
     private void startSendLogging(Connection nc) {
         nc.getOptions().getScheduledExecutor().scheduleAtFixedRate(() -> {
             long reportTime = System.currentTimeMillis();
-            long elapsed = reportTime - lastSendReportTime.get();
+            long elapsedMs = reportTime - lastSendReportTime.get();
             long sent = sendMessageId.get();
             if (lastSendMessageId.get() == -1) {
                 Debug.info(TPS_SENDER, "Last Message Id %s", sent);
             }
             else {
                 long diff = sent - lastSendMessageId.get();
-                Debug.info(TPS_SENDER, "Last Id %s", sent, "Messages %s", diff, "Per Sec %s", format3((float)diff/(elapsed*1000)));
+                Debug.info(TPS_SENDER, "Last Id %s", sent, "Messages %s", diff, "Per Sec %s", format3(1000f * diff /elapsedMs));
             }
             lastSendMessageId.set(sent);
             lastSendReportTime.set(reportTime);
