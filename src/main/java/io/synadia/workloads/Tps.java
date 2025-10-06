@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static io.nats.client.support.JsonValueUtils.*;
-import static io.nats.jsmulti.shared.Stats.format3;
+import static io.nats.jsmulti.shared.Stats.format3NoGrouping;
 import static io.synadia.chaos.ConnectionUtils.statusMessage;
 
 public class Tps extends Workload {
@@ -136,7 +136,7 @@ public class Tps extends Workload {
             }
             else {
                 long diff = sent - lastSendMessageId.get();
-                Debug.info(TPS_SENDER, "Last Id %s", sent, "Messages %s", diff, "Per Sec %s", format3(1000f * diff /elapsedMs));
+                Debug.info(TPS_SENDER, "Last Id %s", sent, "Messages %s", diff, "Per Sec %s", format3NoGrouping(1000f * diff /elapsedMs));
             }
             lastSendMessageId.set(sent);
             lastSendReportTime.set(reportTime);

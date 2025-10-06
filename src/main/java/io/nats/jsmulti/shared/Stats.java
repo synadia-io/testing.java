@@ -50,6 +50,14 @@ public class Stats {
 
     public static final String LCSV_HEADER = "Publish Time,Server Time,Received Time,Publish to Server,Server to Consumer,Publish to Consumer\n";
 
+    public static final NumberFormat FORMATTER = NumberFormat.getNumberInstance(Locale.getDefault());
+    public static final NumberFormat FORMATTER_NO_GROUPING;
+
+    static {
+        FORMATTER_NO_GROUPING = NumberFormat.getNumberInstance(Locale.getDefault());
+        FORMATTER_NO_GROUPING.setGroupingUsed(false);
+    }
+
     // Misc
     public final int version;
     public final String id;
@@ -506,15 +514,23 @@ public class Stats {
         return format3(millis) + " ms";
     }
 
-    public static String format(Number s) {
-        return NumberFormat.getNumberInstance(Locale.getDefault()).format(s);
+    public static String format(Number n) {
+        return FORMATTER.format(n);
     }
 
     public static String format3(Number n) {
+        return format3(n, true);
+    }
+
+    public static String format3NoGrouping(Number n) {
+        return format3(n, false);
+    }
+
+    public static String format3(Number n, boolean useGrouping) {
         if (n.longValue() >= 1_000_000_000) {
             return humanBytes(n.doubleValue());
         }
-        String f = format(n);
+        String f = useGrouping ? FORMATTER.format(n) : FORMATTER_NO_GROUPING.format(n);
         int at = f.indexOf('.');
         if (at == -1) {
             return f;
