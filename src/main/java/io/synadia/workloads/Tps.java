@@ -17,6 +17,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static io.nats.client.support.JsonValueUtils.*;
+import static io.nats.jsmulti.shared.Stats.format3;
 import static io.synadia.chaos.ConnectionUtils.statusMessage;
 
 public class Tps extends Workload {
@@ -68,7 +69,9 @@ public class Tps extends Workload {
         }
     }
 
+    AtomicLong lastSendMessageId = new AtomicLong(-1);
     AtomicLong sendMessageId = new AtomicLong();
+    AtomicLong lastSendReportTime = new AtomicLong();
     private void tpsSend() throws IOException, InterruptedException {
         Options options = buildOptions(params, 0, TPS_SENDER);
         try (Connection nc = Nats.connect(options)) {
@@ -125,7 +128,18 @@ public class Tps extends Workload {
 
     private void startSendLogging(Connection nc) {
         nc.getOptions().getScheduledExecutor().scheduleAtFixedRate(() -> {
-            Debug.info(TPS_SENDER, "Last Message Id %s", sendMessageId.get());
+            long reportTime = System.currentTimeMillis();
+            long elapsed = reportTime - lastSendReportTime.get();
+            long sent = sendMessageId.get();
+            if (lastSendMessageId.get() == -1) {
+                Debug.info(TPS_SENDER, "Last Message Id %s", sent);
+            }
+            else {
+                long diff = sent - lastSendMessageId.get();
+                Debug.info(TPS_SENDER, "Last Id %s", sent, "Messages %s", diff, "Per Sec %s", format3((float)diff/(elapsed*1000)));
+            }
+            lastSendMessageId.set(sent);
+            lastSendReportTime.set(reportTime);
         }, sendLogRate, sendLogRate, TimeUnit.SECONDS);
     }
 
