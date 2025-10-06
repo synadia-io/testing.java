@@ -16,7 +16,7 @@ public class OutputConnectionListener implements ConnectionListener {
     protected CustomFunction afterFunction;
 
     public interface CustomFunction {
-        void afterOutput(Connection conn, Events type, String uriDetails);
+        void afterOutput(Connection conn, Events type, Long time, String uriDetails);
     }
 
     public OutputConnectionListener(String outputLabel) {
@@ -39,22 +39,22 @@ public class OutputConnectionListener implements ConnectionListener {
 
     @Override
     public void connectionEvent(Connection conn, Events type) {
-        connectionEvent(conn, type, null);
+        connectionEvent(conn, type, null, null);
     }
 
     @Override
-    public void connectionEvent(Connection conn, Events type, String uriDetails) {
+    public void connectionEvent(Connection conn, Events type, Long time, String uriDetails) {
         if (connectionEventsOnly && !type.isConnectionEvent()) {
             return;
         }
-        report(conn, type, uriDetails);
-        afterFunction.afterOutput(conn, type, uriDetails);
+        report(conn, type, time, uriDetails);
+        afterFunction.afterOutput(conn, type, time, uriDetails);
     }
 
-    protected void after(Connection conn, Events type, String uriDetails) {
+    protected void after(Connection conn, Events type, Long time, String uriDetails) {
     }
 
-    protected void report(Connection conn, Events type, String uriDetails) {
+    protected void report(Connection conn, Events type, Long time, String uriDetails) {
         if (uriDetails == null) {
             Output.write(outputLabel, "CL/" + eventMessage(type));
         }

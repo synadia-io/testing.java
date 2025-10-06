@@ -2,6 +2,7 @@ package io.synadia.workloads;
 
 import io.nats.client.*;
 import io.nats.client.impl.Headers;
+import io.nats.client.impl.NoOpStatistics;
 import io.nats.client.support.JsonValue;
 import io.nats.client.support.JsonValueUtils;
 import io.synadia.CommandLine;
@@ -9,6 +10,7 @@ import io.synadia.Params;
 import io.synadia.Workload;
 import io.synadia.chaos.DebugConnectionListener;
 import io.synadia.chaos.OutputConnectionListener;
+import io.synadia.chaos.TpsStatsCollector;
 import io.synadia.utils.Debug;
 
 import java.io.IOException;
@@ -72,8 +74,10 @@ public class Tps extends Workload {
     AtomicLong lastSendMessageId = new AtomicLong(-1);
     AtomicLong sendMessageId = new AtomicLong();
     AtomicLong lastSendReportTime = new AtomicLong();
+    TpsStatsCollector sendStatsCollector = new TpsStatsCollector();
+
     private void tpsSend() throws IOException, InterruptedException {
-        Options options = buildOptions(params, 0, TPS_SENDER, null);
+        Options options = buildOptions(params, 0, true, sendStatsCollector, null);
         try (Connection nc = Nats.connect(options)) {
             startSendLogging(nc);
             long startNanos = System.nanoTime();
@@ -136,7 +140,10 @@ public class Tps extends Workload {
             }
             else {
                 long diff = sent - lastSendMessageId.get();
-                Debug.info(TPS_SENDER, "Last Id %s", sent, "Messages %s", diff, "Per Sec %s", format3NoGrouping(1000f * diff /elapsedMs));
+                Debug.info(TPS_SENDER, "Last Id %s", sent, "Messages %s", diff,
+                    "Per Sec %s", format3NoGrouping(1000f * diff /elapsedMs),
+                    "%s ", format3(sendStatsCollector.getOutMsgs()), format3(sendStatsCollector.getOutBytes()), format3(sendStatsCollector.getWriteBytes())
+                );
             }
             lastSendMessageId.set(sent);
             lastSendReportTime.set(reportTime);
@@ -150,7 +157,7 @@ public class Tps extends Workload {
     AtomicLong receivedLosses = new AtomicLong(0);
 
     private void tpsReceive() throws IOException, InterruptedException {
-        Options options = buildOptions(params, 1, TPS_RECEIVER, (c, t, d) -> receivedLastMessageId.set(-1));
+        Options options = buildOptions(params, 1, false, new NoOpStatistics(), (c, et, t, d) -> receivedLastMessageId.set(-1));
         try (Connection nc = Nats.connect(options)) {
             startMetricsLogging(nc);
             MessageHandler handler = msg -> {
@@ -225,8 +232,10 @@ public class Tps extends Workload {
         }
     }
 
-    private static Options buildOptions(Params params, int serverIx, String label,
+    private static Options buildOptions(Params params, int serverIx, boolean sender,
+                                        StatisticsCollector collector,
                                         OutputConnectionListener.CustomFunction behavior) {
+        String label = sender ? TPS_SENDER : TPS_RECEIVER;
         JsonValue jv = params.jv;
         DebugConnectionListener dbcl = new DebugConnectionListener(label, true);
         dbcl.afterFunction(behavior);
@@ -234,6 +243,7 @@ public class Tps extends Workload {
         Options.Builder builder  = new Options.Builder()
             .server(params.servers.get(serverIx))
             .ignoreDiscoveredServers()
+            .statisticsCollector(collector)
             .connectionListener(dbcl)
 //            .errorListener(new DebugErrorListener(label))
             .errorListener(new ErrorListener() {})

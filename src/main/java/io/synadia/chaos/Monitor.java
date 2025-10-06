@@ -52,7 +52,7 @@ public class Monitor implements Runnable, java.util.function.Consumer<String> {
     @Override
     public void run() {
         OutputConnectionListener connectionListener = new OutputConnectionListener(MONITOR_LABEL);
-        connectionListener.afterFunction = (c, t, d) -> reportFull.set(true);
+        connectionListener.afterFunction = (c, et, t, d) -> reportFull.set(true);
 
         Options options = new Options.Builder()
             .servers(cmd.servers)

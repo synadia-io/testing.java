@@ -2,7 +2,7 @@
   "target.tps": 10000,
   "subject": "tps",
   "message.id.key": "mid",
-  "payload.size": 8192,
+  "payload.size": 12288,
   "send.log.rate": 5,
   "metrics.initial.delay": 5,
   "metrics.log.rate": 10,

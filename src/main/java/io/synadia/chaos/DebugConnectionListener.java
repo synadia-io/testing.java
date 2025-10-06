@@ -24,7 +24,7 @@ public class DebugConnectionListener extends OutputConnectionListener {
     }
 
     @Override
-    protected void report(Connection conn, Events type, String uriDetails) {
+    protected void report(Connection conn, Events type, Long time, String uriDetails) {
         if (uriDetails == null) {
             Debug.info(outputLabel, "CL", eventMessage(type));
         }

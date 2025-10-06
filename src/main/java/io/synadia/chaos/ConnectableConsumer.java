@@ -60,7 +60,7 @@ public abstract class ConnectableConsumer {
         label = name + " (" + consumerKind.name() + ")";
 
         connectionListener = new OutputConnectionListener(label);
-        connectionListener.afterFunction = (c, t, d) -> refreshInfo();
+        connectionListener.afterFunction = (c, et, t, d) -> refreshInfo();
         errorListener = new OutputErrorListener(label);
 
         Options options = cmd.makeOptions(connectionListener, errorListener);
