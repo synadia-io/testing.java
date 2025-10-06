@@ -31,7 +31,7 @@ public class Tps extends Workload {
     String messageIdKey;
     int payloadSize;
     int sendLogRate;
-    int metricsDelayRate;
+    int metricsInitialDelay;
     int metricsLogRate;
 
     @Override
@@ -49,9 +49,9 @@ public class Tps extends Workload {
         subject = JsonValueUtils.readString(params.jv, "subject", "tps");
         messageIdKey = JsonValueUtils.readString(params.jv, "message.id.key", "mid");
         payloadSize = readInteger(params.jv, "payload.size", 12 * 1024);
-        sendLogRate = readInteger(params.jv, "send.log.rate", 3);
-        metricsDelayRate = readInteger(params.jv, "metrics.delay.rate", 3);
-        metricsLogRate = readInteger(params.jv, "metrics.log.rate", 30);
+        sendLogRate = readInteger(params.jv, "send.log.rate", 5);
+        metricsInitialDelay = readInteger(params.jv, "metrics.initial.delay", 5);
+        metricsLogRate = readInteger(params.jv, "metrics.log.rate", 10);
 
         Debug.info(workLabel, "targetTps", targetTps);
         Debug.info(workLabel, "subject", subject);
@@ -182,7 +182,7 @@ public class Tps extends Workload {
         nc.getOptions().getScheduledExecutor().scheduleAtFixedRate(() -> {
             long currentCount = receivedMessages.get();
             long previousCount = receivedLastCurrentCount.getAndSet(currentCount);
-            long currentTps = currentCount - previousCount;
+            long currentTps = (currentCount - previousCount) / metricsLogRate;
             Debug.info(TPS_RECEIVER, "Receive TPS: %s/%s", currentTps, targetTps,
                 "Total Messages %s", currentCount,
                 "%s %s", statusMessage(nc.getStatus()), nc.getConnectedUrl());
@@ -190,7 +190,7 @@ public class Tps extends Workload {
             if (currentTps > 0 && currentTps < targetTps * 0.8) {
                 Debug.info(TPS_RECEIVER, "Performance below target: %s/%s", currentTps, targetTps);
             }
-        }, metricsLogRate, metricsLogRate, TimeUnit.SECONDS);
+        }, metricsInitialDelay, metricsLogRate, TimeUnit.SECONDS);
     }
 
     @SuppressWarnings("SameParameterValue")
