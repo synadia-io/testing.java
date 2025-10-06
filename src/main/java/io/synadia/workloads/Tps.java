@@ -30,6 +30,7 @@ public class Tps extends Workload {
     String messageIdKey;
     int payloadSize;
     int sendLogRate;
+    int metricsDelayRate;
     int metricsLogRate;
 
     @Override
@@ -47,8 +48,9 @@ public class Tps extends Workload {
         subject = JsonValueUtils.readString(params.jv, "subject", "tps");
         messageIdKey = JsonValueUtils.readString(params.jv, "message.id.key", "mid");
         payloadSize = readInteger(params.jv, "payload.size", 12 * 1024);
-        sendLogRate = readInteger(params.jv, "send.log.rate", 1);
-        metricsLogRate = readInteger(params.jv, "metrics.log.rate", 1);
+        sendLogRate = readInteger(params.jv, "send.log.rate", 3);
+        metricsDelayRate = readInteger(params.jv, "metrics.delay.rate", 3);
+        metricsLogRate = readInteger(params.jv, "metrics.log.rate", 30);
 
         Debug.info(workLabel, "targetTps", targetTps);
         Debug.info(workLabel, "subject", subject);
@@ -200,6 +202,7 @@ public class Tps extends Workload {
         JsonValue jv = params.jv;
         Options.Builder builder  = new Options.Builder()
             .server(params.servers.get(serverIx))
+            .ignoreDiscoveredServers()
             .connectionListener(new DebugConnectionListener(label))
             .errorListener(new DebugErrorListener(label))
             .connectionTimeout(readLong(jv, "nats.connection.timeout.millis", 5000))
