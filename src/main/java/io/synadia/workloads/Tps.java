@@ -162,7 +162,7 @@ public class Tps extends Workload {
                     receivedLastMessageId.set(mid);
                 }
                 else if (mid != expected) {
-                    receivedLastMessageId.set(-1);
+                    receivedLastMessageId.set(0);
                     long diff = mid - expected;
                     Debug.info(TPS_RECEIVER, "******", "Got Message Id: %s but expected: %s", mid, expected, "Loss of %s", diff);
                 }
