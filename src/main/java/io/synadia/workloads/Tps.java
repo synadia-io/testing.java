@@ -19,8 +19,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static io.nats.client.support.JsonValueUtils.*;
-import static io.nats.jsmulti.shared.Stats.format3;
-import static io.nats.jsmulti.shared.Stats.format3NoGrouping;
+import static io.nats.jsmulti.shared.Stats.*;
 
 public class Tps extends Workload {
     private String action;
@@ -142,7 +141,9 @@ public class Tps extends Workload {
                 long diff = sent - lastSendMessageId.get();
                 Debug.info(TPS_SENDER, "Last Id %s", sent, "Messages %s", diff,
                     "Per Sec %s", format3NoGrouping(1000f * diff /elapsedMs),
-                    "%s ", format3(sendStatsCollector.getOutMsgs()), format3(sendStatsCollector.getOutBytes()), format3(sendStatsCollector.getWriteBytes())
+                    FORMATTER.format(sendStatsCollector.getOutMsgs()),
+                    FORMATTER.format(sendStatsCollector.getOutBytes()),
+                    FORMATTER.format(sendStatsCollector.getWriteBytes())
                 );
             }
             lastSendMessageId.set(sent);
