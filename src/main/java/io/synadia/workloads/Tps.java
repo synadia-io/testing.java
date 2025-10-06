@@ -146,6 +146,8 @@ public class Tps extends Workload {
     AtomicLong receivedMessages = new AtomicLong(0);
     AtomicLong receivedLastCurrentCount = new AtomicLong(0);
     AtomicLong receivedLastMessageId = new AtomicLong(-1);
+    AtomicLong receivedTotalLost = new AtomicLong(0);
+    AtomicLong receivedLosses = new AtomicLong(0);
 
     private void tpsReceive() throws IOException, InterruptedException {
         Options options = buildOptions(params, 1, TPS_RECEIVER);
@@ -165,7 +167,12 @@ public class Tps extends Workload {
                     long diff = mid - expected;
                     if (diff > 0) {
                         receivedLastMessageId.set(-1);
-                        Debug.info(TPS_RECEIVER, "******", "Got Message Id: %s but expected: %s", mid, expected, "Loss of %s", diff);
+                        long totalLosses = receivedTotalLost.addAndGet(diff);
+                        long numLosses = receivedLosses.incrementAndGet();
+                        Debug.info(TPS_RECEIVER, "******"
+                            , "Got Message Id: %s but expected: %s", mid, expected
+                            , "Loss of %s", diff
+                            , "Average Loss of %s", format3NoGrouping((float)totalLosses / numLosses));
                     }
                     else {
                         receivedLastMessageId.set(mid);
