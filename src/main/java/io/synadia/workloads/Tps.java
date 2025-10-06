@@ -8,7 +8,6 @@ import io.synadia.CommandLine;
 import io.synadia.Params;
 import io.synadia.Workload;
 import io.synadia.chaos.DebugConnectionListener;
-import io.synadia.chaos.DebugErrorListener;
 import io.synadia.utils.Debug;
 
 import java.io.IOException;
@@ -17,8 +16,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static io.nats.client.support.JsonValueUtils.*;
+import static io.nats.jsmulti.shared.Stats.format3;
 import static io.nats.jsmulti.shared.Stats.format3NoGrouping;
-import static io.synadia.chaos.ConnectionUtils.statusMessage;
 
 public class Tps extends Workload {
     private String action;
@@ -195,13 +194,14 @@ public class Tps extends Workload {
             long currentCount = receivedMessages.get();
             long previousCount = receivedLastCurrentCount.getAndSet(currentCount);
             long currentTps = (currentCount - previousCount) / metricsLogRate;
-            Debug.info(TPS_RECEIVER, "Receive TPS: %s/%s", currentTps, targetTps,
-                "Total Messages %s", currentCount,
-                "%s %s", statusMessage(nc.getStatus()), nc.getConnectedUrl());
+            Debug.info(TPS_RECEIVER, "Receive TPS: %s/%s", currentTps, targetTps, "Total Messages %s", format3(currentCount));
+//            Debug.info(TPS_RECEIVER, "Receive TPS: %s/%s", currentTps, targetTps,
+//                "Total Messages %s", currentCount,
+//                "%s %s", statusMessage(nc.getStatus()), nc.getConnectedUrl());
             // Log performance warning if TPS is significantly below target (only if actively receiving)
-            if (currentTps > 0 && currentTps < targetTps * 0.8) {
-                Debug.info(TPS_RECEIVER, "Performance below target: %s/%s", currentTps, targetTps);
-            }
+//            if (currentTps > 0 && currentTps < targetTps * 0.8) {
+//                Debug.info(TPS_RECEIVER, "Performance below target: %s/%s", currentTps, targetTps);
+//            }
         }, metricsInitialDelay, metricsLogRate, TimeUnit.SECONDS);
     }
 
@@ -229,8 +229,9 @@ public class Tps extends Workload {
         Options.Builder builder  = new Options.Builder()
             .server(params.servers.get(serverIx))
             .ignoreDiscoveredServers()
-            .connectionListener(new DebugConnectionListener(label))
-            .errorListener(new DebugErrorListener(label))
+            .connectionListener(new DebugConnectionListener(label, true))
+//            .errorListener(new DebugErrorListener(label))
+            .errorListener(new ErrorListener() {})
             .connectionTimeout(readLong(jv, "nats.connection.timeout.millis", 5000))
             .maxReconnects(readInteger(jv, "nats.max.reconnects", -1))
             .reconnectBufferSize(readLong(jv, "nats.connection.max.buffer", 500000000))
