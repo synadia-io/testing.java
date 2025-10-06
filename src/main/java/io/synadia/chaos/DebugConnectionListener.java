@@ -4,39 +4,32 @@
 package io.synadia.chaos;
 
 import io.nats.client.Connection;
-import io.nats.client.ConnectionListener;
 import io.synadia.utils.Debug;
 
 import static io.synadia.chaos.ConnectionUtils.eventMessage;
 
-public class DebugConnectionListener implements ConnectionListener {
-
-    protected final String outputLabel;
-    protected final boolean connectionEventsOnly;
+public class DebugConnectionListener extends OutputConnectionListener {
 
     public DebugConnectionListener(String outputLabel) {
-        this.outputLabel = outputLabel;
-        this.connectionEventsOnly = false;
+        super(outputLabel, true);
     }
 
     public DebugConnectionListener(String outputLabel, boolean connectionEventsOnly) {
-        this.outputLabel = outputLabel;
-        this.connectionEventsOnly = connectionEventsOnly;
+        super(outputLabel, connectionEventsOnly);
     }
 
     @Override
-    public void connectionEvent(Connection conn, Events type) {
-        if (connectionEventsOnly && !type.isConnectionEvent()) {
-            return;
-        }
-        Debug.info(outputLabel, "CL", eventMessage(type));
+    public void reportFunction(CustomFunction reportFunction) {
+        throw new UnsupportedOperationException("Report Function cannot be overridden.");
     }
 
     @Override
-    public void connectionEvent(Connection conn, Events type, String uriDetails) {
-        if (connectionEventsOnly && !type.isConnectionEvent()) {
-            return;
+    protected void report(Connection conn, Events type, String uriDetails) {
+        if (uriDetails == null) {
+            Debug.info(outputLabel, "CL", eventMessage(type));
         }
-        Debug.info(outputLabel, "CL", eventMessage(type), uriDetails);
+        else {
+            Debug.info(outputLabel, "CL", eventMessage(type), uriDetails);
+        }
     }
 }

@@ -8,6 +8,7 @@ import io.synadia.CommandLine;
 import io.synadia.Params;
 import io.synadia.Workload;
 import io.synadia.chaos.DebugConnectionListener;
+import io.synadia.chaos.OutputConnectionListener;
 import io.synadia.utils.Debug;
 
 import java.io.IOException;
@@ -72,7 +73,7 @@ public class Tps extends Workload {
     AtomicLong sendMessageId = new AtomicLong();
     AtomicLong lastSendReportTime = new AtomicLong();
     private void tpsSend() throws IOException, InterruptedException {
-        Options options = buildOptions(params, 0, TPS_SENDER);
+        Options options = buildOptions(params, 0, TPS_SENDER, null);
         try (Connection nc = Nats.connect(options)) {
             startSendLogging(nc);
             long startNanos = System.nanoTime();
@@ -149,7 +150,7 @@ public class Tps extends Workload {
     AtomicLong receivedLosses = new AtomicLong(0);
 
     private void tpsReceive() throws IOException, InterruptedException {
-        Options options = buildOptions(params, 1, TPS_RECEIVER);
+        Options options = buildOptions(params, 1, TPS_RECEIVER, (c, t, d) -> receivedLastMessageId.set(-1));
         try (Connection nc = Nats.connect(options)) {
             startMetricsLogging(nc);
             MessageHandler handler = msg -> {
@@ -224,12 +225,16 @@ public class Tps extends Workload {
         }
     }
 
-    private static Options buildOptions(Params params, int serverIx, String label) {
+    private static Options buildOptions(Params params, int serverIx, String label,
+                                        OutputConnectionListener.CustomFunction behavior) {
         JsonValue jv = params.jv;
+        DebugConnectionListener dbcl = new DebugConnectionListener(label, true);
+        dbcl.afterFunction(behavior);
+
         Options.Builder builder  = new Options.Builder()
             .server(params.servers.get(serverIx))
             .ignoreDiscoveredServers()
-            .connectionListener(new DebugConnectionListener(label, true))
+            .connectionListener(dbcl)
 //            .errorListener(new DebugErrorListener(label))
             .errorListener(new ErrorListener() {})
             .connectionTimeout(readLong(jv, "nats.connection.timeout.millis", 5000))

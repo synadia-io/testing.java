@@ -59,7 +59,8 @@ public abstract class ConnectableConsumer {
         this.initials = initials;
         label = name + " (" + consumerKind.name() + ")";
 
-        connectionListener = new OutputConnectionListener(label, (c, t) -> refreshInfo());
+        connectionListener = new OutputConnectionListener(label);
+        connectionListener.afterFunction = (c, t, d) -> refreshInfo();
         errorListener = new OutputErrorListener(label);
 
         Options options = cmd.makeOptions(connectionListener, errorListener);

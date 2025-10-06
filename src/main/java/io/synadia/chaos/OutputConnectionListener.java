@@ -11,30 +11,55 @@ import static io.synadia.chaos.ConnectionUtils.eventMessage;
 public class OutputConnectionListener implements ConnectionListener {
 
     protected final String outputLabel;
-    protected final AfterFunction afterFunction;
+    protected final boolean connectionEventsOnly;
+    protected CustomFunction reportFunction;
+    protected CustomFunction afterFunction;
 
-    public interface AfterFunction {
-        void afterOutput(Connection conn, Events type);
+    public interface CustomFunction {
+        void afterOutput(Connection conn, Events type, String uriDetails);
     }
 
     public OutputConnectionListener(String outputLabel) {
-        this(outputLabel, (c, t) -> {});
+        this(outputLabel, false);
     }
 
-    public OutputConnectionListener(String outputLabel, AfterFunction afterFunction) {
+    public OutputConnectionListener(String outputLabel, boolean connectionEventsOnly) {
         this.outputLabel = outputLabel;
-        this.afterFunction = afterFunction;
+        this.connectionEventsOnly = connectionEventsOnly;
+        reportFunction = this::report;
+    }
+
+    public void reportFunction(CustomFunction reportFunction) {
+        this.reportFunction = reportFunction == null ? this::report : reportFunction;
+    }
+
+    public void afterFunction(CustomFunction afterFunction) {
+        this.afterFunction = afterFunction == null ? this::after : afterFunction;
     }
 
     @Override
     public void connectionEvent(Connection conn, Events type) {
-        Output.write(outputLabel, "CL/" + eventMessage(type));
-        afterFunction.afterOutput(conn, type);
+        connectionEvent(conn, type, null);
     }
 
     @Override
     public void connectionEvent(Connection conn, Events type, String uriDetails) {
-        Output.write(outputLabel, "CL/" + eventMessage(type) + "/" + uriDetails);
-        afterFunction.afterOutput(conn, type);
+        if (connectionEventsOnly && !type.isConnectionEvent()) {
+            return;
+        }
+        report(conn, type, uriDetails);
+        afterFunction.afterOutput(conn, type, uriDetails);
+    }
+
+    protected void after(Connection conn, Events type, String uriDetails) {
+    }
+
+    protected void report(Connection conn, Events type, String uriDetails) {
+        if (uriDetails == null) {
+            Output.write(outputLabel, "CL/" + eventMessage(type));
+        }
+        else {
+            Output.write(outputLabel, "CL/" + eventMessage(type) + "/" + uriDetails);
+        }
     }
 }
