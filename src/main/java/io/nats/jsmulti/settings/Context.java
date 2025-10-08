@@ -18,10 +18,8 @@ import io.nats.client.JetStreamOptions;
 import io.nats.client.Nats;
 import io.nats.client.Options;
 import io.nats.client.api.AckPolicy;
-import io.nats.jsmulti.shared.ActionRunner;
-import io.nats.jsmulti.shared.Application;
-import io.nats.jsmulti.shared.OptionsFactory;
-import io.nats.jsmulti.shared.Utils;
+import io.nats.client.impl.Headers;
+import io.nats.jsmulti.shared.*;
 
 import java.lang.reflect.Constructor;
 import java.time.Duration;
@@ -51,6 +49,9 @@ public class Context {
     // latency
     public final boolean latencyFlag;
     public final String lcsv;
+
+    //
+    public final HeaderSupplier headerSupplier;
 
     // connection options
     public final String credsFile;
@@ -256,6 +257,7 @@ public class Context {
         Action _action = null;
         String _customActionClassName = null;
         String _customAppClassName = null;
+        String _headerSupplierClassName = null;
         boolean _latencyFlag = false;
         String[] _servers = new String[]{Options.DEFAULT_URL};
         String _credsFile = null;
@@ -307,12 +309,16 @@ public class Context {
                             }
                             break;
                         case "-ca":
-                        case "-_custom_action_class_name":
+                        case "-custom_action_class_name":
                             _action = Action.CUSTOM;
                             _customActionClassName = asString(args[++x]);
                             break;
                         case "-app":
                             _customAppClassName = asString(args[++x]);
+                            break;
+                        case "-hs":
+                        case "-header_supplier_class_name":
+                            _headerSupplierClassName = asString(args[++x]);
                             break;
                         case "-lf":
                         case "-latency_flag":
@@ -536,7 +542,43 @@ public class Context {
             optionsFactory = (OptionsFactory)classForName(_optionsFactoryClassName, "Options Factory");
         }
 
+        if (_headerSupplierClassName != null) {
+            HeaderSupplier userHeaderSupplier = (HeaderSupplier) classForName(_headerSupplierClassName, "Header Supplier");
+            if (latencyFlag) {
+                headerSupplier = new LatencyAndUserHeaderSupplier(userHeaderSupplier);
+            }
+            else {
+                headerSupplier = userHeaderSupplier;
+            }
+        }
+        else if (latencyFlag) {
+            headerSupplier = new LatencyHeaderSupplier();
+        }
+        else {
+            headerSupplier = new HeaderSupplier() {};
+        }
+
         app.init(this);
+    }
+
+    static class LatencyHeaderSupplier implements HeaderSupplier {
+        @Override
+        public Headers getHeaders() {
+            return new Headers().put(HDR_PUB_TIME, "" + System.currentTimeMillis());
+        }
+    }
+
+    static class LatencyAndUserHeaderSupplier implements HeaderSupplier {
+        final HeaderSupplier userHeaderSupplier;
+
+        public LatencyAndUserHeaderSupplier(HeaderSupplier userHeaderSupplier) {
+            this.userHeaderSupplier = userHeaderSupplier;
+        }
+
+        @Override
+        public Headers getHeaders() {
+            return userHeaderSupplier.getHeaders().put(HDR_PUB_TIME, "" + System.currentTimeMillis());
+        }
     }
 
     @SuppressWarnings("SameParameterValue")

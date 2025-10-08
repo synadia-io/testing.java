@@ -130,6 +130,15 @@ public class Arguments {
         return add("app", clazz.getCanonicalName());
     }
 
+    public Arguments headerSupplier(String customHeaderSupplier) {
+        return add("hs", customHeaderSupplier);
+    }
+
+    @SuppressWarnings("rawtypes")
+    public Arguments headerSupplier(Class clazz) {
+        return add("hs", clazz.getCanonicalName());
+    }
+
     public Arguments server(String server) {
         return add("s", server);
     }

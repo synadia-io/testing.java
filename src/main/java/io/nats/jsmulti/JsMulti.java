@@ -16,7 +16,6 @@ package io.nats.jsmulti;
 import io.nats.client.*;
 import io.nats.client.api.*;
 import io.nats.client.impl.Headers;
-import io.nats.client.impl.NatsMessage;
 import io.nats.jsmulti.settings.Action;
 import io.nats.jsmulti.settings.Arguments;
 import io.nats.jsmulti.settings.Context;
@@ -176,31 +175,18 @@ public class JsMulti {
     // Publish
     // ----------------------------------------------------------------------------------------------------
     interface Publisher<T> {
-        T publish(String subject, byte[] payload) throws Exception;
+        T publish(String subject, Headers h, byte[] payload) throws Exception;
     }
 
     interface ResultHandler<T> {
         void handle(T t);
     }
 
-    private static NatsMessage buildLatencyMessage(String subject, byte[] p) {
-        //noinspection ConstantConditions
-        return new NatsMessage(subject, null, new Headers().put(HDR_PUB_TIME, "" + System.currentTimeMillis()), p);
-    }
-
     private static void pub(Context ctx, Connection nc, Stats stats, int id) throws Exception {
-        if (ctx.latencyFlag) {
-            _pub(ctx, stats, id, (s, p) -> {
-                nc.publish(buildLatencyMessage(s, p));
-                return true;
-            }, b -> {});
-        }
-        else {
-            _pub(ctx, stats, id, (s, p) -> {
-                nc.publish(s, p);
-                return true;
-            }, b -> {});
-        }
+        _pub(ctx, stats, id, (s, h, p) -> {
+            nc.publish(s, h, p);
+            return true;
+        }, b -> {});
 
         // if you are using pub with a consumer on the other side,
         // sometimes if you disconnect before all publishes have completed
@@ -213,18 +199,16 @@ public class JsMulti {
             _pub(ctx, stats, id, nc::request, cfm -> {});
         }
         else {
-            _pub(ctx, stats, id, (s, p) -> nc.request(s, p, ctx.requestWaitDuration), m -> {});
+            _pub(ctx, stats, id, (s, h, p) -> nc.request(s, h, p, ctx.requestWaitDuration), m -> {});
         }
     }
 
     private static void pubSync(Context ctx, Connection nc, Stats stats, int id) throws Exception {
         final JetStream js = nc.jetStream(ctx.getJetStreamOptions());
-        if (ctx.latencyFlag) {
-            _pub(ctx, stats, id, (s, p) -> js.publish(buildLatencyMessage(s, p)), na -> {});
-        }
-        else {
-            _pub(ctx, stats, id, js::publish, na -> {});
-        }
+        _pub(ctx, stats, id, (s, h, p) -> {
+            js.publish(s, h, p);
+            return true;
+        }, na -> {});
     }
 
     private static void pubCore(Context ctx, final Connection nc, Stats stats, int id) throws Exception {
@@ -241,15 +225,12 @@ public class JsMulti {
             if (streamNames.size() != 1) {
                 throw new TerminalException("JetStream subject does not exist for latency run [" + ctx.subject + "]");
             }
-            streamName = streamNames.get(0);
+            streamName = streamNames.getFirst();
             StreamInfo si = jsm.getStreamInfo(streamName, StreamInfoOptions.filterSubjects(ctx.subject));
-            List<Subject> subjects = si.getStreamState().getSubjects();
-            startingCount = subjects == null ? 0 : subjects.get(0).getCount();
+            startingCount = si.getStreamState().getSubjectMap().getOrDefault(ctx.subject, 0L);
         }
 
-        Publisher<PublishAck> publisher = ctx.latencyFlag
-            ? (s, p) -> { nc.publish(buildLatencyMessage(s, p)); return null; }
-            : (s, p) -> { nc.publish(s, p); return null; };
+        Publisher<PublishAck> publisher = (s, h, p) -> { nc.publish(s, h, p); return null; };
 
         _pub(ctx, stats, id, publisher, pa -> {});
 
@@ -257,7 +238,7 @@ public class JsMulti {
             long currentCount = 0;
             while (currentCount < ctx.messageCount) {
                 StreamInfo si = jsm.getStreamInfo(streamName, StreamInfoOptions.filterSubjects(ctx.subject));
-                currentCount = si.getStreamState().getSubjects().get(0).getCount();
+                currentCount = si.getStreamState().getSubjectMap().getOrDefault(ctx.subject, 0L);;
                 if (currentCount < ctx.messageCount) {
                     ctx.app.report("Waiting for the server to record all publishes. " + currentCount + " of " + ctx.messageCount);
                     Utils.sleep(100);
@@ -277,7 +258,7 @@ public class JsMulti {
             byte[] payload = ctx.getPayload();
             stats.start();
             try {
-                rh.handle(p.publish(ctx.subject, payload));
+                rh.handle(p.publish(ctx.subject, ctx.headerSupplier.getHeaders(), payload));
                 stats.stopAndCount(ctx.payloadSize);
                 unReported = reportAndTrackMaybe(ctx, ++published, ++unReported, "Published", stats);
             }
@@ -293,14 +274,6 @@ public class JsMulti {
 
     private static void pubAsync(Context ctx, Connection nc, Stats stats, int id) throws Exception {
         JetStream js = nc.jetStream(ctx.getJetStreamOptions());
-        Publisher<CompletableFuture<PublishAck>> publisher;
-        if (ctx.latencyFlag) {
-            publisher = (s, p) -> js.publishAsync(buildLatencyMessage(s, p));
-        }
-        else {
-            publisher = js::publishAsync;
-        }
-
         List<CompletableFuture<PublishAck>> futures = new ArrayList<>();
         int roundCount = 0;
         long pubTarget = ctx.getPubCount(id);
@@ -315,7 +288,7 @@ public class JsMulti {
             jitter(ctx);
             byte[] payload = ctx.getPayload();
             stats.start();
-            futures.add(publisher.publish(ctx.subject, payload));
+            futures.add(js.publishAsync(ctx.subject, ctx.headerSupplier.getHeaders(), payload));
             stats.stopAndCount(ctx.payloadSize);
             unReported = reportAndTrackMaybe(ctx, ++published, ++unReported, "Published", stats);
         }
@@ -326,7 +299,7 @@ public class JsMulti {
         stats.start();
         while (!futures.isEmpty()) {
             try {
-                futures.remove(0).get();
+                futures.removeFirst().get();
             }
             catch (ExecutionException e) {
                 throw new RuntimeException(e);
@@ -491,7 +464,7 @@ public class JsMulti {
         if (stream == null) {
             List<String> streamNames = nc.jetStreamManagement(ctx.getJetStreamOptions()).getStreamNames(ctx.subject);
             if (streamNames.size() == 1) {
-                stream = streamNames.get(0);
+                stream = streamNames.getFirst();
             }
             else {
                 throw new TerminalException("Action requires stream name");
