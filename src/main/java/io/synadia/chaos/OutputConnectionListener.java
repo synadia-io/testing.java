@@ -39,17 +39,21 @@ public class OutputConnectionListener implements ConnectionListener {
 
     @Override
     public void connectionEvent(Connection conn, Events type) {
-        connectionEvent(conn, type, null, null);
-    }
-
-    @Override
-    public void connectionEvent(Connection conn, Events type, Long time, String uriDetails) {
         if (connectionEventsOnly && !type.isConnectionEvent()) {
             return;
         }
-        report(conn, type, time, uriDetails);
-        afterFunction.afterOutput(conn, type, time, uriDetails);
+        report(conn, type, null, null);
+        afterFunction.afterOutput(conn, type, null, null);
     }
+
+//    @Override
+//    public void connectionEvent(Connection conn, Events type, Long time, String uriDetails) {
+//        if (connectionEventsOnly && !type.isConnectionEvent()) {
+//            return;
+//        }
+//        report(conn, type, time, uriDetails);
+//        afterFunction.afterOutput(conn, type, time, uriDetails);
+//    }
 
     protected void after(Connection conn, Events type, Long time, String uriDetails) {
     }
