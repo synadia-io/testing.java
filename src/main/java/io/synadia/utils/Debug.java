@@ -246,6 +246,12 @@ public abstract class Debug {
         if (data == null || data.length == 0) {
             return "<no data>" + SEP;
         }
+
+        if (data[0] < 32) {
+            // this must be actual binary data, probably filler test data
+            return "<binary " + data.length + " bytes>" + SEP;
+        }
+
         String s = new String(data, UTF_8);
         if (DO_NOT_TRUNCATE) {
             return s + SEP;
