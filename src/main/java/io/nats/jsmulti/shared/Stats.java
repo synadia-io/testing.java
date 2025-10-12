@@ -1,6 +1,7 @@
 package io.nats.jsmulti.shared;
 
 import io.nats.client.Message;
+import io.nats.client.api.MessageInfo;
 import io.nats.client.impl.Headers;
 import io.nats.client.support.JsonValue;
 import io.nats.client.support.JsonValueUtils;
@@ -231,6 +232,11 @@ public class Stats {
         messageCount++;
         this.bytes += m.getData().length;
         countService.submit(() -> countTask(m, mReceived));
+    }
+
+    public void count(final MessageInfo mi) {
+        messageCount++;
+        this.bytes += mi.getData().length;
     }
 
     private void countTask(Message m, long mReceived) {

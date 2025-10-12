@@ -36,7 +36,7 @@ public class Context {
 
     public static final long DEFAULT_READ_TIMEOUT_MS = 1000;
     public static final long DEFAULT_REQUEST_WAIT_MS = 1000;
-    public static final long DEFAULT_MAX_WAIT_MS = 10000;
+    public static final long DEFAULT_READ_MAX_WAIT_MS = 5000;
     public static final int MIN_WAIT_MS = 100;
 
     // ----------------------------------------------------------------------------------------------------
@@ -222,8 +222,9 @@ public class Context {
 
         append(sb, "request wait millis", "rqwms", requestWaitDuration, requestWaitDuration.toMillis() != DEFAULT_REQUEST_WAIT_MS);
         append(sb, "read timeout millis", "rtoms", readTimeoutDuration, readTimeoutDuration.toMillis() != DEFAULT_READ_TIMEOUT_MS);
-        append(sb, "read max wait millis", "rmxwms", readMaxWaitDuration, readMaxWaitDuration.toMillis() != DEFAULT_MAX_WAIT_MS);
+        append(sb, "read max wait millis", "rmxwms", readMaxWaitDuration, readMaxWaitDuration.toMillis() != DEFAULT_READ_MAX_WAIT_MS);
 
+        append(sb, "stream", "u", subject, stream != null);
         append(sb, "subject", "u", subject, true);
         append(sb, "message count", "m", messageCount, true);
         append(sb, "threads", "d", threads, true);
@@ -282,7 +283,7 @@ public class Context {
         String _subDurableWhenQueue = "qd" + randomString();
         long _requestWaitMillis = DEFAULT_REQUEST_WAIT_MS;
         long _readTimeoutMillis = DEFAULT_READ_TIMEOUT_MS;
-        long _readMaxWaitMillis = DEFAULT_MAX_WAIT_MS;
+        long _readMaxWaitMillis = DEFAULT_READ_MAX_WAIT_MS;
 
         if (args != null && args.length > 0) {
             try {

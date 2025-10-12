@@ -2,14 +2,13 @@
   "multi_config": {
     "server": "<Bootstrap>",
     "subject": "<TestingStreamSubject>",
-    "action": "PubAsync",
-    "message_count": 10000000,
-    "payload_size": 250,
+    "stream": "<TestingStreamName>",
+    "action": "DirectQueue",
     "threads": 1,
     "connection_strategy": "individual",
     "report_frequency": 50000,
-    "round_size": 100,
-    "header_supplier_class_name": "io.synadia.workloads.support.BenchHeaderSupplier"
+    "message_count": 10000000,
+    "batch_size": 200
   },
   "options_virtual_threads": true
 }

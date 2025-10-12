@@ -1,0 +1,10 @@
+{
+  "stream_config":{
+    "name": "<TestingStreamName>",
+    "subjects": ["<TestingStreamSubject>"],
+    "storage":"file",
+    "num_replicas":1,
+    "discard":"old",
+    "allow_direct": true
+  }
+}

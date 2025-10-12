@@ -42,6 +42,8 @@ public enum Action {
     SUB_ITERATE_QUEUE(   "SubIterateQueue",     false, false, false, false, true),
     // SUB_CONSUME_QUEUE(   "SubConsumeQueue",     false, false, false, false, true),
 
+    DIRECT_QUEUE(        "DirectQueue",         false, false, false, false, false), // none of these apply
+
     RTT(                 "RTT",                 true,  true,  true,  false, false),
     CUSTOM(              "Custom",              false, false, false, false, false);
 

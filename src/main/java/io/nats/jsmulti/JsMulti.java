@@ -20,6 +20,8 @@ import io.nats.jsmulti.settings.Action;
 import io.nats.jsmulti.settings.Arguments;
 import io.nats.jsmulti.settings.Context;
 import io.nats.jsmulti.shared.*;
+import io.synadia.direct.DirectBatchContext;
+import io.synadia.direct.MessageBatchGetRequest;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -27,6 +29,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -150,6 +154,10 @@ public class JsMulti {
                 case SUB_ITERATE_QUEUE:
                 case SUB_FETCH_QUEUE:
                     return JsMulti::subSimple;
+
+                case DIRECT_QUEUE:
+                    return JsMulti::directQueue;
+
             }
         }
         throw new TerminalException("Invalid Action");
@@ -509,6 +517,44 @@ public class JsMulti {
         else {
             throw new TerminalException("Action Not Implemented: " + ctx.action.getLabel());
         }
+    }
+
+    // ----------------------------------------------------------------------------------------------------
+    // Direct
+    // ----------------------------------------------------------------------------------------------------
+    private static void directQueue(Context ctx, Connection nc, Stats stats, int id) throws Exception {
+        long waitMs = ctx.readMaxWaitDuration.toMillis();
+        long consumed = 0;
+        long unReported = 0;
+        long minSeq = 0;
+        report(ctx, consumed, "Begin Direct Consume-Queue");
+        DirectBatchContext context = new DirectBatchContext(nc, ctx.getJetStreamOptions(), ctx.stream);
+        while (consumed < ctx.messageCount) {
+            long left = ctx.messageCount - consumed;
+            int bs = left > ctx.batchSize ? ctx.batchSize : (int)left;
+            MessageBatchGetRequest mbgr = MessageBatchGetRequest.batch(ctx.subject, bs, minSeq);
+            LinkedBlockingQueue<MessageInfo> q = context.queueMessageBatch(mbgr);
+            stats.start();
+            MessageInfo mi = q.poll(waitMs, TimeUnit.MILLISECONDS);
+            long hold = stats.elapsed();
+            while (mi != null && mi.isMessage()) {
+                stats.manualElapsed(hold);
+                stats.count(mi);
+                minSeq = mi.getSeq() + 1;
+                left--;
+                unReported = reportAndTrackMaybe(ctx, ++consumed, ++unReported, "Direct Consume-Queue", stats);
+                stats.start();
+                mi = q.poll(waitMs, TimeUnit.MILLISECONDS);
+                hold = stats.elapsed();
+            }
+            if (mi != null) {
+                if (mi.isErrorStatus()) {
+                    break;
+                }
+                stats.manualElapsed(hold);
+            }
+        }
+        report(ctx, consumed, "Direct Consume-Queue");
     }
 
     // ----------------------------------------------------------------------------------------------------
