@@ -300,6 +300,7 @@ public class JsMulti {
             stats.stopAndCount(ctx.payloadSize);
             unReported = reportAndTrackMaybe(ctx, ++published, ++unReported, "Published", stats);
         }
+        processFutures(futures, stats);
         report(ctx, published, "Completed Publishing");
     }
 
