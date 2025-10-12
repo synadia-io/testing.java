@@ -2,10 +2,11 @@
   "stream_config":{
     "name": "<TestingStreamName>",
     "subjects": ["<TestingStreamSubject>"],
-    "retention":"limits",
-    "max_msgs":50000000,
     "storage":"file",
     "num_replicas":1,
-    "discard":"old"
+    "retention":"limits",
+    "max_msgs":50000000,
+    "discard":"old",
+    "allow_direct": true
   }
 }

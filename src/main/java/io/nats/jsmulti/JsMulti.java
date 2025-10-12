@@ -528,7 +528,7 @@ public class JsMulti {
         long consumed = 0;
         long unReported = 0;
         long minSeq = 0;
-        report(ctx, consumed, "Begin Direct Consume-Queue");
+        report(ctx, consumed, "Begin Direct Consume");
         DirectBatchContext context = new DirectBatchContext(nc, ctx.getJetStreamOptions(), ctx.stream);
         while (consumed < ctx.messageCount) {
             long left = ctx.messageCount - consumed;
@@ -543,19 +543,17 @@ public class JsMulti {
                 stats.count(mi);
                 minSeq = mi.getSeq() + 1;
                 left--;
-                unReported = reportAndTrackMaybe(ctx, ++consumed, ++unReported, "Direct Consume-Queue", stats);
+                unReported = reportAndTrackMaybe(ctx, ++consumed, ++unReported, "Direct Consume", stats);
                 stats.start();
                 mi = q.poll(waitMs, TimeUnit.MILLISECONDS);
                 hold = stats.elapsed();
             }
-            if (mi != null) {
-                if (mi.isErrorStatus()) {
-                    break;
-                }
-                stats.manualElapsed(hold);
+            stats.manualElapsed(hold);
+            if (mi == null || mi.isStatus()) {
+                break;
             }
         }
-        report(ctx, consumed, "Direct Consume-Queue");
+        report(ctx, consumed, "Direct Consume");
     }
 
     // ----------------------------------------------------------------------------------------------------
