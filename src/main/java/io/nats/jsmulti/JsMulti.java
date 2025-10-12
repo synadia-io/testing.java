@@ -549,7 +549,7 @@ public class JsMulti {
                 hold = stats.elapsed();
             }
             stats.manualElapsed(hold);
-            if (mi == null || mi.isStatus()) {
+            if (mi == null || mi.isErrorStatus()) {
                 break;
             }
         }
