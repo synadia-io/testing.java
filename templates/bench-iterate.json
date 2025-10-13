@@ -3,7 +3,7 @@
     "server": "<Bootstrap>",
     "subject": "<TestingStreamSubject>",
     "action": "SubIterate",
-    "message_count": 10000000,
+    "message_count": 6000000,
     "threads": 1,
     "batch_size": 100,
     "connection_strategy": "individual",
