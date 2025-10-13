@@ -4,8 +4,6 @@
     "subjects": ["<TestingStreamSubject>"],
     "storage":"file",
     "num_replicas":1,
-    "retention":"limits",
-    "max_msgs":50000000,
-    "discard":"old"
+    "allow_direct": true
   }
 }

@@ -3,7 +3,6 @@
     "name": "<TestingStreamName>",
     "subjects": ["<TestingStreamSubject>"],
     "storage":"file",
-    "num_replicas":1,
-    "allow_direct": true
+    "num_replicas":1
   }
 }

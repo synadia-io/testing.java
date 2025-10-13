@@ -4,8 +4,6 @@ do
     gen/setup-testing-unlimited
     java -cp "build/libs/*" io.synadia.Runner --id $i --workload Multi --action publish --params params/params.json --params params/bench-publish.json
     gen/watch-report
-    java -cp "build/libs/*" io.synadia.Runner --id $i --workload Multi --action direct --params params/params.json --params params/bench-direct.json
-    gen/watch-report
     java -cp "build/libs/*" io.synadia.Runner --id $i --workload Multi --action fetch --params params/params.json --params params/bench-fetch.json
     gen/watch-report
     java -cp "build/libs/*" io.synadia.Runner --id $i --workload Multi --action iterate --params params/params.json --params params/bench-iterate.json
