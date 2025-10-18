@@ -18,8 +18,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -82,7 +80,7 @@ public class Tps extends Workload {
     TpsStatsCollector sendStatsCollector = new TpsStatsCollector();
 
     private void tpsSend() throws IOException, InterruptedException {
-        Options options = buildOptions(params, 0, true, sendStatsCollector, null);
+        Options options = buildOptions(params, 0, true, targetTps, sendStatsCollector, null);
         try (Connection nc = Nats.connect(options)) {
             startSendLogging(nc);
             long startNanos = System.nanoTime();
@@ -93,12 +91,26 @@ public class Tps extends Workload {
             byte[] payload = new byte[payloadSize];
             Headers h = new Headers();
             while (true) {
-                long now = System.nanoTime();
-                // Check if we've moved to a new second
-                if (now >= nextSecondStart) {
-                    currentSecond++;
+                boolean droppedConnection = false;
+                while (nc.getStatus() != Connection.Status.CONNECTED) {
+                    sleep(100);
+                    droppedConnection = true;
+                }
+                if (droppedConnection) {
+                    // if we dropped connection, reset everything
+                    startNanos = System.nanoTime();
+                    currentSecond = 0;
                     messagesThisSecond = 0;
-                    nextSecondStart = startNanos + (currentSecond + 1) * 1_000_000_000L;
+                    nextSecondStart = startNanos + 1_000_000_000L; // 1 second in nanos
+                }
+                else {
+                    // Check if we've moved to a new second
+                    long now = System.nanoTime();
+                    if (now >= nextSecondStart) {
+                        currentSecond++;
+                        messagesThisSecond = 0;
+                        nextSecondStart = startNanos + (currentSecond + 1) * 1_000_000_000L;
+                    }
                 }
 
                 // Only send if we haven't hit the target for this second
@@ -121,7 +133,6 @@ public class Tps extends Workload {
                     catch (Exception e) {
                         Debug.info(TPS_SENDER, "Error sending message id %s during test: %s", sendMessageId.get(), e.getMessage());
                         sendMessageId.decrementAndGet();
-                        sleep(1000);
                     }
                 }
                 else {
@@ -165,61 +176,54 @@ public class Tps extends Workload {
     AtomicLong receivedTotalLostAfterConn = new AtomicLong(0);
     AtomicLong receivedLossesAfterConn = new AtomicLong(0);
     AtomicBoolean connectionEvent = new AtomicBoolean(false);
-    ExecutorService executorService = Executors.newSingleThreadExecutor();
 
     private void tpsReceive() throws IOException, InterruptedException {
         int firstServerIx = commandLine.args.isEmpty() ? 1 : Integer.parseInt(commandLine.args.getFirst());
-        Options options = buildOptions(params, firstServerIx, false, new NoOpStatistics(), (c, et, t, d) -> {
+        Options options = buildOptions(params, firstServerIx, false, targetTps, new NoOpStatistics(), (c, et, t, d) -> {
             receivedLastMessageId.set(-1);
             connectionEvent.set(true);
         });
         try (Connection nc = Nats.connect(options)) {
             startMetricsLogging(nc);
-            MessageHandler handler = msg -> executorService.submit(() -> {
-                try {
-                    if (msg.getData().length != this.payloadSize) {
-                        Debug.info(TPS_RECEIVER, "Unexpected payload size: %s B (expected: %s B)", msg.getData().length, this.payloadSize);
-                    }
-                    Thread.sleep(10);
-                    //noinspection DataFlowIssue // headers won't be null.
-                    long mid = Long.parseLong(msg.getHeaders().getFirst(messageIdKey));
-                    long expected = receivedLastMessageId.incrementAndGet();
-                    if (expected == 0) {
-                        receivedLastMessageId.set(mid);
-                    }
-                    else if (mid != expected) {
-                        long diff = mid - expected;
-                        if (diff > 0) {
-                            receivedLastMessageId.set(-1);
-                            String mark;
-                            long totalLosses;
-                            long numLosses;
-                            if (connectionEvent.get()) {
-                                mark = "****** After Connection Event";
-                                totalLosses = receivedTotalLostAfterConn.addAndGet(diff);
-                                numLosses = receivedLossesAfterConn.incrementAndGet();
-                                connectionEvent.set(false);
-                            }
-                            else {
-                                mark = "******";
-                                totalLosses = receivedTotalLost.addAndGet(diff);
-                                numLosses = receivedLosses.incrementAndGet();
-                            }
-                            Debug.info(TPS_RECEIVER, mark
-                                , "Got Message Id: %s but expected: %s", format3(mid), format3(expected)
-                                , "Loss of %s", format3(diff)
-                                , "Average Loss of %s", format3((float) totalLosses / numLosses));
+            MessageHandler handler = msg -> {
+                if (msg.getData().length != this.payloadSize) {
+                    Debug.info(TPS_RECEIVER, "Unexpected payload size: %s B (expected: %s B)", msg.getData().length, this.payloadSize);
+                }
+                //noinspection DataFlowIssue // headers won't be null.
+                long mid = Long.parseLong(msg.getHeaders().getFirst(messageIdKey));
+                long expected = receivedLastMessageId.incrementAndGet();
+                if (expected == 0) {
+                    receivedLastMessageId.set(mid);
+                }
+                else if (mid != expected) {
+                    long diff = mid - expected;
+                    if (diff > 0) {
+                        receivedLastMessageId.set(-1);
+                        String mark;
+                        long totalLosses;
+                        long numLosses;
+                        if (connectionEvent.get()) {
+                            mark = "****** After Connection Event";
+                            totalLosses = receivedTotalLostAfterConn.addAndGet(diff);
+                            numLosses = receivedLossesAfterConn.incrementAndGet();
+                            connectionEvent.set(false);
                         }
                         else {
-                            receivedLastMessageId.set(mid);
+                            mark = "******";
+                            totalLosses = receivedTotalLost.addAndGet(diff);
+                            numLosses = receivedLosses.incrementAndGet();
                         }
+                        Debug.info(TPS_RECEIVER, mark
+                            , "Got Message Id: %s but expected: %s", format3(mid), format3(expected)
+                            , "Loss of %s", format3(diff)
+                            , "Average Loss of %s", format3((float) totalLosses / numLosses));
                     }
-                    receivedMessages.incrementAndGet();
+                    else {
+                        receivedLastMessageId.set(mid);
+                    }
                 }
-                catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-            });
+                receivedMessages.incrementAndGet();
+            };
 
             Dispatcher currentDispatcher = nc.createDispatcher();
 
@@ -266,7 +270,7 @@ public class Tps extends Workload {
     }
 
     private static Options buildOptions(Params params, int firstServerIx, boolean sender,
-                                        StatisticsCollector collector,
+                                        int targetTps, StatisticsCollector collector,
                                         OutputConnectionListener.CustomFunction behavior) {
         String label = sender ? TPS_SENDER : TPS_RECEIVER;
         JsonValue jv = params.jv;
@@ -274,6 +278,8 @@ public class Tps extends Workload {
         dbcl.afterFunction(behavior);
 
         String[] servers = figureServers(params.servers, firstServerIx);
+
+        int mmiq = Math.max(targetTps, readInteger(jv, "nats.connection.outgoing.max.messages", Options.DEFAULT_MAX_MESSAGES_IN_OUTGOING_QUEUE));
 
         Options.Builder builder  = new Options.Builder()
             .servers(servers)
@@ -287,7 +293,7 @@ public class Tps extends Workload {
             .maxReconnects(readInteger(jv, "nats.max.reconnects", -1))
             .reconnectBufferSize(readLong(jv, "nats.connection.max.buffer", 500000000))
             .bufferSize(readInteger(jv, "nats.connection.io.buffer", Options.DEFAULT_BUFFER_SIZE))
-            .maxMessagesInOutgoingQueue(readInteger(jv, "nats.connection.outgoing.max.messages", Options.DEFAULT_MAX_MESSAGES_IN_OUTGOING_QUEUE));
+            .maxMessagesInOutgoingQueue(mmiq);
 
         // Conditionally set receive buffer size based on separate flag
         boolean receiveBufferEnabled = readBoolean(jv, "nats.receive.buffer.enabled", false);
@@ -328,6 +334,7 @@ public class Tps extends Workload {
         Debug.info(label, "maxReconnects", o.getMaxReconnect());
         Debug.info(label, "reconnectBufferSize", o.getReconnectBufferSize());
         Debug.info(label, "bufferSize", o.getBufferSize());
+        Debug.info(label, "targetTps", targetTps);
         Debug.info(label, "maxMessagesInOutgoingQueue", o.getMaxMessagesInOutgoingQueue());
 
         Debug.info(label, "receiveBufferSize", o.getReceiveBufferSize());
