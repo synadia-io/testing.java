@@ -248,7 +248,7 @@ public abstract class Debug {
     public static final DateTimeFormatter SIMPLE_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss.SSSS");
 
     public static String simpleTime(long javaTime) {
-        return SIMPLE_TIME_FORMATTER.format(Instant.ofEpochMilli(javaTime));
+        return SIMPLE_TIME_FORMATTER.format(ZonedDateTime.from(Instant.ofEpochMilli(javaTime)));
     }
 
     public static String simpleTime() {
