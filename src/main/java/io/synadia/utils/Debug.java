@@ -12,6 +12,7 @@ import io.nats.client.support.DateTimeUtils;
 import io.nats.client.support.JsonSerializable;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -219,12 +220,12 @@ public abstract class Debug {
     }
 
     public static String time() {
-        switch (TIME_TYPE) {
-            case RFC_DATE_TIME: return rfcDateTime();
-            case RFC_TIME: return rfcTime();
-            case SIMPLE_TIME: return timeWithMillis();
-        }
-        return "" + System.currentTimeMillis();
+        return switch (TIME_TYPE) {
+            case RFC_DATE_TIME -> rfcDateTime();
+            case RFC_TIME -> rfcTime();
+            case SIMPLE_TIME -> simpleTime();
+            default -> "" + System.currentTimeMillis();
+        };
     }
 
     // RFC 2025-02-15T14:09:45
@@ -244,14 +245,18 @@ public abstract class Debug {
         return toRfc3339(zdt).substring(11);
     }
 
-    public static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss.SSSS");
+    public static final DateTimeFormatter SIMPLE_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss.SSSS");
 
-    public static String timeWithMillis() {
-        return timeWithMillis(DateTimeUtils.gmtNow());
+    public static String simpleTime(long javaTime) {
+        return SIMPLE_TIME_FORMATTER.format(Instant.ofEpochMilli(javaTime));
     }
 
-    public static String timeWithMillis(ZonedDateTime zdt) {
-        return TIME_FORMATTER.format(zdt);
+    public static String simpleTime() {
+        return SIMPLE_TIME_FORMATTER.format(DateTimeUtils.gmtNow());
+    }
+
+    public static String simpleTime(ZonedDateTime zdt) {
+        return SIMPLE_TIME_FORMATTER.format(zdt);
     }
 
     public static String dataString(Message msg) {
