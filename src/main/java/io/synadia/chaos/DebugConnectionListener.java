@@ -40,12 +40,22 @@ public class DebugConnectionListener extends OutputConnectionListener {
     @Override
     public void connectionEvent(Connection conn, Events type, Long time, String uriDetails) {
         if (outputLabel != null) {
-            String ts = time == null ? Debug.simpleTime() : Debug.simpleTime(time);
-            Debug.info(outputLabel, "%s@%s", id(conn), ts, "%s(%s)", type.getEvent(), conn.getStatus(), uriDetails);
+            try {
+                String ts = time == null ? Debug.simpleTime() : Debug.simpleTime(time);
+                Debug.info(outputLabel, "%s@%s", id(conn), ts, "%s(%s)", type.getEvent(), conn.getStatus(), uriDetails);
+            }
+            catch (Exception e) {
+                Debug.info("CL connectionEvent ERROR", e);
+            }
         }
     }
 
     private String id(Connection conn) {
-        return connectionHashToId.computeIfAbsent(conn.hashCode(), k -> Integer.toString(connectionId.incrementAndGet()));
+        try {
+            return connectionHashToId.computeIfAbsent(conn.hashCode(), k -> Integer.toString(connectionId.incrementAndGet()));
+        } catch (Exception e) {
+            Debug.info("CL id ERROR", e);
+            return "-1";
+        }
     }
 }
