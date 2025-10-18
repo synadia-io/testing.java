@@ -4,10 +4,7 @@ import io.nats.client.Connection;
 import io.nats.client.JetStreamApiException;
 import io.nats.client.JetStreamManagement;
 import io.nats.client.Message;
-import io.nats.client.api.ConsumerConfiguration;
-import io.nats.client.api.ConsumerInfo;
-import io.nats.client.api.SequenceInfo;
-import io.nats.client.api.StreamInfo;
+import io.nats.client.api.*;
 import io.nats.client.impl.Headers;
 import io.nats.client.impl.NatsJetStreamMetaData;
 import io.nats.client.impl.NatsMessage;
@@ -21,7 +18,7 @@ import java.util.List;
 import static io.nats.client.support.DateTimeUtils.toRfc3339;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-// MODIFIED 10/06/2025
+// MODIFIED 10/17/2025
 
 @SuppressWarnings("SameParameterValue")
 public abstract class Debug {
@@ -53,11 +50,11 @@ public abstract class Debug {
     }
 
     public static void msg(Message msg, Object... extras) {
-        info(null, msg, true, stringify(extras, false));
+        info(null, msg, true, extras, false);
     }
 
     public static void msg(String label, Message msg, Object... extras) {
-        info(label, msg, true, stringify(extras, false));
+        info(label, msg, true, extras, false);
     }
 
     public static void stackTrace(String label) {
@@ -110,14 +107,14 @@ public abstract class Debug {
             info(label, null, false, null);
         }
         else if (extras[0] instanceof NatsMessage) {
-            info(label, (NatsMessage)extras[0], true, stringify(extras, true));
+            info(label, (NatsMessage)extras[0], true, extras, true);
         }
         else {
-            info(label, null, false, stringify(extras, false));
+            info(label, null, false, extras, false);
         }
     }
 
-    public static void info(String label, Message msg, boolean forMsg, String extra) {
+    public static void info(String label, Message msg, boolean forMsg, Object[] extras, boolean skipFirst) {
         if (PAUSE) { return; }
         String start;
         if (TIME_TYPE > NO_TIME && PRINT_THREAD_ID) {
@@ -133,13 +130,6 @@ public abstract class Debug {
             start = "";
         }
 
-        if (extra == null) {
-            extra = "";
-        }
-        else {
-            extra = SEP + extra;
-        }
-
         if (label != null) {
             label = label.trim();
         }
@@ -148,6 +138,16 @@ public abstract class Debug {
         }
         else {
             label = start + label;
+        }
+
+        int indent = label.length() + 1;
+        String extra = stringify(indent, extras, skipFirst);
+
+        if (extra == null) {
+            extra = "";
+        }
+        else {
+            extra = SEP + extra;
         }
 
         if (msg == null) {
@@ -172,7 +172,7 @@ public abstract class Debug {
         else {
             DEBUG_PRINTER.println(label + sidString(msg) + msgInfoString(msg) + dataString(msg) + replyToString(msg) + extra);
         }
-        debugHdr(label.length() + 1, msg);
+        debugHdr(indent, msg);
     }
 
     private static String messageString(Message msg) {
@@ -265,13 +265,13 @@ public abstract class Debug {
         return s.substring(at, at2) + SEP;
     }
 
-    public static String stringify(Object[] extras, boolean skipFirst) {
+    public static String stringify(int indent, Object[] extras, boolean skipFirst) {
         if (extras == null || extras.length == 0) {
             return null;
         }
 
         if (extras.length == 1) {
-            return skipFirst ? null : getString(extras[0]);
+            return skipFirst ? null : getString(indent, extras[0]);
         }
 
         boolean notFirst = false;
@@ -284,9 +284,9 @@ public abstract class Debug {
                 notFirst = true;
             }
 
-            String xtra = getString(extras[i]);
+            String xtra = getString(indent, extras[i]);
             while (xtra.contains("%s")) {
-                xtra = xtra.replaceFirst(REPLACE, getString(extras[++i]));
+                xtra = xtra.replaceFirst(REPLACE, getString(indent, extras[++i]));
             }
             sb.append(xtra);
         }
@@ -294,78 +294,76 @@ public abstract class Debug {
         return sb.length() == 0 ? null : sb.toString();
     }
 
-    public static String getString(Object o) {
-        if (o == null) {
-            return "null";
-        }
-        if (o instanceof Message) {
-            Message msg = (Message)o;
-            if (msg.getSubject() == null) {
-                return msg.toString();
+    public static String getString(int indent, Object o) {
+        switch (o) {
+            case null -> {
+                return "null";
             }
-            return msgInfoString(msg) + dataString(msg) + replyToString(msg);
-        }
-//        if (o instanceof ConsumerInfo) {
-//            o = ((ConsumerInfo)o).getConsumerConfiguration();
-//        }
-        if (o instanceof ConsumerInfo) {
-            return consumerInfoString((ConsumerInfo)o);
-        }
-        if (o instanceof SequenceInfo) {
-            return sequenceInfoString((SequenceInfo)o);
-        }
-        if (o instanceof NatsJetStreamMetaData) {
-            return metaDataString((NatsJetStreamMetaData)o);
-        }
-        if (o instanceof ZonedDateTime) {
-            return DateTimeUtils.toRfc3339((ZonedDateTime)o);
-        }
-//        if (o instanceof ZonedDateTime) {
-//            return zdtString((ZonedDateTime)o);
-//        }
-        if (o instanceof ConsumerConfiguration) {
-            return formatted((ConsumerConfiguration)o);
-        }
-        if (o instanceof Headers) {
-            Headers h = (Headers)o;
-            boolean notFirst = false;
-            StringBuilder sb = new StringBuilder("[");
-            for (String key : h.keySet()) {
-                if (notFirst) {
-                    sb.append(',');
+            case Message msg -> {
+                if (msg.getSubject() == null) {
+                    return msg.toString();
                 }
-                else {
-                    notFirst = true;
-                }
-                sb.append(key).append("=").append(h.get(key));
+                return msgInfoString(msg) + dataString(msg) + replyToString(msg);
             }
-            return sb.append(']').toString();
-        }
-        if (o instanceof JsonSerializable) {
-            return ((JsonSerializable)o).toJson();
-        }
-        if (o instanceof byte[]) {
-            byte[] bytes = (byte[])o;
-            if (bytes.length == 0) {
-                return "<byte[0]>";
+            case ConsumerInfo consumerInfo -> {
+                return consumerInfoString(consumerInfo);
             }
-            return new String((byte[])o);
-        }
-        if (o instanceof String[]) {
-            StringBuilder sb = new StringBuilder();
-            boolean first = true;
-            for (String s : (String[])o) {
-                if (first) {
-                    first = false;
-                }
-                else {
-                    sb.append(", ");
-                }
-                sb.append('\'')
-                    .append(s == null ? "<null>" : (s.isEmpty() ? "<empty>" : s))
-                    .append('\'');
+            case SequenceInfo sequenceInfo -> {
+                return sequenceInfoString(sequenceInfo);
             }
-            return sb.toString();
+            case NatsJetStreamMetaData natsJetStreamMetaData -> {
+                return metaDataString(natsJetStreamMetaData);
+            }
+            case ServerInfo serverInfo -> {
+                return serverInfoString(indent, serverInfo);
+            }
+            case ZonedDateTime zonedDateTime -> {
+                return DateTimeUtils.toRfc3339(zonedDateTime);
+            }
+            case ConsumerConfiguration consumerConfiguration -> {
+                return formatted(consumerConfiguration);
+            }
+            case Headers h -> {
+                boolean notFirst = false;
+                StringBuilder sb = new StringBuilder("[");
+                for (String key : h.keySet()) {
+                    if (notFirst) {
+                        sb.append(',');
+                    }
+                    else {
+                        notFirst = true;
+                    }
+                    sb.append(key).append("=").append(h.get(key));
+                }
+                return sb.append(']').toString();
+            }
+            case JsonSerializable jsonSerializable -> {
+                return jsonSerializable.toJson();
+            }
+            case byte[] bytes -> {
+                if (bytes.length == 0) {
+                    return "<byte[0]>";
+                }
+                return new String(bytes);
+            }
+            case String[] strings -> {
+                StringBuilder sb = new StringBuilder();
+                boolean first = true;
+                for (String s : strings) {
+                    if (first) {
+                        first = false;
+                    }
+                    else {
+                        sb.append(", ");
+                    }
+                    sb.append('\'')
+                        .append(s == null ? "<null>" : (s.isEmpty() ? "<empty>" : s))
+                        .append('\'');
+                }
+                return sb.toString();
+            }
+            default -> {
+            }
         }
         String s = o.toString();
         return s.isEmpty() ? "<empty>" : s;
@@ -488,6 +486,15 @@ public abstract class Debug {
                 ", pending=" + meta.pendingCount() +
                 ", timestamp=" + zdtString(meta.timestamp()) +
                 '}';
+    }
+
+    private static String serverInfoString(int indent, ServerInfo si) {
+        String pad = PAD.substring(0, indent);
+        return si.toString()
+            .replace("ServerInfo{", "ServerInfo ")
+            .replace(", ", "\n" + pad)
+            .replace("}", "")
+            ;
     }
 
     public static String zdtString(ZonedDateTime zdt) {

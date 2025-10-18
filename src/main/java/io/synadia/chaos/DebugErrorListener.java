@@ -13,17 +13,35 @@
 
 package io.synadia.chaos;
 
-import io.nats.client.*;
+import io.nats.client.Connection;
+import io.nats.client.Consumer;
+import io.nats.client.JetStreamSubscription;
+import io.nats.client.Message;
 import io.nats.client.support.Status;
 import io.synadia.utils.Debug;
 
 public class DebugErrorListener extends OutputErrorListener {
-    public DebugErrorListener(String outputLabel) {
-        super(outputLabel);
+    boolean printStackTrace;
+
+    public DebugErrorListener() {
+        this(null, false);
     }
 
-    protected void output(String eventLabel, Connection conn, Consumer consumer, Subscription sub, Object... pairs) {
-        Debug.info(outputLabel, constructMessage(eventLabel, consumer, sub, pairs));
+    public DebugErrorListener(boolean printStackTrace) {
+        this(null, printStackTrace);
+    }
+
+    public DebugErrorListener(String label) {
+        this(label, false);
+    }
+
+    public DebugErrorListener(String elLabel, boolean printStackTrace) {
+        super(elLabel == null ? "EL" : elLabel);
+        this.printStackTrace = printStackTrace;
+    }
+
+    private String string(Connection conn) {
+        return "Connection(" + conn.hashCode() + ") " + conn.getStatus();
     }
 
     /**
@@ -31,15 +49,29 @@ public class DebugErrorListener extends OutputErrorListener {
      */
     @Override
     public void errorOccurred(final Connection conn, final String error) {
-        output("SEVERE errorOccurred", conn, null, null, "Error: ", error);
+        if (outputLabel != null) {
+            Debug.info(outputLabel, "errorOccurred", string(conn), "Error: " + error);
+        }
     }
 
     /**
      * {@inheritDoc}
      */
+    @SuppressWarnings("CallToPrintStackTrace")
     @Override
     public void exceptionOccurred(final Connection conn, final Exception exp) {
-        output("SEVERE exceptionOccurred", conn, null, null, "EX: ", exp);
+        if (outputLabel != null) {
+            Debug.info(outputLabel, "exceptionOccurred:", string(conn), exp);
+            if (exp.getCause() != null) {
+                Debug.info(outputLabel, "            cause:", exp.getCause());
+                if (printStackTrace) {
+                    exp.getCause().printStackTrace();
+                }
+            }
+            else if (printStackTrace) {
+                exp.printStackTrace();
+            }
+        }
     }
 
     /**
@@ -47,7 +79,9 @@ public class DebugErrorListener extends OutputErrorListener {
      */
     @Override
     public void slowConsumerDetected(final Connection conn, final Consumer consumer) {
-        output("WARN slowConsumerDetected", conn, consumer, null);
+        if (outputLabel != null) {
+            Debug.info(outputLabel, "slowConsumerDetected", string(conn), consumer);
+        }
     }
 
     /**
@@ -55,7 +89,9 @@ public class DebugErrorListener extends OutputErrorListener {
      */
     @Override
     public void messageDiscarded(final Connection conn, final Message msg) {
-        output("INFO messageDiscarded", conn, null, null, "Message: ", msg);
+        if (outputLabel != null) {
+            Debug.info(outputLabel, "messageDiscarded", string(conn), "Message: " + msg);
+        }
     }
 
     /**
@@ -64,7 +100,9 @@ public class DebugErrorListener extends OutputErrorListener {
     @Override
     public void heartbeatAlarm(final Connection conn, final JetStreamSubscription sub,
                                final long lastStreamSequence, final long lastConsumerSequence) {
-        output("SEVERE HB Alarm", conn, null, sub, "lastStreamSeq: ", lastStreamSequence, "lastConsumerSeq: ", lastConsumerSequence);
+        if (outputLabel != null) {
+            Debug.info(outputLabel, "heartbeatAlarm", string(conn), sub, "lastStreamSequence: " + lastStreamSequence, "lastConsumerSequence: " + lastConsumerSequence);
+        }
     }
 
     /**
@@ -72,7 +110,9 @@ public class DebugErrorListener extends OutputErrorListener {
      */
     @Override
     public void unhandledStatus(final Connection conn, final JetStreamSubscription sub, final Status status) {
-        output("WARN unhandledStatus", conn, null, sub, "Status:", status);
+        if (outputLabel != null) {
+            Debug.info(outputLabel, "unhandledStatus", string(conn), sub, "Status: " + status);
+        }
     }
 
     /**
@@ -80,6 +120,9 @@ public class DebugErrorListener extends OutputErrorListener {
      */
     @Override
     public void pullStatusWarning(Connection conn, JetStreamSubscription sub, Status status) {
+        if (outputLabel != null) {
+            Debug.info(outputLabel, "pullStatusWarning", string(conn), sub, "Status: " + status);
+        }
     }
 
     /**
@@ -87,7 +130,9 @@ public class DebugErrorListener extends OutputErrorListener {
      */
     @Override
     public void pullStatusError(Connection conn, JetStreamSubscription sub, Status status) {
-        output("SEVERE pullStatusError", conn, null, sub, "Status:", status);
+        if (outputLabel != null) {
+            Debug.info(outputLabel, "pullStatusError", string(conn), sub, "Status: " + status);
+        }
     }
 
     /**
@@ -95,11 +140,18 @@ public class DebugErrorListener extends OutputErrorListener {
      */
     @Override
     public void flowControlProcessed(Connection conn, JetStreamSubscription sub, String id, FlowControlSource source) {
-        output("INFO flowControlProcessed", conn, null, sub, "FlowControlSource:", source);
+        if (outputLabel != null) {
+            Debug.info(outputLabel, "flowControlProcessed", string(conn), sub, "FlowControlSource: " + source);
+        }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void socketWriteTimeout(Connection conn) {
-        output("SEVERE socketWriteTimeout", conn, null, null);
+        if (outputLabel != null) {
+            Debug.info(outputLabel, "socketWriteTimeout", string(conn));
+        }
     }
 }

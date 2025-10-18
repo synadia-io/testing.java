@@ -6,30 +6,35 @@ package io.synadia.chaos;
 import io.nats.client.Connection;
 import io.synadia.utils.Debug;
 
-import static io.synadia.chaos.ConnectionUtils.eventMessage;
-
 public class DebugConnectionListener extends OutputConnectionListener {
 
-    public DebugConnectionListener(String outputLabel) {
-        super(outputLabel, true);
+    public DebugConnectionListener() {
+        this(null, false);
     }
 
-    public DebugConnectionListener(String outputLabel, boolean connectionEventsOnly) {
-        super(outputLabel, connectionEventsOnly);
+    public DebugConnectionListener(String clLabel) {
+        super(clLabel, false);
+    }
+
+    public DebugConnectionListener(boolean connectionEventsOnly) {
+        this(null, connectionEventsOnly);
+    }
+
+    public DebugConnectionListener(String clLabel, boolean connectionEventsOnly) {
+        super(clLabel == null ? "CL" : clLabel, connectionEventsOnly);
     }
 
     @Override
-    public void reportFunction(CustomFunction reportFunction) {
-        throw new UnsupportedOperationException("Report Function cannot be overridden.");
-    }
-
-    @Override
-    protected void report(Connection conn, Events type, Long time, String uriDetails) {
-        if (uriDetails == null) {
-            Debug.info(outputLabel, "CL", eventMessage(type));
+    public void connectionEvent(Connection conn, Events type) {
+        if (outputLabel != null) {
+            Debug.info(outputLabel, "%s/%s/%s", Integer.toHexString(conn.hashCode()), conn.getStatus(), type.getEvent());
         }
-        else {
-            Debug.info(outputLabel, "CL", eventMessage(type), uriDetails);
+    }
+
+    @Override
+    public void connectionEvent(Connection conn, Events type, Long time, String uriDetails) {
+        if (outputLabel != null) {
+            Debug.info(outputLabel, "%s@%s", Integer.toHexString(conn.hashCode()).toUpperCase(), time, "%s(%s)", type.getEvent(), conn.getStatus(), uriDetails);
         }
     }
 }

@@ -15,6 +15,8 @@ import io.synadia.utils.Debug;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -158,7 +160,8 @@ public class Tps extends Workload {
     AtomicLong receivedLosses = new AtomicLong(0);
 
     private void tpsReceive() throws IOException, InterruptedException {
-        Options options = buildOptions(params, 1, false, new NoOpStatistics(), (c, et, t, d) -> receivedLastMessageId.set(-1));
+        int firstServerIx = commandLine.args.isEmpty() ? 1 : Integer.parseInt(commandLine.args.getFirst());
+        Options options = buildOptions(params, firstServerIx, false, new NoOpStatistics(), (c, et, t, d) -> receivedLastMessageId.set(-1));
         try (Connection nc = Nats.connect(options)) {
             startMetricsLogging(nc);
             MessageHandler handler = msg -> {
@@ -233,7 +236,7 @@ public class Tps extends Workload {
         }
     }
 
-    private static Options buildOptions(Params params, int serverIx, boolean sender,
+    private static Options buildOptions(Params params, int firstServerIx, boolean sender,
                                         StatisticsCollector collector,
                                         OutputConnectionListener.CustomFunction behavior) {
         String label = sender ? TPS_SENDER : TPS_RECEIVER;
@@ -241,9 +244,18 @@ public class Tps extends Workload {
         DebugConnectionListener dbcl = new DebugConnectionListener(label, true);
         dbcl.afterFunction(behavior);
 
+        List<String> ordered = new ArrayList<>();
+        for (int x = firstServerIx; x < params.servers.size(); x++) {
+            ordered.add(params.servers.get(x));
+        }
+        for (int x = 0; x < firstServerIx; x++) {
+            ordered.add(params.servers.get(x));
+        }
+
         Options.Builder builder  = new Options.Builder()
-            .server(params.servers.get(serverIx))
+            .servers(ordered.toArray(new String[0]))
             .ignoreDiscoveredServers()
+            .noRandomize()
             .statisticsCollector(collector)
             .connectionListener(dbcl)
 //            .errorListener(new DebugErrorListener(label))

@@ -90,6 +90,7 @@ public class Generator {
             return;
         }
 
+        StringBuilder bootStrap = null;
         Kind lastKind = null;
         for (int x = 0; x < gen.serverCount; x++) {
             String scriptName = "server" + x;
@@ -115,6 +116,13 @@ public class Generator {
 
             if (which != Which.Local && gen.doPublic && !current.failground) {
                 lastKind = printInstance(lastKind, Kind.SERVER, current, scriptName);
+                if (bootStrap == null) {
+                    bootStrap = new StringBuilder("BOOTSTRAP \"");
+                }
+                else {
+                    bootStrap.append(",");
+                }
+                bootStrap.append("nats://").append(current.publicIpAddr);
                 printSsh(current, Kind.SERVER, gen);
                 printNatsCli(current);
                 System.out.println();
@@ -131,6 +139,10 @@ public class Generator {
             }
 
             calc.runningServers.add(calc.runningServers.removeFirst());
+        }
+
+        if (bootStrap != null) {
+            System.out.println(bootStrap.append('"'));
         }
 
         calc.configTemplatePrivate = finishJsonTemplatePopulate(calc.configTemplatePrivate, gen, calc.privateBootstrap, calc.privateAdmin);

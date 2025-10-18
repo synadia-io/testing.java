@@ -7,7 +7,7 @@ alias dir='ls -la'
 alias cls='clear'
 
 # 1. INSTALL NATS
-curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@main | PREFIX=. sh
+curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@v2.12.0 | PREFIX=. sh
 sudo mv nats-server /usr/bin/
 ls -la /usr/bin/nats-server
 which nats-server
