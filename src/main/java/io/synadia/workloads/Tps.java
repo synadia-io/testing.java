@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static io.nats.client.support.JsonValueUtils.*;
@@ -178,47 +177,35 @@ public class Tps extends Workload {
     AtomicLong receivedLastMessageId = new AtomicLong(-1);
     AtomicLong receivedTotalLost = new AtomicLong(0);
     AtomicLong receivedLosses = new AtomicLong(0);
-    AtomicLong receivedTotalLostAfterConn = new AtomicLong(0);
-    AtomicLong receivedLossesAfterConn = new AtomicLong(0);
-    AtomicBoolean connectionEvent = new AtomicBoolean(false);
+    AtomicLong lastLost = new AtomicLong(0);
 
     private void tpsReceive() throws IOException, InterruptedException {
         int firstServerIx = commandLine.args.isEmpty() ? 1 : Integer.parseInt(commandLine.args.getFirst());
         Options options = buildOptions(params, firstServerIx, false, targetTps, new NoOpStatistics(), (c, et, t, d) -> {
             receivedLastMessageId.set(-1);
-            connectionEvent.set(true);
         });
         try (Connection nc = Nats.connect(options)) {
             startMetricsLogging(nc);
             MessageHandler handler = msg -> {
-                if (msg.getData().length != this.payloadSize) {
-                    Debug.info(TPS_RECEIVER, "Unexpected payload size: %s B (expected: %s B)", msg.getData().length, this.payloadSize);
-                }
+//                if (msg.getData().length != this.payloadSize) {
+//                    Debug.info(TPS_RECEIVER, "Unexpected payload size: %s B (expected: %s B)", msg.getData().length, this.payloadSize);
+//                }
                 //noinspection DataFlowIssue // headers won't be null.
                 long mid = Long.parseLong(msg.getHeaders().getFirst(messageIdKey));
                 long expected = receivedLastMessageId.incrementAndGet();
                 if (expected == 0) {
                     receivedLastMessageId.set(mid);
+                    receivedTotalLost.addAndGet(-lastLost.get());
+                    receivedLosses.decrementAndGet();
                 }
                 else if (mid != expected) {
                     long diff = mid - expected;
                     if (diff > 0) {
+                        lastLost.set(diff);
                         receivedLastMessageId.set(-1);
-                        String mark;
-                        long totalLosses;
-                        long numLosses;
-                        if (connectionEvent.get()) {
-                            mark = "****** After Connection Event";
-                            totalLosses = receivedTotalLostAfterConn.addAndGet(diff);
-                            numLosses = receivedLossesAfterConn.incrementAndGet();
-                            connectionEvent.set(false);
-                        }
-                        else {
-                            mark = "******";
-                            totalLosses = receivedTotalLost.addAndGet(diff);
-                            numLosses = receivedLosses.incrementAndGet();
-                        }
-                        Debug.info(TPS_RECEIVER, mark
+                        long totalLosses = receivedTotalLost.addAndGet(diff);
+                        long numLosses = receivedLosses.incrementAndGet();
+                        Debug.info(TPS_RECEIVER, "******"
                             , "Got Message Id: %s but expected: %s", format3(mid), format3(expected)
                             , "Loss of %s", format3(diff)
                             , "Average Loss of %s", format3((float) totalLosses / numLosses));
