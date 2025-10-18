@@ -16,8 +16,10 @@ import io.synadia.utils.Debug;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static io.nats.client.support.JsonValueUtils.*;
@@ -158,10 +160,16 @@ public class Tps extends Workload {
     AtomicLong receivedLastMessageId = new AtomicLong(-1);
     AtomicLong receivedTotalLost = new AtomicLong(0);
     AtomicLong receivedLosses = new AtomicLong(0);
+    AtomicLong receivedTotalLostAfterConn = new AtomicLong(0);
+    AtomicLong receivedLossesAfterConn = new AtomicLong(0);
+    AtomicBoolean connectionEvent = new AtomicBoolean(false);
 
     private void tpsReceive() throws IOException, InterruptedException {
         int firstServerIx = commandLine.args.isEmpty() ? 1 : Integer.parseInt(commandLine.args.getFirst());
-        Options options = buildOptions(params, firstServerIx, false, new NoOpStatistics(), (c, et, t, d) -> receivedLastMessageId.set(-1));
+        Options options = buildOptions(params, firstServerIx, false, new NoOpStatistics(), (c, et, t, d) -> {
+            receivedLastMessageId.set(-1);
+            connectionEvent.set(true);
+        });
         try (Connection nc = Nats.connect(options)) {
             startMetricsLogging(nc);
             MessageHandler handler = msg -> {
@@ -178,12 +186,24 @@ public class Tps extends Workload {
                     long diff = mid - expected;
                     if (diff > 0) {
                         receivedLastMessageId.set(-1);
-                        long totalLosses = receivedTotalLost.addAndGet(diff);
-                        long numLosses = receivedLosses.incrementAndGet();
-                        Debug.info(TPS_RECEIVER, "******"
-                            , "Got Message Id: %s but expected: %s", mid, expected
-                            , "Loss of %s", diff
-                            , "Average Loss of %s", format3NoGrouping((float)totalLosses / numLosses));
+                        String mark;
+                        long totalLosses;
+                        long numLosses;
+                        if (connectionEvent.get()) {
+                            mark = "****** After Connection Event";
+                            totalLosses = receivedTotalLostAfterConn.addAndGet(diff);
+                            numLosses = receivedLossesAfterConn.incrementAndGet();
+                            connectionEvent.set(false);
+                        }
+                        else {
+                            mark = "******";
+                            totalLosses = receivedTotalLost.addAndGet(diff);
+                            numLosses = receivedLosses.incrementAndGet();
+                        }
+                        Debug.info(TPS_RECEIVER, mark
+                            , "Got Message Id: %s but expected: %s", format3(mid), format3(expected)
+                            , "Loss of %s", format3(diff)
+                            , "Average Loss of %s", format3((float) totalLosses / numLosses));
                     }
                     else {
                         receivedLastMessageId.set(mid);
@@ -241,24 +261,18 @@ public class Tps extends Workload {
                                         OutputConnectionListener.CustomFunction behavior) {
         String label = sender ? TPS_SENDER : TPS_RECEIVER;
         JsonValue jv = params.jv;
-        DebugConnectionListener dbcl = new DebugConnectionListener(label, true);
+        DebugConnectionListener dbcl = new DebugConnectionListener(true);
         dbcl.afterFunction(behavior);
 
-        List<String> ordered = new ArrayList<>();
-        for (int x = firstServerIx; x < params.servers.size(); x++) {
-            ordered.add(params.servers.get(x));
-        }
-        for (int x = 0; x < firstServerIx; x++) {
-            ordered.add(params.servers.get(x));
-        }
+        String[] servers = figureServers(params.servers, firstServerIx);
 
         Options.Builder builder  = new Options.Builder()
-            .servers(ordered.toArray(new String[0]))
+            .servers(servers)
             .ignoreDiscoveredServers()
             .noRandomize()
             .statisticsCollector(collector)
             .connectionListener(dbcl)
-//            .errorListener(new DebugErrorListener(label))
+//            .errorListener(new DebugErrorListener())
             .errorListener(new ErrorListener() {})
             .connectionTimeout(readLong(jv, "nats.connection.timeout.millis", 5000))
             .maxReconnects(readInteger(jv, "nats.max.reconnects", -1))
@@ -316,5 +330,14 @@ public class Tps extends Workload {
         Debug.info(label, "socketReadTimeoutMillis", o.getSocketReadTimeoutMillis());
 
         return o;
+    }
+
+    private static String[] figureServers(List<String> paramsServers, int firstServerIx) {
+        String firstServer = paramsServers.get(firstServerIx);
+        List<String> ordered = new ArrayList<>(paramsServers);
+        ordered.remove(firstServer);
+        Collections.shuffle(ordered);
+        ordered.addFirst(firstServer);
+        return ordered.toArray(new String[0]);
     }
 }

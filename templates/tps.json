@@ -11,7 +11,7 @@
   "nats.reconnect.wait.millis": 5000,
   "nats.max.reconnects": -1,
   "nats.socket.write.timeout.millis": 100,
-  "nats.socket.read.timeout.millis": 15000,
+  "nats.socket.read.timeout.millis": 10000,
   "nats.connection.max.ping.out": 2,
   "nats.connection.send.buffer": 65536,
   "nats.connection.receive.buffer": 12500000,
