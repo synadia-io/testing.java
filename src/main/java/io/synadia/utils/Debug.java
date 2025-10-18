@@ -13,6 +13,7 @@ import io.nats.client.support.JsonSerializable;
 
 import java.io.IOException;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import static io.nats.client.support.DateTimeUtils.toRfc3339;
@@ -28,9 +29,10 @@ public abstract class Debug {
     }
 
     public static final int NO_TIME = 0;
-    public static final int REGULAR_TIME = 1;
-    public static final int RFC_TIME = -1;
-    public static final int RFC_SHORT_TIME = -2;
+    public static final int MILLIS_TIME = 1;
+    public static final int SIMPLE_TIME = 2;
+    public static final int RFC_DATE_TIME = 3;
+    public static final int RFC_TIME = 4;
 
     public static final String SEP = " | ";
     public static final String DIV = "/";
@@ -38,7 +40,7 @@ public abstract class Debug {
     public static final String REPLACE = "\\Q%s\\E";
     public static boolean DO_NOT_TRUNCATE = true;
     public static boolean PRINT_THREAD_ID = true;
-    public static int TIME_TYPE = REGULAR_TIME;
+    public static int TIME_TYPE = SIMPLE_TIME;
     public static boolean PAUSE = false;
     public static DebugPrinter DEBUG_PRINTER = System.out::println;
     public static int MAX_DATA_DISPLAY = 50;
@@ -218,27 +220,38 @@ public abstract class Debug {
 
     public static String time() {
         switch (TIME_TYPE) {
-            case RFC_TIME -> rfcTime();
-            case RFC_SHORT_TIME -> rfcShortTime();
+            case RFC_DATE_TIME: return rfcDateTime();
+            case RFC_TIME: return rfcTime();
+            case SIMPLE_TIME: return timeWithMillis();
         }
         return "" + System.currentTimeMillis();
     }
 
     // RFC 2025-02-15T14:09:45
-    public static String rfcTime() {
+    public static String rfcDateTime() {
         return toRfc3339(DateTimeUtils.gmtNow()).substring(0, 19);
     }
 
-    public static String rfcTime(ZonedDateTime zdt) {
+    public static String rfcDateTime(ZonedDateTime zdt) {
         return toRfc3339(zdt).substring(0, 19);
     }
 
-    public static String rfcShortTime() {
-        return rfcShortTime(DateTimeUtils.gmtNow());
+    public static String rfcTime() {
+        return rfcTime(DateTimeUtils.gmtNow());
     }
 
-    public static String rfcShortTime(ZonedDateTime zdt) {
-        return toRfc3339(zdt).substring(0, 19).replace("-", "").replace(":", "");
+    public static String rfcTime(ZonedDateTime zdt) {
+        return toRfc3339(zdt).substring(11);
+    }
+
+    public static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss.SSSS");
+
+    public static String timeWithMillis() {
+        return timeWithMillis(DateTimeUtils.gmtNow());
+    }
+
+    public static String timeWithMillis(ZonedDateTime zdt) {
+        return TIME_FORMATTER.format(zdt);
     }
 
     public static String dataString(Message msg) {
