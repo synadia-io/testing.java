@@ -18,6 +18,8 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -163,6 +165,7 @@ public class Tps extends Workload {
     AtomicLong receivedTotalLostAfterConn = new AtomicLong(0);
     AtomicLong receivedLossesAfterConn = new AtomicLong(0);
     AtomicBoolean connectionEvent = new AtomicBoolean(false);
+    ExecutorService executorService = Executors.newSingleThreadExecutor();
 
     private void tpsReceive() throws IOException, InterruptedException {
         int firstServerIx = commandLine.args.isEmpty() ? 1 : Integer.parseInt(commandLine.args.getFirst());
@@ -172,45 +175,51 @@ public class Tps extends Workload {
         });
         try (Connection nc = Nats.connect(options)) {
             startMetricsLogging(nc);
-            MessageHandler handler = msg -> {
-                if (msg.getData().length != this.payloadSize) {
-                    Debug.info(TPS_RECEIVER, "Unexpected payload size: %s B (expected: %s B)", msg.getData().length, this.payloadSize);
-                }
-                //noinspection DataFlowIssue // headers won't be null.
-                long mid = Long.parseLong(msg.getHeaders().getFirst(messageIdKey));
-                long expected = receivedLastMessageId.incrementAndGet();
-                if (expected == 0) {
-                    receivedLastMessageId.set(mid);
-                }
-                else if (mid != expected) {
-                    long diff = mid - expected;
-                    if (diff > 0) {
-                        receivedLastMessageId.set(-1);
-                        String mark;
-                        long totalLosses;
-                        long numLosses;
-                        if (connectionEvent.get()) {
-                            mark = "****** After Connection Event";
-                            totalLosses = receivedTotalLostAfterConn.addAndGet(diff);
-                            numLosses = receivedLossesAfterConn.incrementAndGet();
-                            connectionEvent.set(false);
-                        }
-                        else {
-                            mark = "******";
-                            totalLosses = receivedTotalLost.addAndGet(diff);
-                            numLosses = receivedLosses.incrementAndGet();
-                        }
-                        Debug.info(TPS_RECEIVER, mark
-                            , "Got Message Id: %s but expected: %s", format3(mid), format3(expected)
-                            , "Loss of %s", format3(diff)
-                            , "Average Loss of %s", format3((float) totalLosses / numLosses));
+            MessageHandler handler = msg -> executorService.submit(() -> {
+                try {
+                    if (msg.getData().length != this.payloadSize) {
+                        Debug.info(TPS_RECEIVER, "Unexpected payload size: %s B (expected: %s B)", msg.getData().length, this.payloadSize);
                     }
-                    else {
+                    Thread.sleep(10);
+                    //noinspection DataFlowIssue // headers won't be null.
+                    long mid = Long.parseLong(msg.getHeaders().getFirst(messageIdKey));
+                    long expected = receivedLastMessageId.incrementAndGet();
+                    if (expected == 0) {
                         receivedLastMessageId.set(mid);
                     }
+                    else if (mid != expected) {
+                        long diff = mid - expected;
+                        if (diff > 0) {
+                            receivedLastMessageId.set(-1);
+                            String mark;
+                            long totalLosses;
+                            long numLosses;
+                            if (connectionEvent.get()) {
+                                mark = "****** After Connection Event";
+                                totalLosses = receivedTotalLostAfterConn.addAndGet(diff);
+                                numLosses = receivedLossesAfterConn.incrementAndGet();
+                                connectionEvent.set(false);
+                            }
+                            else {
+                                mark = "******";
+                                totalLosses = receivedTotalLost.addAndGet(diff);
+                                numLosses = receivedLosses.incrementAndGet();
+                            }
+                            Debug.info(TPS_RECEIVER, mark
+                                , "Got Message Id: %s but expected: %s", format3(mid), format3(expected)
+                                , "Loss of %s", format3(diff)
+                                , "Average Loss of %s", format3((float) totalLosses / numLosses));
+                        }
+                        else {
+                            receivedLastMessageId.set(mid);
+                        }
+                    }
+                    receivedMessages.incrementAndGet();
                 }
-                receivedMessages.incrementAndGet();
-            };
+                catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            });
 
             Dispatcher currentDispatcher = nc.createDispatcher();
 
