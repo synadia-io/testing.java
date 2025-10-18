@@ -177,7 +177,7 @@ public class Tps extends Workload {
     AtomicLong receivedLastMessageId = new AtomicLong(-1);
     AtomicLong receivedTotalLost = new AtomicLong(0);
     AtomicLong receivedLosses = new AtomicLong(0);
-    AtomicLong lastLost = new AtomicLong(0);
+    AtomicLong lastLost = new AtomicLong(-1);
 
     private void tpsReceive() throws IOException, InterruptedException {
         int firstServerIx = commandLine.args.isEmpty() ? 1 : Integer.parseInt(commandLine.args.getFirst());
@@ -195,8 +195,10 @@ public class Tps extends Workload {
                 long expected = receivedLastMessageId.incrementAndGet();
                 if (expected == 0) {
                     receivedLastMessageId.set(mid);
-                    receivedTotalLost.addAndGet(-lastLost.get());
-                    receivedLosses.decrementAndGet();
+                    if (lastLost.get() != -1) {
+                        receivedTotalLost.addAndGet(-lastLost.get());
+                        receivedLosses.decrementAndGet();
+                    }
                 }
                 else if (mid != expected) {
                     long diff = mid - expected;
