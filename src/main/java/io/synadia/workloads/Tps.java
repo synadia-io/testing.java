@@ -93,10 +93,15 @@ public class Tps extends Workload {
             while (true) {
                 boolean droppedConnection = false;
                 while (nc.getStatus() != Connection.Status.CONNECTED) {
-                    sleep(100);
+                    Debug.info(TPS_SENDER, "Waiting to be connected...");
+                    sleep(10);
                     droppedConnection = true;
                 }
                 if (droppedConnection) {
+                    Debug.info(TPS_SENDER, "Waiting for previous messages to be flushed...");
+                    while (nc.outgoingPendingMessageCount() > 0) {
+                        sleep(10);
+                    }
                     // if we dropped connection, reset everything
                     startNanos = System.nanoTime();
                     currentSecond = 0;
