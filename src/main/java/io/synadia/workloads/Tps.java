@@ -9,9 +9,9 @@ import io.synadia.CommandLine;
 import io.synadia.Params;
 import io.synadia.Workload;
 import io.synadia.utils.Debug;
-import io.synadia.utils.TestingStatsCollector;
 import io.synadia.workloads.tps.TpsConnectionListener;
 import io.synadia.workloads.tps.TpsErrorListener;
+import io.synadia.workloads.tps.TpsStatsCollector;
 import io.synadia.workloads.tps.TpsWriteListener;
 
 import java.io.IOException;
@@ -85,12 +85,12 @@ public class Tps extends Workload {
     // Sender
     // ----------------------------------------------------------------------------------------------------
     AtomicLong pubId;
-    TestingStatsCollector sendStats;
+    TpsStatsCollector sendStats;
     TpsWriteListener sendWL;
 
     private void tpsSend() throws IOException, InterruptedException {
         pubId = new AtomicLong();
-        sendStats = new TestingStatsCollector(payloadSize);
+        sendStats = new TpsStatsCollector(payloadSize);
         sendWL = new TpsWriteListener();
 
         Options options = buildOptions(0)

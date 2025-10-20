@@ -1,14 +1,15 @@
 // Copyright (c) 2025 Synadia Communications Inc. All Rights Reserved.
 // See LICENSE and NOTICE file for details.
 
-package io.synadia.utils;
+package io.synadia.workloads.tps;
 
 import io.nats.client.impl.NoOpStatistics;
+import io.synadia.utils.Debug;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-public class TestingStatsCollector extends NoOpStatistics {
+public class TpsStatsCollector extends NoOpStatistics {
     private final AtomicLong bufferedMsgs;
     private final AtomicLong bufferedBytes;
     private final AtomicLong payloadMsgs;
@@ -26,7 +27,7 @@ public class TestingStatsCollector extends NoOpStatistics {
     private final AtomicLong lastWriteBytes;
     private final AtomicBoolean running;
 
-    public TestingStatsCollector(int payloadSize) {
+    public TpsStatsCollector(int payloadSize) {
         bufferedMsgs = new AtomicLong();
         bufferedBytes = new AtomicLong();
         payloadMsgs = new AtomicLong();
