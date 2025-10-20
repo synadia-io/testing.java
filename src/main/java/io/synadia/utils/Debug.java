@@ -122,13 +122,13 @@ public abstract class Debug {
         if (PAUSE) { return; }
         String start;
         if (TIME_TYPE > NO_TIME && PRINT_THREAD_ID) {
-            start = "[" + Thread.currentThread().getName() + "@" + time() + "] ";
+            start = "[" + getThreadName() + "@" + time() + "] ";
         }
         else if (TIME_TYPE > NO_TIME){
             start = "[" + time() + "] ";
         }
         else if (PRINT_THREAD_ID){
-            start = "[" + Thread.currentThread().getName() + "] ";
+            start = "[" + getThreadName() + "] ";
         }
         else {
             start = "";
@@ -177,6 +177,10 @@ public abstract class Debug {
             DEBUG_PRINTER.println(label + sidString(msg) + msgInfoString(msg) + dataString(msg) + replyToString(msg) + extra);
         }
         debugHdr(indent, msg);
+    }
+
+    private static String getThreadName() {
+        return Thread.currentThread().getName().replace("-thread-", "-");
     }
 
     private static String messageString(Message msg) {
@@ -283,6 +287,10 @@ public abstract class Debug {
         }
         int at2 = s.indexOf('"', at);
         return s.substring(at, at2) + SEP;
+    }
+
+    public static String stringify(Object... extras) {
+        return stringify(0, extras, false);
     }
 
     public static String stringify(int indent, Object[] extras, boolean skipFirst) {
