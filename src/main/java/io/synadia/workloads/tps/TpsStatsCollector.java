@@ -64,26 +64,35 @@ public class TpsStatsCollector extends NoOpStatistics {
 
     @Override
     public void registerWrite(long bytes) {
+        Collector cPay;
+        Collector cProto;
         if (phase1.get()) {
+            cPay = payloadCollector;
+            cProto = protocolCollector;
+        }
+        else {
+            cPay = payloadCollector2;
+            cProto = protocolCollector2;
+        }
 
-            payloadCollector.writtenMessages += payloadCollector.notWrittenMessages;
-            protocolCollector.writtenMessages += protocolCollector.notWrittenMessages;
-            payloadCollector.writtenBytes += payloadCollector.notWrittenBytes;
-            protocolCollector.writtenBytes += protocolCollector.notWrittenBytes;
+            cPay.writtenMessages += cPay.notWrittenMessages;
+            cProto.writtenMessages += cProto.notWrittenMessages;
+            cPay.writtenBytes += cPay.notWrittenBytes;
+            cProto.writtenBytes += cProto.notWrittenBytes;
 
-            long notWrittenMessages = payloadCollector.notWrittenMessages + protocolCollector.notWrittenMessages;
-            long notWrittenBytes = payloadCollector.notWrittenBytes + protocolCollector.notWrittenBytes;
+            long notWrittenMessages = cPay.notWrittenMessages + cProto.notWrittenMessages;
+            long notWrittenBytes = cPay.notWrittenBytes + cProto.notWrittenBytes;
             if (notWrittenBytes != bytes) {
                 Debug.info("STATS", "Mismatch %s vs %s", notWrittenBytes, bytes);
             }
 
-            lastWriteMessages = notWrittenMessages;
-            lastWriteBytes = bytes;
-
-            payloadCollector.notWrittenMessages = 0;
-            protocolCollector.notWrittenMessages = 0;
-            payloadCollector.notWrittenBytes = 0;
-            protocolCollector.notWrittenBytes = 0;
-        }
+            if (phase1.get()) {
+                lastWriteMessages = notWrittenMessages;
+                lastWriteBytes = bytes;
+                payloadCollector.notWrittenMessages = 0;
+                protocolCollector.notWrittenMessages = 0;
+                payloadCollector.notWrittenBytes = 0;
+                protocolCollector.notWrittenBytes = 0;
+            }
     }
 }
