@@ -75,24 +75,23 @@ public class TpsStatsCollector extends NoOpStatistics {
             cProto = protocolCollector2;
         }
 
-            cPay.writtenMessages += cPay.notWrittenMessages;
-            cProto.writtenMessages += cProto.notWrittenMessages;
-            cPay.writtenBytes += cPay.notWrittenBytes;
-            cProto.writtenBytes += cProto.notWrittenBytes;
+        cPay.writtenMessages += cPay.notWrittenMessages;
+        cProto.writtenMessages += cProto.notWrittenMessages;
+        cPay.writtenBytes += cPay.notWrittenBytes;
+        cProto.writtenBytes += cProto.notWrittenBytes;
 
+        if (phase1.get()) {
             long notWrittenMessages = cPay.notWrittenMessages + cProto.notWrittenMessages;
             long notWrittenBytes = cPay.notWrittenBytes + cProto.notWrittenBytes;
             if (notWrittenBytes != bytes) {
                 Debug.info("STATS", "Mismatch %s vs %s", notWrittenBytes, bytes);
             }
-
-            if (phase1.get()) {
-                lastWriteMessages = notWrittenMessages;
-                lastWriteBytes = bytes;
-                payloadCollector.notWrittenMessages = 0;
-                protocolCollector.notWrittenMessages = 0;
-                payloadCollector.notWrittenBytes = 0;
-                protocolCollector.notWrittenBytes = 0;
-            }
+            lastWriteMessages = notWrittenMessages;
+            lastWriteBytes = bytes;
+            payloadCollector.notWrittenMessages = 0;
+            protocolCollector.notWrittenMessages = 0;
+            payloadCollector.notWrittenBytes = 0;
+            protocolCollector.notWrittenBytes = 0;
+        }
     }
 }
