@@ -196,11 +196,20 @@ public class Tps extends Workload {
                 format3(sendStats.payloadCollector.writtenMessages)));
             sendResults.add(Debug.stringify("  Socket Written Bytes: %s",
                 format3(sendStats.payloadCollector.writtenBytes)));
-
             sendResults.add(Debug.stringify("  Buffered Messages: %s",
                 format3(sendStats.payloadCollector.bufferedMessages)));
             sendResults.add(Debug.stringify("  Buffered Bytes: %s",
                 format3(sendStats.payloadCollector.bufferedBytes)));
+
+            sendResults.add("After Disconnect...");
+            sendResults.add(Debug.stringify("  Socket Written Messages: %s",
+                format3(sendStats.payloadCollector2.writtenMessages)));
+            sendResults.add(Debug.stringify("  Socket Written Bytes: %s",
+                format3(sendStats.payloadCollector2.writtenBytes)));
+            sendResults.add(Debug.stringify("  Buffered Messages: %s",
+                format3(sendStats.payloadCollector2.bufferedMessages)));
+            sendResults.add(Debug.stringify("  Buffered Bytes: %s",
+                format3(sendStats.payloadCollector2.bufferedBytes)));
 
             sendResults.add("Analysis ...");
             sendResults.add(Debug.stringify("  Last Write Messages: %s",
