@@ -188,23 +188,18 @@ public class Tps extends Workload {
 
             sendResults.add("\n" + TPS_SENDER);
             sendResults.add("Before Disconnect...");
-            sendResults.add(Debug.stringify("  Total Socket Written Messages: %s", format3(sendStats.getTotalWriteBytes())));
+            sendResults.add(Debug.stringify("  Total Socket Written Messages: %s", format3(sendStats.getTotalWriteMsgs())));
             sendResults.add(Debug.stringify("  Total Socket Written Bytes: %s", format3(sendStats.getTotalWriteBytes())));
-            sendResults.add(Debug.stringify("  Total Buffered Payload Messages: %s", sendStats.getPayloadMsgs()));
+            sendResults.add(Debug.stringify("  Total Buffered Payload Messages: %s", format3(sendStats.getPayloadMsgs())));
             sendResults.add(Debug.stringify("  Total Buffered Payload Bytes: %s", format3(sendStats.getPayloadBytes())));
-            sendResults.add(Debug.stringify("  Last Message Id Buffered: %s", sendWL.getLastBufferedMessageId()));
+            sendResults.add(Debug.stringify("  Last Message Id Buffered: %s", format3(sendWL.getLastBufferedMessageId())));
             sendResults.add("After Disconnect...");
-//            results.add(Debug.stringify("  Total Buffered Messages: %s", sendStats.getAfterBufferedMsgs()));
-//            results.add(Debug.stringify("  Total Buffered Bytes: %s", format3(sendStats.getAfterBufferedBytes())));
-            sendResults.add(Debug.stringify("  Total Buffered Payload Messages: %s", sendStats.getAfterPayloadMsgs()));
+            sendResults.add(Debug.stringify("  Total Buffered Payload Messages: %s", format3(sendStats.getAfterPayloadMsgs())));
             sendResults.add(Debug.stringify("  Total Buffered Payload Bytes: %s", format3(sendStats.getAfterPayloadBytes())));
             sendResults.add("Analysis ...");
-//            results.add(Debug.stringify("  Total Published Messages: %s", pubId.get()));
-//            sendResults.add(Debug.stringify("  Diff (Buffered - Written) Bytes: %s", format3(sendStats.outDiff())));
-//            sendResults.add(Debug.stringify("  Diff Approximate Messages: %s", sendStats.approximateDiffMessages()));
-            sendResults.add(Debug.stringify("  Last Write Messages: %s", sendStats.getLastWriteMessages()));
+            sendResults.add(Debug.stringify("  Last Write Messages: %s", format3(sendStats.getLastWriteMessages())));
             sendResults.add(Debug.stringify("  Last Write Bytes: %s", format3(sendStats.getLastWriteBytes())));
-            sendResults.add(Debug.stringify("  Buffered Not Written Messages: %s", sendStats.getNotWrittenMessages()));
+            sendResults.add(Debug.stringify("  Buffered Not Written Messages: %s", format3(sendStats.getNotWrittenMessages())));
             sendResults.add(Debug.stringify("  Buffered Not Written Bytes: %s", format3(sendStats.getNotWrittenBytes())));
 
             List<String> skipList = sendWL.getGapList();

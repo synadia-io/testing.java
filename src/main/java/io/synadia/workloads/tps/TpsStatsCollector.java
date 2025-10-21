@@ -111,6 +111,10 @@ public class TpsStatsCollector extends NoOpStatistics {
         return payloadBytes.get();
     }
 
+    public long getTotalWriteMsgs() {
+        return totalWriteMsgs.get();
+    }
+
     public long getTotalWriteBytes() {
         return totalWriteBytes.get();
     }

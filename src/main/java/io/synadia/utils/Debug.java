@@ -391,10 +391,10 @@ public abstract class Debug {
                 return sb.toString();
             }
             default -> {
+                String s = o.toString();
+                return s.isEmpty() ? "<empty>" : s;
             }
         }
-        String s = o.toString();
-        return s.isEmpty() ? "<empty>" : s;
     }
 
     public static void debugHdr(int indent, Message msg) {
