@@ -11,7 +11,7 @@ import io.synadia.utils.Debug;
 
 public class TpsErrorListener implements ErrorListener {
 
-    public volatile boolean readClosed = false;
+    public volatile boolean connectionException = false;
 
     private final String label;
 
@@ -25,10 +25,10 @@ public class TpsErrorListener implements ErrorListener {
 
     @Override
     public void errorOccurred(final Connection conn, final String error) {
-        Debug.info(label, "errorOccurred", string(conn), "Error: " + error);
         if (error.contains("Read channel closed")) {
-            readClosed = true;
+            connectionException = true;
         }
+        Debug.info(label, "errorOccurred", string(conn), "Error: " + error);
     }
 
     @Override
@@ -56,6 +56,7 @@ public class TpsErrorListener implements ErrorListener {
 
     @Override
     public void socketWriteTimeout(Connection conn) {
+        connectionException = true;
         Debug.info(label, "socketWriteTimeout", string(conn));
     }
 }

@@ -131,7 +131,7 @@ public class Tps extends Workload {
             long nextSecondStart = -1;
             long startNanos = System.nanoTime();
 
-            while (nc.getStatus() == Connection.Status.CONNECTED && !sendEL.readClosed && !sendCL.disconnected)
+            while (nc.getStatus() == Connection.Status.CONNECTED && !sendEL.connectionException && !sendCL.disconnected)
             {
                 // Check if we've moved to a new second
                 long now = System.nanoTime();
@@ -226,7 +226,6 @@ public class Tps extends Workload {
     // ----------------------------------------------------------------------------------------------------
     AtomicLong receivedMessages = new AtomicLong(0);
     AtomicLong receivedLastMessageId = new AtomicLong(-1);
-    AtomicLong receiveGap = new AtomicLong(0);
     CountDownLatch terminate = new CountDownLatch(1);
     TpsConnectionListener receiveCL;
     TpsErrorListener receiveEL;
@@ -269,13 +268,13 @@ public class Tps extends Workload {
                 long expected = receivedLastMessageId.incrementAndGet();
                 receivedLastMessageId.set(mid);
                 if (mid != expected) {
-                    long diff = mid - expected;
-                    receiveGap.set(diff);
+                    long gap = mid - expected;
                     receiveResults.add(Debug.stringify("  Received Gap Message: %s", format3(mid)));
                     receiveResults.add(Debug.stringify("  Expected Gap Message: %s", format3(expected)));
+                    receiveResults.add(Debug.stringify("  Gap: %s", gap));
                     Debug.info(TPS_RECEIVER, "******"
                         , "Got Message Id: %s but expected: %s", format3(mid), format3(expected)
-                        , "Loss of %s", format3(diff));
+                        , "Loss of %s", format3(gap));
                 }
             };
 
@@ -288,7 +287,6 @@ public class Tps extends Workload {
 
             receiveResults.addFirst(Debug.stringify("  Total Received Messages: %s", receivedMessages.get()));
             receiveResults.addFirst("\n" + TPS_RECEIVER);
-            receiveResults.add(Debug.stringify("  Gap: %s", receiveGap.get()));
 
             currentDispatcher.unsubscribe(subject);
         }
