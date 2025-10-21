@@ -14,27 +14,29 @@ import static io.synadia.workloads.tps.TpsUtils.extractMessageId;
 
 public class TpsWriteListener extends WriteListener {
     private final AtomicLong lastBufferedMessageId;
-    private final AtomicBoolean running;
+    private final AtomicBoolean phase1;
     private final List<String> gapList;
+    private final String label;
 
-    public TpsWriteListener() {
+    public TpsWriteListener(String labelSuffix) {
+        this.label = "WL-" + labelSuffix;
         lastBufferedMessageId = new AtomicLong(0);
         gapList = new ArrayList<>();
-        running = new AtomicBoolean(true);
+        phase1 = new AtomicBoolean(true);
     }
 
-    public void stop() {
-        running.set(false);
+    public void startPhase2() {
+        phase1.set(false);
     }
 
     @Override
     public void runStarted(int instanceHashCode) {
-//        Debug.info("WL", "%s run started", printable(instanceHashCode));
+//        Debug.info(label, "%s run started", printable(instanceHashCode));
     }
 
     @Override
     public void runEnded(int instanceHashCode) {
-//        Debug.info("WL", "%s run ended", printable(instanceHashCode));
+//        Debug.info(label, "%s run ended", printable(instanceHashCode));
     }
 
     private static String printable(int instanceHashCode) {
@@ -43,18 +45,21 @@ public class TpsWriteListener extends WriteListener {
 
     @Override
     public void buffered(NatsMessage msg) {
-        if (running.get()) {
-            long mid = extractMessageId(msg);
-            long expected = lastBufferedMessageId.incrementAndGet();
-            if (expected == 1) {
-                Debug.info("WL", "buffering started");
+        if (phase1.get()) {
+            // only care about messages with message ids, there can be protocol messages too
+            Long mid = extractMessageId(msg);
+            if (mid != null) {
+                long expected = lastBufferedMessageId.incrementAndGet();
+                if (expected == 1) {
+                    Debug.info(label, "buffering started");
+                }
+                else if (mid != expected) {
+                    long diff = mid - expected;
+                    gapList.add("expected:" + expected + ", received:" + mid + ", diff" + diff);
+                    Debug.info(label, "!!!!! buffered message id gap", "expected: %s", format3(expected), "actual: %s ", format3(mid), "difference: %s", diff);
+                }
+                lastBufferedMessageId.set(mid);
             }
-            else if (mid != expected) {
-                long diff = mid - expected;
-                gapList.add("expected:" + expected + ", received:" + mid + ", diff" + diff );
-                Debug.info("WL", "!!!!! buffered message id gap", "expected: %s", format3(expected), "actual: %s ", format3(mid), "difference: %s", diff);
-            }
-            lastBufferedMessageId.set(mid);
         }
     }
 

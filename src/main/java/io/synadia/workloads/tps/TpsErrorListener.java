@@ -11,7 +11,13 @@ import io.synadia.utils.Debug;
 
 public class TpsErrorListener implements ErrorListener {
 
-    public volatile boolean closed = false;
+    public volatile boolean readClosed = false;
+
+    private final String label;
+
+    public TpsErrorListener(String labelSuffix) {
+        this.label = "EL-" + labelSuffix;
+    }
 
     private String string(Connection conn) {
         return "Connection(" + conn.hashCode() + ") " + conn.getStatus();
@@ -19,32 +25,32 @@ public class TpsErrorListener implements ErrorListener {
 
     @Override
     public void errorOccurred(final Connection conn, final String error) {
-        Debug.info("EL", "errorOccurred", string(conn), "Error: " + error);
+        Debug.info(label, "errorOccurred", string(conn), "Error: " + error);
         if (error.contains("Read channel closed")) {
-            closed = true;
+            readClosed = true;
         }
     }
 
     @Override
     public void exceptionOccurred(final Connection conn, final Exception exp) {
-        Debug.info("EL", "exceptionOccurred:", string(conn), exp);
+        Debug.info(label, "exceptionOccurred:", string(conn), exp);
         if (exp.getCause() != null) {
-            Debug.info("EL", "            cause:", exp.getCause());
+            Debug.info(label, "            cause:", exp.getCause());
         }
     }
 
     @Override
     public void slowConsumerDetected(final Connection conn, final Consumer consumer) {
-        Debug.info("EL", "slowConsumerDetected", string(conn), consumer);
+        Debug.info(label, "slowConsumerDetected", string(conn), consumer);
     }
 
     @Override
     public void messageDiscarded(final Connection conn, final Message msg) {
-        Debug.info("EL", "messageDiscarded", string(conn), "Message: " + msg);
+        Debug.info(label, "messageDiscarded", string(conn), "Message: " + msg);
     }
 
     @Override
     public void socketWriteTimeout(Connection conn) {
-        Debug.info("EL", "socketWriteTimeout", string(conn));
+        Debug.info(label, "socketWriteTimeout", string(conn));
     }
 }

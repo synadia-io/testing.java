@@ -9,30 +9,29 @@ import io.synadia.utils.Debug;
 
 public class TpsConnectionListener implements ConnectionListener {
 
-    public volatile int connects = 0;
-    public volatile int disconnects = 0;
-    public volatile int closes = 0;
-    public volatile int reconnects = 0;
+    public volatile boolean disconnected = false;
+
+    private final String label;
+
+    public TpsConnectionListener(String labelSuffix) {
+        this.label = "CL-" + labelSuffix;
+    }
 
     @Override
     public void connectionEvent(Connection conn, Events type) {
         connectionEvent(conn, type, null, null);
     }
 
-    @SuppressWarnings("NonAtomicOperationOnVolatileField")
     @Override
     public void connectionEvent(Connection conn, Events type, Long time, String uriDetails) {
         if (time == null) {
-            Debug.info("CL", "%s(%s)", type.getEvent(), conn.getStatus(), uriDetails);
+            Debug.info(label, "%s(%s)", type.getEvent(), conn.getStatus(), uriDetails);
         }
         else {
-            Debug.info("CL", "[%s]", Debug.simpleTime(time), "%s(%s)", type.getEvent(), conn.getStatus(), uriDetails);
+            Debug.info(label, "[%s]", Debug.simpleTime(time), "%s(%s)", type.getEvent(), conn.getStatus(), uriDetails);
         }
-        switch (type) {
-            case CONNECTED: connects++; break;
-            case DISCONNECTED: disconnects++; break;
-            case CLOSED: closes++; break;
-            case RECONNECTED: reconnects++; break;
+        if (type == Events.DISCONNECTED) {
+            disconnected = true;
         }
     }
 }

@@ -25,7 +25,7 @@ public class TpsStatsCollector extends NoOpStatistics {
     private final AtomicLong notWrittenBytes;
     private final AtomicLong lastWriteMessages;
     private final AtomicLong lastWriteBytes;
-    private final AtomicBoolean running;
+    private final AtomicBoolean phase1;
 
     public TpsStatsCollector(int payloadSize) {
         bufferedMsgs = new AtomicLong();
@@ -43,16 +43,16 @@ public class TpsStatsCollector extends NoOpStatistics {
         notWrittenBytes = new AtomicLong();
         lastWriteMessages = new AtomicLong();
         lastWriteBytes = new AtomicLong();
-        running = new AtomicBoolean(true);
+        phase1 = new AtomicBoolean(true);
     }
 
-    public void stop() {
-        running.set(false);
+    public void startPhase2() {
+        phase1.set(false);
     }
 
     @Override
     public void incrementOutBytes(long bytes) {
-        if (running.get()) {
+        if (phase1.get()) {
             bufferedMsgs.incrementAndGet();
             bufferedBytes.addAndGet(bytes);
             notWrittenMessages.incrementAndGet();
@@ -78,7 +78,7 @@ public class TpsStatsCollector extends NoOpStatistics {
 
     @Override
     public void registerWrite(long bytes) {
-        if (running.get()) {
+        if (phase1.get()) {
             lastWriteMessages.set(notWrittenMessages.get());
             lastWriteBytes.set(notWrittenBytes.get());
             notWrittenMessages.set(0);

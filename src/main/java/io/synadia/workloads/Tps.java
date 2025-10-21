@@ -36,14 +36,9 @@ public class Tps extends Workload {
     int targetTps;
     String subject;
     int payloadSize;
-    int sendLogRate;
-    int metricsInitialDelay;
-    int metricsLogRate;
 
-    TpsConnectionListener tpsCL;
-    TpsErrorListener tpsEL;
-
-    List<String> results = new ArrayList<>();
+    List<String> sendResults = new ArrayList<>();
+    List<String> receiveResults = new ArrayList<>();
 
     @Override
     public void init(CommandLine commandLine) {
@@ -60,22 +55,40 @@ public class Tps extends Workload {
         subject = JsonValueUtils.readString(params.jv, "subject", "tps");
         MESSAGE_ID_KEY = JsonValueUtils.readString(params.jv, "message.id.key", "mid");
         payloadSize = readInteger(params.jv, "payload.size", 12 * 1024);
-        sendLogRate = readInteger(params.jv, "send.log.rate", 5);
-        metricsInitialDelay = readInteger(params.jv, "metrics.initial.delay", 5);
-        metricsLogRate = readInteger(params.jv, "metrics.log.rate", 10);
+
+        reportApplicationOptions(workLabel);
     }
 
     @Override
     public void runWorkload() throws Exception {
         switch (action) {
-            case "send" -> tpsSend();
-            case "rec"  -> tpsReceive();
+            case "send": send(); break;
+            case "rec": receive(); break;
+            case "both":
+                // start the receiver first
+                Thread r = new Thread(() -> {
+                    try { receive(); } catch (Exception ignored) {}
+                });
+                r.start();
+
+                sleep(100); // give time to make sure receive is started
+                Thread s = new Thread(() -> {
+                    try { send(); } catch (Exception ignored) {}
+                });
+                s.start();
+
+                s.join();
+                r.join();
         }
 
-        if (!results.isEmpty()) {
-            sleep(100); // callbacks time to finish
-            System.out.println();
-            for (String r : results) {
+        sleep(100); // give callbacks time to finish
+        if (receiveResults.size() > 0) {
+            for (String r : receiveResults) {
+                System.out.println(r);
+            }
+        }
+        if (sendResults.size() > 0) {
+            for (String r : sendResults) {
                 System.out.println(r);
             }
         }
@@ -87,18 +100,25 @@ public class Tps extends Workload {
     AtomicLong pubId;
     TpsStatsCollector sendStats;
     TpsWriteListener sendWL;
+    TpsConnectionListener sendCL;
+    TpsErrorListener sendEL;
 
-    private void tpsSend() throws IOException, InterruptedException {
+    private void send() throws IOException, InterruptedException {
         pubId = new AtomicLong();
         sendStats = new TpsStatsCollector(payloadSize);
-        sendWL = new TpsWriteListener();
+        sendWL = new TpsWriteListener(TPS_SENDER);
+
+        sendCL = new TpsConnectionListener(TPS_SENDER);
+        sendEL = new TpsErrorListener(TPS_SENDER);
 
         Options options = buildOptions(0)
             .writeListener(sendWL)
             .statisticsCollector(sendStats)
+            .connectionListener(sendCL)
+            .errorListener(sendEL)
             .build();
 
-        reportSettings(TPS_SENDER, options);
+        reportConnectionOptions(TPS_SENDER, options);
 
         try (Connection nc = Nats.connect(options)) {
 
@@ -110,7 +130,7 @@ public class Tps extends Workload {
             long nextSecondStart = -1;
             long startNanos = System.nanoTime();
 
-            while (nc.getStatus() == Connection.Status.CONNECTED && tpsCL.disconnects == 0 && !tpsEL.closed)
+            while (nc.getStatus() == Connection.Status.CONNECTED && !sendEL.readClosed && !sendCL.disconnected)
             {
                 // Check if we've moved to a new second
                 long now = System.nanoTime();
@@ -153,48 +173,49 @@ public class Tps extends Workload {
                     }
                 }
             }
-            sendStats.stop();
-            sendWL.stop();
+            sendStats.startPhase2();
+            sendWL.startPhase2();
+            // publish the end marker for the receiver
+            Debug.info(TPS_SENDER, "Publishing end marker message");
+            nc.publish(subject, null);
+
             Debug.info(TPS_SENDER, "Waiting for %s queued messages to be sent...", nc.outgoingPendingMessageCount());
             while (nc.outgoingPendingMessageCount() > 0) {
                 sleep(10);
             }
 
-            results.add("\n" + TPS_SENDER);
-            results.add("Before Disconnect...");
+            sendResults.add("\n" + TPS_SENDER);
+            sendResults.add("Before Disconnect...");
 //            results.add(Debug.stringify("  Total Buffered Messages: %s", sendStats.getOutMsgs()));
 //            results.add(Debug.stringify("  Total Buffered Bytes: %s", format3(sendStats.getOutBytes())));
-            results.add(Debug.stringify("  Total Socket Written Bytes: %s", format3(sendStats.getWriteBytes())));
-            results.add(Debug.stringify("  Total Buffered Payload Messages: %s", sendStats.getPayloadMsgs()));
-            results.add(Debug.stringify("  Total Buffered Payload Bytes: %s", format3(sendStats.getPayloadBytes())));
-            results.add(Debug.stringify("  Last Message Id Buffered: %s", sendWL.getLastBufferedMessageId()));
-            results.add("After Disconnect...");
+            sendResults.add(Debug.stringify("  Total Socket Written Bytes: %s", format3(sendStats.getWriteBytes())));
+            sendResults.add(Debug.stringify("  Total Buffered Payload Messages: %s", sendStats.getPayloadMsgs()));
+            sendResults.add(Debug.stringify("  Total Buffered Payload Bytes: %s", format3(sendStats.getPayloadBytes())));
+            sendResults.add(Debug.stringify("  Last Message Id Buffered: %s", sendWL.getLastBufferedMessageId()));
+            sendResults.add("After Disconnect...");
 //            results.add(Debug.stringify("  Total Buffered Messages: %s", sendStats.getAfterBufferedMsgs()));
 //            results.add(Debug.stringify("  Total Buffered Bytes: %s", format3(sendStats.getAfterBufferedBytes())));
-            results.add(Debug.stringify("  Total Buffered Payload Messages: %s", sendStats.getAfterPayloadMsgs()));
-            results.add(Debug.stringify("  Total Buffered Payload Bytes: %s", format3(sendStats.getAfterPayloadBytes())));
-            results.add("Analysis ...");
+            sendResults.add(Debug.stringify("  Total Buffered Payload Messages: %s", sendStats.getAfterPayloadMsgs()));
+            sendResults.add(Debug.stringify("  Total Buffered Payload Bytes: %s", format3(sendStats.getAfterPayloadBytes())));
+            sendResults.add("Analysis ...");
 //            results.add(Debug.stringify("  Total Published Messages: %s", pubId.get()));
-            results.add(Debug.stringify("  Diff (Buffered - Written) Bytes: %s", format3(sendStats.outDiff())));
-            results.add(Debug.stringify("  Diff Approximate Messages: %s", sendStats.approximateDiffMessages()));
-            results.add(Debug.stringify("  Last Write Messages: %s", sendStats.getLastWriteMessages()));
-            results.add(Debug.stringify("  Last Write Bytes: %s", format3(sendStats.getLastWriteBytes())));
-            results.add(Debug.stringify("  Buffered Not Written Messages: %s", sendStats.getNotWrittenMessages()));
-            results.add(Debug.stringify("  Buffered Not Written Bytes: %s", format3(sendStats.getNotWrittenBytes())));
+//            sendResults.add(Debug.stringify("  Diff (Buffered - Written) Bytes: %s", format3(sendStats.outDiff())));
+//            sendResults.add(Debug.stringify("  Diff Approximate Messages: %s", sendStats.approximateDiffMessages()));
+            sendResults.add(Debug.stringify("  Last Write Messages: %s", sendStats.getLastWriteMessages()));
+            sendResults.add(Debug.stringify("  Last Write Bytes: %s", format3(sendStats.getLastWriteBytes())));
+            sendResults.add(Debug.stringify("  Buffered Not Written Messages: %s", sendStats.getNotWrittenMessages()));
+            sendResults.add(Debug.stringify("  Buffered Not Written Bytes: %s", format3(sendStats.getNotWrittenBytes())));
 
             List<String> skipList = sendWL.getGapList();
             if (skipList.isEmpty()) {
-                results.add("No Writer Gaps");
+                sendResults.add("  No Writer Gaps");
             }
             else {
-                results.add("Writer Gaps");
+                sendResults.add("  Writer Gaps");
                 for (String s : skipList) {
-                    results.add(" " + s);
+                    sendResults.add(" " + s);
                 }
             }
-
-            // publish the end marker for the receiver
-            nc.publish(subject, null);
         }
     }
 
@@ -205,15 +226,21 @@ public class Tps extends Workload {
     AtomicLong receivedLastMessageId = new AtomicLong(-1);
     AtomicLong receiveGap = new AtomicLong(0);
     CountDownLatch doneLatch = new CountDownLatch(1);
+    TpsConnectionListener receiveCL;
+    TpsErrorListener receiveEL;
 
-    private void tpsReceive() throws IOException, InterruptedException {
+    private void receive() throws IOException, InterruptedException {
         int firstServerIx = commandLine.args.isEmpty() ? 1 : Integer.parseInt(commandLine.args.getFirst());
+        receiveCL = new TpsConnectionListener(TPS_RECEIVER);
+        receiveEL = new TpsErrorListener(TPS_RECEIVER);
 
         Options options = buildOptions(firstServerIx)
             .statisticsCollector(new NoOpStatistics())
+            .connectionListener(receiveCL)
+            .errorListener(receiveEL)
             .build();
 
-        reportSettings(TPS_RECEIVER, options);
+        reportConnectionOptions(TPS_RECEIVER, options);
 
         try (Connection nc = Nats.connect(options)) {
             MessageHandler handler = msg -> {
@@ -227,6 +254,7 @@ public class Tps extends Workload {
                     return;
                 }
 
+                //noinspection DataFlowIssue this will never return null
                 long mid = extractMessageId(msg);
                 long rcvd = receivedMessages.incrementAndGet();
                 if (rcvd == 1) {
@@ -252,9 +280,9 @@ public class Tps extends Workload {
             Subscription subscription = currentDispatcher.subscribe(subject, handler);//, queueGroup);
 
             doneLatch.await();
-            results.add("\n" + TPS_RECEIVER);
-            results.add(Debug.stringify("  Total Received Messages: %s", receivedMessages.get()));
-            results.add(Debug.stringify("  Total Receive Gap: %s", receiveGap.get()));
+            receiveResults.add("\n" + TPS_RECEIVER);
+            receiveResults.add(Debug.stringify("  Total Received Messages: %s", receivedMessages.get()));
+            receiveResults.add(Debug.stringify("  Total Receive Gap: %s", receiveGap.get()));
         }
     }
 
@@ -268,15 +296,10 @@ public class Tps extends Workload {
 
         int mmiq = Math.max(targetTps, readInteger(jv, "nats.connection.outgoing.max.messages", Options.DEFAULT_MAX_MESSAGES_IN_OUTGOING_QUEUE));
 
-        tpsCL = new TpsConnectionListener();
-        tpsEL = new TpsErrorListener();
-
         Options.Builder builder  = new Options.Builder()
             .servers(servers)
             .ignoreDiscoveredServers()
             .noRandomize()
-            .connectionListener(tpsCL)
-            .errorListener(tpsEL)
             .connectionTimeout(readLong(jv, "nats.connection.timeout.millis", 5000))
             .maxReconnects(readInteger(jv, "nats.max.reconnects", -1))
             .reconnectBufferSize(readLong(jv, "nats.connection.max.buffer", 500000000))
@@ -328,15 +351,15 @@ public class Tps extends Workload {
         return ordered.toArray(new String[0]);
     }
 
-    private void reportSettings(String label, Options o) {
+    private void reportApplicationOptions(String label) {
         Debug.info(label, "----- Application Options -----");
-        Debug.info(label, "action", action);
         Debug.info(label, "targetTps", targetTps);
         Debug.info(label, "subject", subject);
         Debug.info(label, "messageIdKey", MESSAGE_ID_KEY);
         Debug.info(label, "payloadSize", payloadSize);
-        Debug.info(label, "sendLogRate", sendLogRate);
-        Debug.info(label, "metricsLogRate", metricsLogRate);
+    }
+
+    private void reportConnectionOptions(String label, Options o) {
         Debug.info(label, "----- Connection Options -----");
         Debug.info(label, "servers", o.getServers());
         Debug.info(label, "connectionTimeout", o.getConnectionTimeout());

@@ -1,15 +1,20 @@
 package io.synadia.workloads.tps;
 
 import io.nats.client.Message;
+import io.nats.client.impl.Headers;
 
 public class TpsUtils {
-    public static final String TPS_SENDER = "TPS Sender";
-    public static final String TPS_RECEIVER = "TPS Receiver";
     public static String MESSAGE_ID_KEY = "mid";
 
-    public static long extractMessageId(Message msg) {
-        //noinspection DataFlowIssue // headers won't be null.
-        return Long.parseLong(msg.getHeaders().getFirst(MESSAGE_ID_KEY));
+    public static Long extractMessageId(Message msg) {
+        Headers headers = msg.getHeaders();
+        if (headers != null) {
+            String mid = headers.getFirst(MESSAGE_ID_KEY);
+            if (mid != null) {
+                return Long.parseLong(mid);
+            }
+        }
+        return null;
     }
 
     @SuppressWarnings("SameParameterValue")
