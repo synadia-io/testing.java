@@ -186,15 +186,11 @@ public class Tps extends Workload {
             sendStats.startPhase2();
             sendWL.startPhase2();
 
-            boolean hadMessages = false;
             Debug.info(TPS_SENDER, "Waiting for %s queued messages to be sent...", nc.outgoingPendingMessageCount());
             while (nc.outgoingPendingMessageCount() > 0) {
-                hadMessages = true;
                 sleep(10);
             }
-            if (hadMessages) {
-                Debug.info(TPS_SENDER, "Queue empty...", nc.outgoingPendingMessageCount());
-            }
+            Debug.info(TPS_SENDER, "Queue empty...", nc.outgoingPendingMessageCount());
 
             // publish the end marker for the receiver
             Debug.info(TPS_SENDER, "Publishing Terminate Message");
