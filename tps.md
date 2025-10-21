@@ -53,7 +53,7 @@ If `disconnected` is true, the sender will leave phase 1.
 
 #### Write Listener
 The write listener gets notified with every message that has been _buffered_.
-Buffered means it has been removed from the pending message and its bytes have been copied to the byte array
+Buffered means it has been removed from the pending message and its bytes that have been copied to the byte array
 buffer in preparation to be written to the socket. 
 
 The message id is extracted from the header and is tracked much like the receiver looking for a gap.
@@ -64,7 +64,7 @@ If a gap occurs it's recorded for later reporting. In phase 2, the notification 
 In phase 1 ...
 
 `incrementOutBytes(bytes)` and `registerWrite(bytes)` are tracked.
-Every call to `incrementOutBytes` represent that 1 message and it's bytes have been buffered from the 
+Every call to `incrementOutBytes` represent that 1 message and it's bytes that have been buffered from the 
 pending message queue to the byte array buffer. A call to `registerWrite(bytes)` indicates that
 all the bytes currently in the byte array buffer have been used to call the socket write.
 
@@ -82,7 +82,6 @@ While the client is connected...
 * Publish messages at the TPS rate. 
   * For each publish, increment an id counter and build a header entry with its value.
 * Log the number of messages published during the last "publish second" each time a new "publish second" starts
-* If there is a publish failure (i.e. queue full) log the failure and decrement the id counter since the message was not published.
 
 Once the process becomes aware of being disconnected...
 * switch all listeners to phase 2
