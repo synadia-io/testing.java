@@ -188,19 +188,39 @@ public class Tps extends Workload {
 
             sendResults.add("\n" + TPS_SENDER);
             sendResults.add("Before Disconnect...");
-            sendResults.add(Debug.stringify("  Total Socket Written Messages: %s", format3(sendStats.getTotalWriteMsgs())));
-            sendResults.add(Debug.stringify("  Total Socket Written Bytes: %s", format3(sendStats.getTotalWriteBytes())));
-            sendResults.add(Debug.stringify("  Total Buffered Payload Messages: %s", format3(sendStats.getPayloadMsgs())));
-            sendResults.add(Debug.stringify("  Total Buffered Payload Bytes: %s", format3(sendStats.getPayloadBytes())));
-            sendResults.add(Debug.stringify("  Last Message Id Buffered: %s", format3(sendWL.getLastBufferedMessageId())));
-            sendResults.add("After Disconnect...");
-            sendResults.add(Debug.stringify("  Total Buffered Payload Messages: %s", format3(sendStats.getAfterPayloadMsgs())));
-            sendResults.add(Debug.stringify("  Total Buffered Payload Bytes: %s", format3(sendStats.getAfterPayloadBytes())));
+            sendResults.add(Debug.stringify("  Socket Written Payload Messages: %s",
+                format3(sendStats.payloadCollector.writtenMessages)));
+            sendResults.add(Debug.stringify("  Socket Written Payload Bytes: %s",
+                format3(sendStats.payloadCollector.writtenBytes)));
+            sendResults.add(Debug.stringify("  Socket Written Protocol Messages: %s",
+                format3(sendStats.protocolCollector.writtenMessages)));
+            sendResults.add(Debug.stringify("  Socket Written Protocol Bytes: %s",
+                format3(sendStats.protocolCollector.writtenBytes)));
+
+            sendResults.add(Debug.stringify("  Buffered Payload Messages: %s",
+                format3(sendStats.payloadCollector.bufferedMessages)));
+            sendResults.add(Debug.stringify("  Buffered Payload Bytes: %s",
+                format3(sendStats.payloadCollector.bufferedBytes)));
+            sendResults.add(Debug.stringify("  Buffered Protocol Messages: %s",
+                format3(sendStats.protocolCollector.bufferedMessages)));
+            sendResults.add(Debug.stringify("  Buffered Protocol Bytes: %s",
+                format3(sendStats.protocolCollector.bufferedBytes)));
+
             sendResults.add("Analysis ...");
-            sendResults.add(Debug.stringify("  Last Write Messages: %s", format3(sendStats.getLastWriteMessages())));
-            sendResults.add(Debug.stringify("  Last Write Bytes: %s", format3(sendStats.getLastWriteBytes())));
-            sendResults.add(Debug.stringify("  Buffered Not Written Messages: %s", format3(sendStats.getNotWrittenMessages())));
-            sendResults.add(Debug.stringify("  Buffered Not Written Bytes: %s", format3(sendStats.getNotWrittenBytes())));
+            sendResults.add(Debug.stringify("  Last Write Messages: %s",
+                format3(sendStats.lastWriteMessages)));
+            sendResults.add(Debug.stringify("  Last Write Bytes: %s",
+                format3(sendStats.lastWriteBytes)));
+
+            sendResults.add(Debug.stringify("  Buffered Not Written Payload Messages: %s",
+                format3(sendStats.payloadCollector.notWrittenMessages)));
+            sendResults.add(Debug.stringify("  Buffered Not Written Payload Bytes: %s",
+                format3(sendStats.payloadCollector.notWrittenBytes)));
+
+            sendResults.add(Debug.stringify("  Buffered Not Written Protocol Messages: %s",
+                format3(sendStats.protocolCollector.notWrittenMessages)));
+            sendResults.add(Debug.stringify("  Buffered Not Written Protocol Bytes: %s",
+                format3(sendStats.protocolCollector.notWrittenBytes)));
 
             List<String> skipList = sendWL.getGapList();
             if (skipList.isEmpty()) {
