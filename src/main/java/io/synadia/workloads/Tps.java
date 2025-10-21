@@ -72,7 +72,7 @@ public class Tps extends Workload {
                 });
                 r.start();
 
-                sleep(100); // give time to make sure receive is started
+                sleep(300); // give time to make sure receive is started
                 Thread s = new Thread(() -> {
                     try { send(); } catch (Exception ignored) {}
                 });
