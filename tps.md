@@ -31,6 +31,8 @@ The main thread of the receiver waits for the terminate latch to complete, then 
 
 ### Sender
 
+Connect to server 1
+
 #### Phase 1
 Normal publishing until the connection is broken. A connection is considered broken if any of these are true.
 (They should all be true within milliseconds.)
