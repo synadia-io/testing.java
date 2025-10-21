@@ -272,7 +272,7 @@ public class Tps extends Workload {
                 if (mid != expected) {
                     long diff = mid - expected;
                     receiveGap.set(diff);
-                    receiveGapMessage.set(Debug.stringify(  "Receive Gap Note: Got Message Id: %s but expected: %s", format3(mid), format3(expected)));
+                    receiveGapMessage.set(Debug.stringify("  Receive Gap Note: Got Message Id: %s but expected: %s", format3(mid), format3(expected)));
                     Debug.info(TPS_RECEIVER, "******"
                         , "Got Message Id: %s but expected: %s", format3(mid), format3(expected)
                         , "Loss of %s", format3(diff));

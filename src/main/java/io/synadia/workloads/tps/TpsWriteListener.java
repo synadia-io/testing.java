@@ -29,16 +29,6 @@ public class TpsWriteListener extends WriteListener {
         phase1.set(false);
     }
 
-    @Override
-    public void runStarted(int instanceHashCode) {
-//        Debug.info(label, "%s run started", printable(instanceHashCode));
-    }
-
-    @Override
-    public void runEnded(int instanceHashCode) {
-//        Debug.info(label, "%s run ended", printable(instanceHashCode));
-    }
-
     private static String printable(int instanceHashCode) {
         return Integer.toHexString(instanceHashCode).toUpperCase();
     }
