@@ -21,6 +21,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static io.nats.client.support.JsonValueUtils.*;
@@ -72,10 +73,13 @@ public class Tps extends Workload {
                 });
                 r.start();
 
-                sleep(300); // give time to make sure receive is started
                 Thread s = new Thread(() -> {
                     try { send(); } catch (Exception ignored) {}
                 });
+
+                while (!receiverStarted.get()) {
+                    sleep(10);
+                }
                 s.start();
 
                 s.join();
@@ -230,6 +234,7 @@ public class Tps extends Workload {
     CountDownLatch terminate = new CountDownLatch(1);
     TpsConnectionListener receiveCL;
     TpsErrorListener receiveEL;
+    AtomicBoolean receiverStarted = new AtomicBoolean(false);
 
     private void receive() throws IOException, InterruptedException {
         int firstServerIx = commandLine.args.isEmpty() ? 1 : Integer.parseInt(commandLine.args.getFirst());
@@ -281,8 +286,9 @@ public class Tps extends Workload {
 
             Dispatcher currentDispatcher = nc.createDispatcher();
 
-            // Subscribe with high-throughput settings
-            Subscription subscription = currentDispatcher.subscribe(subject, handler);//, queueGroup);
+            Subscription subscription = currentDispatcher.subscribe(subject, handler);
+            sleep(100);
+            receiverStarted.set(true);
 
             terminate.await(10, TimeUnit.SECONDS);
 
