@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -227,7 +228,7 @@ public class Tps extends Workload {
     AtomicLong receivedLastMessageId = new AtomicLong(-1);
     AtomicLong receiveGap = new AtomicLong(0);
     AtomicReference<String> receiveGapMessage = new AtomicReference<>();
-    CountDownLatch doneLatch = new CountDownLatch(1);
+    CountDownLatch terminate = new CountDownLatch(1);
     TpsConnectionListener receiveCL;
     TpsErrorListener receiveEL;
 
@@ -246,13 +247,14 @@ public class Tps extends Workload {
 
         try (Connection nc = Nats.connect(options)) {
             MessageHandler handler = msg -> {
-                if (doneLatch.getCount() == 0) {
+                if (terminate.getCount() == 0) {
                     return;
                 }
 
                 int dlen = msg.getData().length;
                 if (dlen == 0) {
-                    doneLatch.countDown();
+                    Debug.info(TPS_RECEIVER, "Received Terminate Message...");
+                    terminate.countDown();
                     return;
                 }
 
@@ -282,11 +284,13 @@ public class Tps extends Workload {
             // Subscribe with high-throughput settings
             Subscription subscription = currentDispatcher.subscribe(subject, handler);//, queueGroup);
 
-            doneLatch.await();
+            terminate.await(20, TimeUnit.SECONDS);
             receiveResults.add("\n" + TPS_RECEIVER);
             receiveResults.add(Debug.stringify("  Total Received Messages: %s", receivedMessages.get()));
             receiveResults.add(Debug.stringify("  Total Receive Gap: %s", receiveGap.get()));
             receiveResults.add(Debug.stringify(receiveGapMessage.get()));
+
+            currentDispatcher.unsubscribe(subject);
         }
     }
 
