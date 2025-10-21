@@ -15,6 +15,7 @@ import io.synadia.workloads.tps.TpsStatsCollector;
 import io.synadia.workloads.tps.TpsWriteListener;
 
 import java.io.IOException;
+import java.net.Socket;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -58,11 +59,13 @@ public class Tps extends Workload {
         MESSAGE_ID_KEY = JsonValueUtils.readString(params.jv, "message.id.key", "mid");
         payloadSize = readInteger(params.jv, "payload.size", 12 * 1024);
 
-        reportApplicationOptions(workLabel);
+        reportApplicationOptions();
+        reportSocketBufferSize();
     }
 
     @Override
     public void runWorkload() throws Exception {
+
         switch (action) {
             case "send": send(); break;
             case "rec": receive(); break;
@@ -85,6 +88,8 @@ public class Tps extends Workload {
                 s.join();
                 r.join();
         }
+
+        reportSocketBufferSize();
 
         sleep(100); // give callbacks time to finish
         if (receiveResults.size() > 0) {
@@ -311,7 +316,7 @@ public class Tps extends Workload {
     // ----------------------------------------------------------------------------------------------------
     // Helpers
     // ----------------------------------------------------------------------------------------------------
-    public Options.Builder buildOptions(int firstServerIx) {
+    private Options.Builder buildOptions(int firstServerIx) {
         JsonValue jv = params.jv;
 
         String[] servers = figureServers(params.servers, firstServerIx);
@@ -364,7 +369,7 @@ public class Tps extends Workload {
         return builder;
     }
 
-    public static String[] figureServers(List<String> paramsServers, int firstServerIx) {
+    private static String[] figureServers(List<String> paramsServers, int firstServerIx) {
         String firstServer = paramsServers.get(firstServerIx);
         List<String> ordered = new ArrayList<>(paramsServers);
         ordered.remove(firstServer);
@@ -373,12 +378,22 @@ public class Tps extends Workload {
         return ordered.toArray(new String[0]);
     }
 
-    private void reportApplicationOptions(String label) {
-        Debug.info(label, "----- Application Options -----");
-        Debug.info(label, "targetTps", targetTps);
-        Debug.info(label, "subject", subject);
-        Debug.info(label, "messageIdKey", MESSAGE_ID_KEY);
-        Debug.info(label, "payloadSize", payloadSize);
+    private void reportSocketBufferSize() {
+        try {
+            Socket socket = new Socket();
+            Debug.info(workLabel, "Receive Buffer %s bytes", socket.getReceiveBufferSize());
+            Debug.info(workLabel, "Send Buffer %s bytes", socket.getSendBufferSize());
+            socket.close();
+        }
+        catch (IOException ignore) {}
+    }
+
+    private void reportApplicationOptions() {
+        Debug.info(workLabel, "----- Application Options -----");
+        Debug.info(workLabel, "targetTps", targetTps);
+        Debug.info(workLabel, "subject", subject);
+        Debug.info(workLabel, "messageIdKey", MESSAGE_ID_KEY);
+        Debug.info(workLabel, "payloadSize", payloadSize);
     }
 
     private void reportConnectionOptions(String label, Options o) {
