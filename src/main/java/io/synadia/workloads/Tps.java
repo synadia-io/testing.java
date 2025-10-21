@@ -186,14 +186,14 @@ public class Tps extends Workload {
             sendStats.startPhase2();
             sendWL.startPhase2();
 
-            // publish the end marker for the receiver
-            Debug.info(TPS_SENDER, "Publishing Terminate Message");
-            nc.publish(subject, null);
-
             Debug.info(TPS_SENDER, "Waiting for %s queued messages to be sent...", nc.outgoingPendingMessageCount());
             while (nc.outgoingPendingMessageCount() > 0) {
                 sleep(10);
             }
+
+            // publish the end marker for the receiver
+            Debug.info(TPS_SENDER, "Publishing Terminate Message");
+            nc.publish(subject, null);
 
             sendResults.add("\n" + TPS_SENDER);
             sendResults.add("Before Disconnect...");
