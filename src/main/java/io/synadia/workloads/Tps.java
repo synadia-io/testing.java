@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static io.nats.client.support.JsonValueUtils.*;
 import static io.nats.jsmulti.shared.Stats.format3;
@@ -177,8 +176,9 @@ public class Tps extends Workload {
             }
             sendStats.startPhase2();
             sendWL.startPhase2();
+
             // publish the end marker for the receiver
-            Debug.info(TPS_SENDER, "Publishing end marker message");
+            Debug.info(TPS_SENDER, "Publishing Terminate Message");
             nc.publish(subject, null);
 
             Debug.info(TPS_SENDER, "Waiting for %s queued messages to be sent...", nc.outgoingPendingMessageCount());
@@ -227,7 +227,6 @@ public class Tps extends Workload {
     AtomicLong receivedMessages = new AtomicLong(0);
     AtomicLong receivedLastMessageId = new AtomicLong(-1);
     AtomicLong receiveGap = new AtomicLong(0);
-    AtomicReference<String> receiveGapMessage = new AtomicReference<>();
     CountDownLatch terminate = new CountDownLatch(1);
     TpsConnectionListener receiveCL;
     TpsErrorListener receiveEL;
@@ -253,7 +252,7 @@ public class Tps extends Workload {
 
                 int dlen = msg.getData().length;
                 if (dlen == 0) {
-                    Debug.info(TPS_RECEIVER, "Received Terminate Message...");
+                    Debug.info(TPS_RECEIVER, "Received Terminate Message");
                     terminate.countDown();
                     return;
                 }
@@ -263,7 +262,7 @@ public class Tps extends Workload {
                 long rcvd = receivedMessages.incrementAndGet();
                 if (rcvd == 1) {
                     receivedLastMessageId.set(mid);
-                    Debug.info(TPS_RECEIVER, "Started Receiving...");
+                    Debug.info(TPS_RECEIVER, "Started Receiving");
                     return;
                 }
 
@@ -272,7 +271,8 @@ public class Tps extends Workload {
                 if (mid != expected) {
                     long diff = mid - expected;
                     receiveGap.set(diff);
-                    receiveGapMessage.set(Debug.stringify("  Receive Gap Note: Got Message Id: %s but expected: %s", format3(mid), format3(expected)));
+                    receiveResults.add(Debug.stringify("  Received Gap Message: %s", format3(mid)));
+                    receiveResults.add(Debug.stringify("  Expected Gap Message: %s", format3(expected)));
                     Debug.info(TPS_RECEIVER, "******"
                         , "Got Message Id: %s but expected: %s", format3(mid), format3(expected)
                         , "Loss of %s", format3(diff));
@@ -284,11 +284,11 @@ public class Tps extends Workload {
             // Subscribe with high-throughput settings
             Subscription subscription = currentDispatcher.subscribe(subject, handler);//, queueGroup);
 
-            terminate.await(20, TimeUnit.SECONDS);
-            receiveResults.add("\n" + TPS_RECEIVER);
-            receiveResults.add(Debug.stringify("  Total Received Messages: %s", receivedMessages.get()));
-            receiveResults.add(Debug.stringify("  Total Receive Gap: %s", receiveGap.get()));
-            receiveResults.add(Debug.stringify(receiveGapMessage.get()));
+            terminate.await(10, TimeUnit.SECONDS);
+
+            receiveResults.addFirst(Debug.stringify("  Total Received Messages: %s", receivedMessages.get()));
+            receiveResults.addFirst("\n" + TPS_RECEIVER);
+            receiveResults.add(Debug.stringify("  Gap: %s", receiveGap.get()));
 
             currentDispatcher.unsubscribe(subject);
         }
