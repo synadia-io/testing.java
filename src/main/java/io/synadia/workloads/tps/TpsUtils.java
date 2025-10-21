@@ -11,7 +11,10 @@ public class TpsUtils {
         if (headers != null) {
             String mid = headers.getFirst(MESSAGE_ID_KEY);
             if (mid != null) {
-                return Long.parseLong(mid);
+                try {
+                    return Long.parseLong(mid);
+                }
+                catch (NumberFormatException ignored) {}
             }
         }
         return null;
