@@ -21,6 +21,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static io.nats.client.support.JsonValueUtils.*;
 import static io.nats.jsmulti.shared.Stats.format3;
@@ -225,6 +226,7 @@ public class Tps extends Workload {
     AtomicLong receivedMessages = new AtomicLong(0);
     AtomicLong receivedLastMessageId = new AtomicLong(-1);
     AtomicLong receiveGap = new AtomicLong(0);
+    AtomicReference<String> receiveGapMessage = new AtomicReference<>();
     CountDownLatch doneLatch = new CountDownLatch(1);
     TpsConnectionListener receiveCL;
     TpsErrorListener receiveEL;
@@ -268,6 +270,7 @@ public class Tps extends Workload {
                 if (mid != expected) {
                     long diff = mid - expected;
                     receiveGap.set(diff);
+                    receiveGapMessage.set(Debug.stringify(  "Receive Gap Note: Got Message Id: %s but expected: %s", format3(mid), format3(expected)));
                     Debug.info(TPS_RECEIVER, "******"
                         , "Got Message Id: %s but expected: %s", format3(mid), format3(expected)
                         , "Loss of %s", format3(diff));
@@ -283,6 +286,7 @@ public class Tps extends Workload {
             receiveResults.add("\n" + TPS_RECEIVER);
             receiveResults.add(Debug.stringify("  Total Received Messages: %s", receivedMessages.get()));
             receiveResults.add(Debug.stringify("  Total Receive Gap: %s", receiveGap.get()));
+            receiveResults.add(Debug.stringify(receiveGapMessage.get()));
         }
     }
 
