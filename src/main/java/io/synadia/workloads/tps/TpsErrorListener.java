@@ -34,9 +34,11 @@ public class TpsErrorListener implements ErrorListener {
     @Override
     public void exceptionOccurred(final Connection conn, final Exception exp) {
         Debug.info(label, "exceptionOccurred:", string(conn), exp);
-        System.out.println("\n---------------------------------");
-        exp.printStackTrace(System.out);
-        System.out.println("---------------------------------\n");
+        if (exp.getMessage().contains("NullPointerException")) {
+            System.out.println("\n---------------------------------");
+            exp.printStackTrace(System.out);
+            System.out.println("---------------------------------\n");
+        }
         if (exp.getCause() != null) {
             Debug.info(label, "            cause:", exp.getCause());
         }
