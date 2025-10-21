@@ -188,9 +188,8 @@ public class Tps extends Workload {
 
             sendResults.add("\n" + TPS_SENDER);
             sendResults.add("Before Disconnect...");
-//            results.add(Debug.stringify("  Total Buffered Messages: %s", sendStats.getOutMsgs()));
-//            results.add(Debug.stringify("  Total Buffered Bytes: %s", format3(sendStats.getOutBytes())));
-            sendResults.add(Debug.stringify("  Total Socket Written Bytes: %s", format3(sendStats.getWriteBytes())));
+            sendResults.add(Debug.stringify("  Total Socket Written Messages: %s", format3(sendStats.getTotalWriteBytes())));
+            sendResults.add(Debug.stringify("  Total Socket Written Bytes: %s", format3(sendStats.getTotalWriteBytes())));
             sendResults.add(Debug.stringify("  Total Buffered Payload Messages: %s", sendStats.getPayloadMsgs()));
             sendResults.add(Debug.stringify("  Total Buffered Payload Bytes: %s", format3(sendStats.getPayloadBytes())));
             sendResults.add(Debug.stringify("  Last Message Id Buffered: %s", sendWL.getLastBufferedMessageId()));

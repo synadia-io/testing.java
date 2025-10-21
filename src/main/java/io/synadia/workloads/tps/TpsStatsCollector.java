@@ -10,15 +10,16 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class TpsStatsCollector extends NoOpStatistics {
-    private final AtomicLong bufferedMsgs;
-    private final AtomicLong bufferedBytes;
+    private final AtomicLong totalBufferedMsgs;
+    private final AtomicLong totalBufferedBytes;
     private final AtomicLong payloadMsgs;
     private final AtomicLong payloadBytes;
     private final AtomicLong afterBufferedMsgs;
     private final AtomicLong afterBufferedBytes;
     private final AtomicLong afterPayloadMsgs;
     private final AtomicLong afterPayloadBytes;
-    private final AtomicLong writeBytes;
+    private final AtomicLong totalWriteMsgs;
+    private final AtomicLong totalWriteBytes;
     private final int payloadSize;
     private final AtomicLong lastPayloadSize;
     private final AtomicLong notWrittenMessages;
@@ -28,15 +29,16 @@ public class TpsStatsCollector extends NoOpStatistics {
     private final AtomicBoolean phase1;
 
     public TpsStatsCollector(int payloadSize) {
-        bufferedMsgs = new AtomicLong();
-        bufferedBytes = new AtomicLong();
+        totalBufferedMsgs = new AtomicLong();
+        totalBufferedBytes = new AtomicLong();
         payloadMsgs = new AtomicLong();
         payloadBytes = new AtomicLong();
         afterBufferedMsgs = new AtomicLong();
         afterBufferedBytes = new AtomicLong();
         afterPayloadMsgs = new AtomicLong();
         afterPayloadBytes = new AtomicLong();
-        writeBytes = new AtomicLong();
+        totalWriteMsgs = new AtomicLong();
+        totalWriteBytes = new AtomicLong();
         this.payloadSize = payloadSize;
         lastPayloadSize = new AtomicLong(payloadSize);
         notWrittenMessages = new AtomicLong();
@@ -53,8 +55,8 @@ public class TpsStatsCollector extends NoOpStatistics {
     @Override
     public void incrementOutBytes(long bytes) {
         if (phase1.get()) {
-            bufferedMsgs.incrementAndGet();
-            bufferedBytes.addAndGet(bytes);
+            totalBufferedMsgs.incrementAndGet();
+            totalBufferedBytes.addAndGet(bytes);
             notWrittenMessages.incrementAndGet();
             notWrittenBytes.addAndGet(bytes);
             if (bytes >= payloadSize) {
@@ -79,22 +81,26 @@ public class TpsStatsCollector extends NoOpStatistics {
     @Override
     public void registerWrite(long bytes) {
         if (phase1.get()) {
+            totalWriteMsgs.addAndGet(notWrittenMessages.get());
+            totalWriteBytes.addAndGet(bytes);
+            if (notWrittenBytes.get() != bytes) {
+                Debug.info("STATS", "Mismatch %s vs %s", notWrittenBytes.get(), bytes);
+            }
             lastWriteMessages.set(notWrittenMessages.get());
             lastWriteBytes.set(notWrittenBytes.get());
             notWrittenMessages.set(0);
             notWrittenBytes.set(0);
-            writeBytes.addAndGet(bytes);
         }
     }
 
     @Override
     public long getOutMsgs() {
-        return bufferedMsgs.get();
+        return totalBufferedMsgs.get();
     }
 
     @Override
     public long getOutBytes() {
-        return bufferedBytes.get();
+        return totalBufferedBytes.get();
     }
 
     public long getPayloadMsgs() {
@@ -105,12 +111,12 @@ public class TpsStatsCollector extends NoOpStatistics {
         return payloadBytes.get();
     }
 
-    public long getWriteBytes() {
-        return writeBytes.get();
+    public long getTotalWriteBytes() {
+        return totalWriteBytes.get();
     }
 
     public long outDiff() {
-        return bufferedBytes.get() - writeBytes.get();
+        return totalBufferedBytes.get() - totalWriteBytes.get();
     }
 
     public long approximateDiffMessages() {
