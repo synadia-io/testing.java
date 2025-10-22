@@ -81,12 +81,11 @@ public class TpsStatsCollector extends NoOpStatistics {
         cProto.writtenBytes += cProto.notWrittenBytes;
 
         if (phase1.get()) {
-            long notWrittenMessages = cPay.notWrittenMessages + cProto.notWrittenMessages;
             long notWrittenBytes = cPay.notWrittenBytes + cProto.notWrittenBytes;
-            if (notWrittenBytes != bytes) {
+            if (notWrittenBytes > 0 && notWrittenBytes != bytes) {
                 Debug.info("STATS", "MISMATCH %s vs %s", notWrittenBytes, bytes);
             }
-            lastWriteMessages = notWrittenMessages;
+            lastWriteMessages = cPay.notWrittenMessages + cProto.notWrittenMessages;
             lastWriteBytes = bytes;
             payloadCollector.notWrittenMessages = 0;
             nonCollector.notWrittenMessages = 0;
