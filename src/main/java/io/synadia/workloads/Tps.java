@@ -217,22 +217,22 @@ public class Tps extends Workload {
         sendResults.add("Before Disconnect...");
         addSendResult("Buffered vs Socket Messages",
             sendStats.pay.bufferedMessages, sendStats.pay.writtenMessages);
-        addSendResult("Buffered vs Socket Bytes",
+        addSendResult("Buffered vs Socket Bytes   ",
             sendStats.pay.bufferedBytes, sendStats.pay.writtenBytes);
 
         sendResults.add("After Disconnect...");
         addSendResult("Buffered vs Socket Messages",
             sendStats.pay2.bufferedMessages, sendStats.pay2.writtenMessages);
-        addSendResult("Buffered vs Socket Bytes",
+        addSendResult("Buffered vs Socket Bytes   ",
             sendStats.pay2.bufferedBytes, sendStats.pay2.writtenBytes);
 
         sendResults.add("Etc ...");
         addSendResult("Control Messages Buffered", sendWL.getControlsBuffered());
         addSendResult("Last Write Messages", sendStats.lastWriteMessages);
-        addSendResult("Last Write Bytes", sendStats.lastWriteBytes);
+        addSendResult("Last Write Bytes   ", sendStats.lastWriteBytes);
 
         addSendResult("Buffered Not Written Messages", sendStats.pay.notWrittenMessages);
-        addSendResult("Buffered Not Written Bytes", sendStats.pay.notWrittenBytes);
+        addSendResult("Buffered Not Written Bytes   ", sendStats.pay.notWrittenBytes);
 
         List<String> skipList = sendWL.getGapList();
         if (skipList.isEmpty()) {
@@ -251,7 +251,8 @@ public class Tps extends Workload {
     }
 
     private void addSendResult(String s, Number n1, Number n2) {
-        sendResults.add(stringify("  " + s + ": %s vs %s", format3(n1), format3(n2)));
+        long diff = n1.longValue() - n2.longValue();
+        sendResults.add(stringify("  " + s + ": %s vs %s ... %s", format3(n1), format3(n2), format3(diff)));
     }
 
     // ----------------------------------------------------------------------------------------------------
