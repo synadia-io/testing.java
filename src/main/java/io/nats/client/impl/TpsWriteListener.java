@@ -37,6 +37,11 @@ public class TpsWriteListener extends WriteListener {
 
     @Override
     public void buffered(NatsMessage msg) {
+        if (msg.getSubject().equals(controlSubject)) {
+            controlsBuffered.incrementAndGet();
+            return;
+        }
+
         if (phase1.get() && msg.getSubject().equals(testSubject)) {
             long mid = extractMessageId(msg);
             long expected = lastBufferedMessageId.incrementAndGet();
@@ -49,9 +54,6 @@ public class TpsWriteListener extends WriteListener {
                 Debug.info(label, "!!!!! buffered message id gap", "expected: %s", format3(expected), "actual: %s ", format3(mid), "difference: %s", diff);
             }
             lastBufferedMessageId.set(mid);
-        }
-        else if (msg.getSubject().equals(controlSubject)) {
-            controlsBuffered.incrementAndGet();
         }
     }
 
