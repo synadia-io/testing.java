@@ -64,7 +64,6 @@ public class TpsStatsCollector extends NoOpStatistics {
 
     @Override
     public void registerWrite(long bytes) {
-
         Collector cPay;
         Collector cNon;
         if (phase1.get()) {

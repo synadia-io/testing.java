@@ -94,12 +94,12 @@ public class Tps extends Workload {
         reportSocketBufferSize();
 
         sleep(100); // give callbacks time to finish
-        if (receiveResults.size() > 0) {
+        if (!receiveResults.isEmpty()) {
             for (String r : receiveResults) {
                 System.out.println(r);
             }
         }
-        if (sendResults.size() > 0) {
+        if (!sendResults.isEmpty()) {
             for (String r : sendResults) {
                 System.out.println(r);
             }
@@ -205,16 +205,16 @@ public class Tps extends Workload {
 
             sendResults.add("\n" + TPS_SENDER);
             sendResults.add("Before Disconnect...");
-            addSendResult("Socket Written Messages", sendStats.pay.writtenMessages);
-            addSendResult("Socket Written Bytes", sendStats.pay.writtenBytes);
-            addSendResult("Buffered Messages", sendStats.pay.bufferedMessages);
-            addSendResult("Buffered Bytes", sendStats.pay.bufferedBytes);
+            addSendResult("Buffered vs Socket Messages",
+                sendStats.pay.bufferedMessages, sendStats.pay.writtenMessages);
+            addSendResult("Buffered vs Socket Bytes",
+                sendStats.pay.bufferedBytes, sendStats.pay.writtenBytes);
 
             sendResults.add("After Disconnect...");
-            addSendResult("Socket Written Messages", sendStats.pay2.writtenMessages);
-            addSendResult("Socket Written Bytes", sendStats.pay2.writtenBytes);
-            addSendResult("Buffered Messages", sendStats.pay2.bufferedMessages);
-            addSendResult("Buffered Bytes", sendStats.pay2.bufferedBytes);
+            addSendResult("Buffered vs Socket Messages",
+                sendStats.pay2.bufferedMessages, sendStats.pay2.writtenMessages);
+            addSendResult("Buffered vs Socket Bytes",
+                sendStats.pay2.bufferedBytes, sendStats.pay2.writtenBytes);
 
             sendResults.add("Etc ...");
             addSendResult("Control Messages Buffered", sendWL.getControlsBuffered());
@@ -239,6 +239,10 @@ public class Tps extends Workload {
 
     private void addSendResult(String s, Number n) {
         sendResults.add(stringify("  " + s + ": %s", format3(n)));
+    }
+
+    private void addSendResult(String s, Number n1, Number n2) {
+        sendResults.add(stringify("  " + s + ": %s vs %s", format3(n1), format3(n2)));
     }
 
     // ----------------------------------------------------------------------------------------------------
