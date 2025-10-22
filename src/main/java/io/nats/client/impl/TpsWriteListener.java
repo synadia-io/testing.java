@@ -52,7 +52,6 @@ public class TpsWriteListener extends WriteListener {
         }
         else if (msg.getSubject().equals(controlSubject)) {
             controlsBuffered.incrementAndGet();
-            Debug.info(label, "CONTROL", msg.sizeInBytes);
         }
     }
 

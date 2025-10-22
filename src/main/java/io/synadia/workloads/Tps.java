@@ -36,8 +36,8 @@ public class Tps extends Workload {
 
     private static final String TPS_SENDER = "SENDER";
     private static final String TPS_RECEIVER = "RECEIVER";
-    private static final String TEST_SUBJECT = "t";
-    private static final String CONTROL_SUBJECT = "x";
+    private static final String TEST_SUBJECT = "test";
+    private static final String CONTROL_SUBJECT = "control";
 
     // Common
     String action;
