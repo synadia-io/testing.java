@@ -6,7 +6,7 @@ import io.nats.client.impl.Headers;
 public class TpsUtils {
     public static String MESSAGE_ID_KEY = "mid";
 
-    public static Long extractMessageId(Message msg) {
+    public static long extractMessageId(Message msg) {
         Headers headers = msg.getHeaders();
         if (headers != null) {
             String mid = headers.getFirst(MESSAGE_ID_KEY);
@@ -17,7 +17,7 @@ public class TpsUtils {
                 catch (NumberFormatException ignored) {}
             }
         }
-        return null;
+        return -1;
     }
 
     @SuppressWarnings("SameParameterValue")

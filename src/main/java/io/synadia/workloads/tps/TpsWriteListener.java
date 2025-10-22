@@ -17,9 +17,11 @@ public class TpsWriteListener extends WriteListener {
     private final AtomicBoolean phase1;
     private final List<String> gapList;
     private final String label;
+    private final String testSubject;
 
-    public TpsWriteListener(String labelSuffix) {
+    public TpsWriteListener(String labelSuffix, String testSubject) {
         this.label = "WL-" + labelSuffix;
+        this.testSubject = testSubject;
         lastBufferedMessageId = new AtomicLong(0);
         gapList = new ArrayList<>();
         phase1 = new AtomicBoolean(true);
@@ -29,27 +31,20 @@ public class TpsWriteListener extends WriteListener {
         phase1.set(false);
     }
 
-    private static String printable(int instanceHashCode) {
-        return Integer.toHexString(instanceHashCode).toUpperCase();
-    }
-
     @Override
     public void buffered(NatsMessage msg) {
-        if (phase1.get()) {
-            // only care about messages with message ids, there can be protocol messages too
-            Long mid = extractMessageId(msg);
-            if (mid != null) {
-                long expected = lastBufferedMessageId.incrementAndGet();
-                if (expected == 1) {
-                    Debug.info(label, "buffering started");
-                }
-                else if (mid != expected) {
-                    long diff = mid - expected;
-                    gapList.add("expected:" + expected + ", received:" + mid + ", diff" + diff);
-                    Debug.info(label, "!!!!! buffered message id gap", "expected: %s", format3(expected), "actual: %s ", format3(mid), "difference: %s", diff);
-                }
-                lastBufferedMessageId.set(mid);
+        if (phase1.get() && msg.getSubject().equals(testSubject)) {
+            long mid = extractMessageId(msg);
+            long expected = lastBufferedMessageId.incrementAndGet();
+            if (expected == 1) {
+                Debug.info(label, "buffering started");
             }
+            else if (mid != expected) {
+                long diff = mid - expected;
+                gapList.add("expected:" + expected + ", received:" + mid + ", diff" + diff);
+                Debug.info(label, "!!!!! buffered message id gap", "expected: %s", format3(expected), "actual: %s ", format3(mid), "difference: %s", diff);
+            }
+            lastBufferedMessageId.set(mid);
         }
     }
 

@@ -1,7 +1,5 @@
 {
   "target.tps": 10000,
-  "subject": "tps",
-  "message.id.key": "mid",
   "payload.size": 12288,
   "nats.connection.timeout.millis": 5000,
   "nats.ping.interval.millis": 5000,

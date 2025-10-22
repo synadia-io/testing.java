@@ -1,10 +1,12 @@
 package io.synadia.workloads;
 
-import io.nats.client.*;
+import io.nats.client.Connection;
+import io.nats.client.Dispatcher;
+import io.nats.client.Nats;
+import io.nats.client.Options;
 import io.nats.client.impl.Headers;
 import io.nats.client.impl.NoOpStatistics;
 import io.nats.client.support.JsonValue;
-import io.nats.client.support.JsonValueUtils;
 import io.synadia.CommandLine;
 import io.synadia.Params;
 import io.synadia.Workload;
@@ -27,17 +29,19 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static io.nats.client.support.JsonValueUtils.*;
 import static io.nats.jsmulti.shared.Stats.format3;
+import static io.synadia.utils.Debug.stringify;
 import static io.synadia.workloads.tps.TpsUtils.*;
 
 public class Tps extends Workload {
 
     private static final String TPS_SENDER = "SENDER";
     private static final String TPS_RECEIVER = "RECEIVER";
+    private static final String TEST_SUBJECT = "t";
+    private static final String TERMINATE_SUBJECT = "x";
 
     // Common
     String action;
     int targetTps;
-    String subject;
     int payloadSize;
 
     List<String> sendResults = new ArrayList<>();
@@ -55,8 +59,6 @@ public class Tps extends Workload {
         this.action = commandLine.action;
 
         targetTps = readInteger(params.jv, "target.tps", 10000);
-        subject = JsonValueUtils.readString(params.jv, "subject", "tps");
-        MESSAGE_ID_KEY = JsonValueUtils.readString(params.jv, "message.id.key", "mid");
         payloadSize = readInteger(params.jv, "payload.size", 12 * 1024);
 
         reportApplicationOptions();
@@ -80,7 +82,7 @@ public class Tps extends Workload {
                     try { send(); } catch (Exception ignored) {}
                 });
 
-                while (!receiverStarted.get()) {
+                while (!receiverReady.get()) {
                     sleep(10);
                 }
                 s.start();
@@ -116,7 +118,7 @@ public class Tps extends Workload {
     private void send() throws IOException, InterruptedException {
         pubId = new AtomicLong();
         sendStats = new TpsStatsCollector(payloadSize);
-        sendWL = new TpsWriteListener(TPS_SENDER);
+        sendWL = new TpsWriteListener(TPS_SENDER, TEST_SUBJECT);
 
         sendCL = new TpsConnectionListener(TPS_SENDER);
         sendEL = new TpsErrorListener(TPS_SENDER);
@@ -157,7 +159,7 @@ public class Tps extends Workload {
                 if (messagesThisSecond < targetTps) {
                     try {
                         h.put(MESSAGE_ID_KEY, pubId.incrementAndGet() + "");
-                        nc.publish(subject, h, payload);
+                        nc.publish(TEST_SUBJECT, h, payload);
                         messagesThisSecond++;
 
                         // Calculate sleep time to maintain even distribution
@@ -196,39 +198,27 @@ public class Tps extends Workload {
 
             // publish the end marker for the receiver
             Debug.info(TPS_SENDER, "Publishing Terminate Message");
-            nc.publish(subject, null);
+            nc.publish(TERMINATE_SUBJECT, null);
 
             sendResults.add("\n" + TPS_SENDER);
             sendResults.add("Before Disconnect...");
-            sendResults.add(Debug.stringify("  Socket Written Messages: %s",
-                format3(sendStats.payloadCollector.writtenMessages)));
-            sendResults.add(Debug.stringify("  Socket Written Bytes: %s",
-                format3(sendStats.payloadCollector.writtenBytes)));
-            sendResults.add(Debug.stringify("  Buffered Messages: %s",
-                format3(sendStats.payloadCollector.bufferedMessages)));
-            sendResults.add(Debug.stringify("  Buffered Bytes: %s",
-                format3(sendStats.payloadCollector.bufferedBytes)));
+            sendResults.add(stringify("  Socket Written Messages: %s", format3(sendStats.payloadCollector.writtenMessages)));
+            sendResults.add(stringify("  Socket Written Bytes: %s", format3(sendStats.payloadCollector.writtenBytes)));
+            sendResults.add(stringify("  Buffered Messages: %s", format3(sendStats.payloadCollector.bufferedMessages)));
+            sendResults.add(stringify("  Buffered Bytes: %s", format3(sendStats.payloadCollector.bufferedBytes)));
 
             sendResults.add("After Disconnect...");
-            sendResults.add(Debug.stringify("  Socket Written Messages: %s",
-                format3(sendStats.payloadCollector2.writtenMessages)));
-            sendResults.add(Debug.stringify("  Socket Written Bytes: %s",
-                format3(sendStats.payloadCollector2.writtenBytes)));
-            sendResults.add(Debug.stringify("  Buffered Messages: %s",
-                format3(sendStats.payloadCollector2.bufferedMessages)));
-            sendResults.add(Debug.stringify("  Buffered Bytes: %s",
-                format3(sendStats.payloadCollector2.bufferedBytes)));
+            sendResults.add(stringify("  Socket Written Messages: %s", format3(sendStats.payloadCollector2.writtenMessages)));
+            sendResults.add(stringify("  Socket Written Bytes: %s", format3(sendStats.payloadCollector2.writtenBytes)));
+            sendResults.add(stringify("  Buffered Messages: %s", format3(sendStats.payloadCollector2.bufferedMessages)));
+            sendResults.add(stringify("  Buffered Bytes: %s", format3(sendStats.payloadCollector2.bufferedBytes)));
 
             sendResults.add("Analysis ...");
-            sendResults.add(Debug.stringify("  Last Write Messages: %s",
-                format3(sendStats.lastWriteMessages)));
-            sendResults.add(Debug.stringify("  Last Write Bytes: %s",
-                format3(sendStats.lastWriteBytes)));
+            sendResults.add(stringify("  Last Write Messages: %s", format3(sendStats.lastWriteMessages)));
+            sendResults.add(stringify("  Last Write Bytes: %s", format3(sendStats.lastWriteBytes)));
 
-            sendResults.add(Debug.stringify("  Buffered Not Written Messages: %s",
-                format3(sendStats.payloadCollector.notWrittenMessages)));
-            sendResults.add(Debug.stringify("  Buffered Not Written Bytes: %s",
-                format3(sendStats.payloadCollector.notWrittenBytes)));
+            sendResults.add(stringify("  Buffered Not Written Messages: %s", format3(sendStats.payloadCollector.notWrittenMessages)));
+            sendResults.add(stringify("  Buffered Not Written Bytes: %s", format3(sendStats.payloadCollector.notWrittenBytes)));
 
             List<String> skipList = sendWL.getGapList();
             if (skipList.isEmpty()) {
@@ -246,12 +236,12 @@ public class Tps extends Workload {
     // ----------------------------------------------------------------------------------------------------
     // Receiver
     // ----------------------------------------------------------------------------------------------------
-    AtomicLong receivedMessages = new AtomicLong(0);
-    AtomicLong receivedLastMessageId = new AtomicLong(-1);
+    long receivedMessages = 0;
+    long receivedLastMessageId = -1;
     CountDownLatch terminate = new CountDownLatch(1);
     TpsConnectionListener receiveCL;
     TpsErrorListener receiveEL;
-    AtomicBoolean receiverStarted = new AtomicBoolean(false);
+    AtomicBoolean receiverReady = new AtomicBoolean(false);
 
     private void receive() throws IOException, InterruptedException {
         int firstServerIx = commandLine.args.isEmpty() ? 1 : Integer.parseInt(commandLine.args.getFirst());
@@ -267,54 +257,46 @@ public class Tps extends Workload {
         reportConnectionOptions(TPS_RECEIVER, options);
 
         try (Connection nc = Nats.connect(options)) {
-            MessageHandler handler = msg -> {
-                if (terminate.getCount() == 0) {
-                    return;
-                }
 
-                int dlen = msg.getData().length;
-                if (dlen == 0) {
-                    Debug.info(TPS_RECEIVER, "Received Terminate Message");
-                    terminate.countDown();
-                    return;
-                }
+            Dispatcher d = nc.createDispatcher();
 
-                //noinspection DataFlowIssue this will never return null
-                long mid = extractMessageId(msg);
-                long rcvd = receivedMessages.incrementAndGet();
-                if (rcvd == 1) {
-                    receivedLastMessageId.set(mid);
+            d.subscribe(TEST_SUBJECT, msg -> {
+                if (++receivedMessages == 1) {
+                    receivedLastMessageId = 1;
                     Debug.info(TPS_RECEIVER, "Started Receiving");
                     return;
                 }
 
-                long expected = receivedLastMessageId.incrementAndGet();
-                receivedLastMessageId.set(mid);
+                long expected = receivedLastMessageId + 1;
+                long mid = extractMessageId(msg);
+                receivedLastMessageId = mid;
                 if (mid != expected) {
                     long gap = mid - expected;
-                    receiveResults.add(Debug.stringify("  Received Gap Message: %s", format3(mid)));
-                    receiveResults.add(Debug.stringify("  Expected Gap Message: %s", format3(expected)));
-                    receiveResults.add(Debug.stringify("  Gap: %s", gap));
+                    receiveResults.add(stringify("  Received Gap Message: %s", format3(mid)));
+                    receiveResults.add(stringify("  Expected Gap Message: %s", format3(expected)));
+                    receiveResults.add(stringify("  Gap: %s", gap));
                     Debug.info(TPS_RECEIVER, "******"
                         , "Got Message Id: %s but expected: %s", format3(mid), format3(expected)
                         , "Loss of %s", format3(gap));
                 }
-            };
+            });
 
-            Dispatcher currentDispatcher = nc.createDispatcher();
+            d.subscribe(TERMINATE_SUBJECT, msg -> {
+                Debug.info(TPS_RECEIVER, "Received Terminate Message.");
+                terminate.countDown();
+            });
 
-            Subscription subscription = currentDispatcher.subscribe(subject, handler);
-            sleep(100);
-            receiverStarted.set(true);
+            sleep(50);
+            receiverReady.set(true);
 
             if (!terminate.await(10, TimeUnit.SECONDS)) {
                 Debug.info(TPS_RECEIVER, "!!!!! Terminate Message NOT Received");
             }
 
-            receiveResults.addFirst(Debug.stringify("  Total Received Messages: %s", format3(receivedMessages.get())));
+            receiveResults.addFirst(stringify("  Total Received Messages: %s", format3(receivedMessages.get())));
             receiveResults.addFirst("\n" + TPS_RECEIVER);
 
-            currentDispatcher.unsubscribe(subject);
+            d.unsubscribe(TEST_SUBJECT);
         }
     }
 
@@ -396,7 +378,7 @@ public class Tps extends Workload {
     private void reportApplicationOptions() {
         Debug.info(workLabel, "----- Application Options -----");
         Debug.info(workLabel, "targetTps", targetTps);
-        Debug.info(workLabel, "subject", subject);
+        Debug.info(workLabel, "subject", TEST_SUBJECT);
         Debug.info(workLabel, "messageIdKey", MESSAGE_ID_KEY);
         Debug.info(workLabel, "payloadSize", payloadSize);
     }
