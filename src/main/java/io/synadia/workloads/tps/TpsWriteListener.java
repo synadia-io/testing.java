@@ -7,24 +7,29 @@ import io.synadia.utils.Debug;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static io.nats.jsmulti.shared.Stats.format3;
 import static io.synadia.workloads.tps.TpsUtils.extractMessageId;
 
 public class TpsWriteListener extends WriteListener {
-    private final AtomicLong lastBufferedMessageId;
-    private final AtomicBoolean phase1;
-    private final List<String> gapList;
     private final String label;
     private final String testSubject;
+    private final String controlSubject;
+    private final AtomicBoolean phase1;
+    private final AtomicLong lastBufferedMessageId;
+    private final AtomicInteger controlsBuffered;
+    private final List<String> gapList;
 
-    public TpsWriteListener(String labelSuffix, String testSubject) {
+    public TpsWriteListener(String labelSuffix, String testSubject, String controlSubject) {
         this.label = "WL-" + labelSuffix;
         this.testSubject = testSubject;
-        lastBufferedMessageId = new AtomicLong(0);
-        gapList = new ArrayList<>();
+        this.controlSubject = controlSubject;
         phase1 = new AtomicBoolean(true);
+        lastBufferedMessageId = new AtomicLong(0);
+        controlsBuffered = new AtomicInteger(0);
+        gapList = new ArrayList<>();
     }
 
     public void startPhase2() {
@@ -46,10 +51,18 @@ public class TpsWriteListener extends WriteListener {
             }
             lastBufferedMessageId.set(mid);
         }
+        else if (msg.getSubject().equals(controlSubject)) {
+            controlsBuffered.incrementAndGet();
+            Debug.info(label, "CONTROL", msg.consumeByteCount());
+        }
     }
 
     public long getLastBufferedMessageId() {
         return lastBufferedMessageId.get();
+    }
+
+    public int getControlsBuffered() {
+        return controlsBuffered.get();
     }
 
     public List<String> getGapList() {

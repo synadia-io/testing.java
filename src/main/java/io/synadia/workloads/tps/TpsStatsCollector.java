@@ -19,10 +19,10 @@ public class TpsStatsCollector extends NoOpStatistics {
     }
 
     public final Collector payloadCollector = new Collector();
-    public final Collector protocolCollector = new Collector();
+    public final Collector nonCollector = new Collector();
 
     public final Collector payloadCollector2 = new Collector();
-    public final Collector protocolCollector2 = new Collector();
+    public final Collector nonCollector2 = new Collector();
 
     public long lastWriteMessages = 0;
     public long lastWriteBytes = 0;
@@ -47,14 +47,14 @@ public class TpsStatsCollector extends NoOpStatistics {
                 c = payloadCollector;
             }
             else {
-                c = protocolCollector;
+                c = nonCollector;
             }
         }
         else if (bytes >= payloadSize) {
             c = payloadCollector2;
         }
         else {
-            c = protocolCollector2;
+            c = nonCollector2;
         }
         c.bufferedMessages++;
         c.bufferedBytes += bytes;
@@ -68,11 +68,11 @@ public class TpsStatsCollector extends NoOpStatistics {
         Collector cProto;
         if (phase1.get()) {
             cPay = payloadCollector;
-            cProto = protocolCollector;
+            cProto = nonCollector;
         }
         else {
             cPay = payloadCollector2;
-            cProto = protocolCollector2;
+            cProto = nonCollector2;
         }
 
         cPay.writtenMessages += cPay.notWrittenMessages;
@@ -89,9 +89,9 @@ public class TpsStatsCollector extends NoOpStatistics {
             lastWriteMessages = notWrittenMessages;
             lastWriteBytes = bytes;
             payloadCollector.notWrittenMessages = 0;
-            protocolCollector.notWrittenMessages = 0;
+            nonCollector.notWrittenMessages = 0;
             payloadCollector.notWrittenBytes = 0;
-            protocolCollector.notWrittenBytes = 0;
+            nonCollector.notWrittenBytes = 0;
         }
     }
 }

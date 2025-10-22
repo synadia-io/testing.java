@@ -118,7 +118,7 @@ public class Tps extends Workload {
     private void send() throws IOException, InterruptedException {
         pubId = new AtomicLong();
         sendStats = new TpsStatsCollector(payloadSize);
-        sendWL = new TpsWriteListener(TPS_SENDER, TEST_SUBJECT);
+        sendWL = new TpsWriteListener(TPS_SENDER, TEST_SUBJECT, CONTROL_SUBJECT);
 
         sendCL = new TpsConnectionListener(TPS_SENDER);
         sendEL = new TpsErrorListener(TPS_SENDER);
@@ -142,7 +142,7 @@ public class Tps extends Workload {
             long nextSecondStart = -1;
             long startNanos = System.nanoTime();
 
-            Debug.info(TPS_SENDER, "Publishing Control Start Message '%s'", CONTROL_SUBJECT);
+            Debug.info(TPS_SENDER, "Publishing Control Start Message");
             nc.publish(CONTROL_SUBJECT, null);
 
             while (nc.getStatus() == Connection.Status.CONNECTED && !sendEL.connectionException && !sendCL.disconnected)
@@ -200,7 +200,7 @@ public class Tps extends Workload {
             Debug.info(TPS_SENDER, "Queue empty");
 
             // publish the end marker for the receiver
-            Debug.info(TPS_SENDER, "Publishing Control Terminate Message '%s'", CONTROL_SUBJECT);
+            Debug.info(TPS_SENDER, "Publishing Control Terminate Message");
             nc.publish(CONTROL_SUBJECT, null);
 
             sendResults.add("\n" + TPS_SENDER);
@@ -216,7 +216,8 @@ public class Tps extends Workload {
             sendResults.add(stringify("  Buffered Messages: %s", format3(sendStats.payloadCollector2.bufferedMessages)));
             sendResults.add(stringify("  Buffered Bytes: %s", format3(sendStats.payloadCollector2.bufferedBytes)));
 
-            sendResults.add("Analysis ...");
+            sendResults.add("Etc ...");
+            sendResults.add(stringify("  Control Messages Buffered: %s", sendWL.getControlsBuffered()));
             sendResults.add(stringify("  Last Write Messages: %s", format3(sendStats.lastWriteMessages)));
             sendResults.add(stringify("  Last Write Bytes: %s", format3(sendStats.lastWriteBytes)));
 
