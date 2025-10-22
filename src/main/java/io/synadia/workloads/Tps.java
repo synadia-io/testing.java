@@ -205,24 +205,24 @@ public class Tps extends Workload {
 
             sendResults.add("\n" + TPS_SENDER);
             sendResults.add("Before Disconnect...");
-            sendResults.add(stringify("  Socket Written Messages: %s", format3(sendStats.payloadCollector.writtenMessages)));
-            sendResults.add(stringify("  Socket Written Bytes: %s", format3(sendStats.payloadCollector.writtenBytes)));
-            sendResults.add(stringify("  Buffered Messages: %s", format3(sendStats.payloadCollector.bufferedMessages)));
-            sendResults.add(stringify("  Buffered Bytes: %s", format3(sendStats.payloadCollector.bufferedBytes)));
+            addSendResult("Socket Written Messages", sendStats.pay.writtenMessages);
+            addSendResult("Socket Written Bytes", sendStats.pay.writtenBytes);
+            addSendResult("Buffered Messages", sendStats.pay.bufferedMessages);
+            addSendResult("Buffered Bytes", sendStats.pay.bufferedBytes);
 
             sendResults.add("After Disconnect...");
-            sendResults.add(stringify("  Socket Written Messages: %s", format3(sendStats.payloadCollector2.writtenMessages)));
-            sendResults.add(stringify("  Socket Written Bytes: %s", format3(sendStats.payloadCollector2.writtenBytes)));
-            sendResults.add(stringify("  Buffered Messages: %s", format3(sendStats.payloadCollector2.bufferedMessages)));
-            sendResults.add(stringify("  Buffered Bytes: %s", format3(sendStats.payloadCollector2.bufferedBytes)));
+            addSendResult("Socket Written Messages", sendStats.pay2.writtenMessages);
+            addSendResult("Socket Written Bytes", sendStats.pay2.writtenBytes);
+            addSendResult("Buffered Messages", sendStats.pay2.bufferedMessages);
+            addSendResult("Buffered Bytes", sendStats.pay2.bufferedBytes);
 
             sendResults.add("Etc ...");
-            sendResults.add(stringify("  Control Messages Buffered: %s", sendWL.getControlsBuffered()));
-            sendResults.add(stringify("  Last Write Messages: %s", format3(sendStats.lastWriteMessages)));
-            sendResults.add(stringify("  Last Write Bytes: %s", format3(sendStats.lastWriteBytes)));
+            addSendResult("Control Messages Buffered", sendWL.getControlsBuffered());
+            addSendResult("Last Write Messages", sendStats.lastWriteMessages);
+            addSendResult("Last Write Bytes", sendStats.lastWriteBytes);
 
-            sendResults.add(stringify("  Buffered Not Written Messages: %s", format3(sendStats.payloadCollector.notWrittenMessages)));
-            sendResults.add(stringify("  Buffered Not Written Bytes: %s", format3(sendStats.payloadCollector.notWrittenBytes)));
+            addSendResult("Buffered Not Written Messages", sendStats.pay.notWrittenMessages);
+            addSendResult("Buffered Not Written Bytes", sendStats.pay.notWrittenBytes);
 
             List<String> skipList = sendWL.getGapList();
             if (skipList.isEmpty()) {
@@ -235,6 +235,10 @@ public class Tps extends Workload {
                 }
             }
         }
+    }
+
+    private void addSendResult(String s, Number n) {
+        sendResults.add(stringify("  " + s + ": %s", format3(n)));
     }
 
     // ----------------------------------------------------------------------------------------------------

@@ -18,11 +18,11 @@ public class TpsStatsCollector extends NoOpStatistics {
         public long notWrittenBytes = 0;
     }
 
-    public final Collector payloadCollector = new Collector();
-    public final Collector nonCollector = new Collector();
+    public final Collector pay = new Collector();
+    public final Collector non = new Collector();
 
-    public final Collector payloadCollector2 = new Collector();
-    public final Collector nonCollector2 = new Collector();
+    public final Collector pay2 = new Collector();
+    public final Collector non2 = new Collector();
 
     public long lastWriteMessages = 0;
     public long lastWriteBytes = 0;
@@ -44,17 +44,17 @@ public class TpsStatsCollector extends NoOpStatistics {
         Collector c;
         if (phase1.get()) {
             if (bytes >= payloadSize) {
-                c = payloadCollector;
+                c = pay;
             }
             else {
-                c = nonCollector;
+                c = non;
             }
         }
         else if (bytes >= payloadSize) {
-            c = payloadCollector2;
+            c = pay2;
         }
         else {
-            c = nonCollector2;
+            c = non2;
         }
         c.bufferedMessages++;
         c.bufferedBytes += bytes;
@@ -64,33 +64,34 @@ public class TpsStatsCollector extends NoOpStatistics {
 
     @Override
     public void registerWrite(long bytes) {
+
         Collector cPay;
-        Collector cProto;
+        Collector cNon;
         if (phase1.get()) {
-            cPay = payloadCollector;
-            cProto = nonCollector;
+            cPay = pay;
+            cNon = non;
         }
         else {
-            cPay = payloadCollector2;
-            cProto = nonCollector2;
+            cPay = pay2;
+            cNon = non2;
         }
 
-        cPay.writtenMessages += cPay.notWrittenMessages;
-        cProto.writtenMessages += cProto.notWrittenMessages;
-        cPay.writtenBytes += cPay.notWrittenBytes;
-        cProto.writtenBytes += cProto.notWrittenBytes;
-
         if (phase1.get()) {
-            long notWrittenBytes = cPay.notWrittenBytes + cProto.notWrittenBytes;
+            long notWrittenBytes = cPay.notWrittenBytes + cNon.notWrittenBytes;
             if (notWrittenBytes > 0 && notWrittenBytes != bytes) {
                 Debug.info("STATS", "MISMATCH %s vs %s", notWrittenBytes, bytes);
             }
-            lastWriteMessages = cPay.notWrittenMessages + cProto.notWrittenMessages;
+            lastWriteMessages = cPay.notWrittenMessages + cNon.notWrittenMessages;
             lastWriteBytes = bytes;
-            payloadCollector.notWrittenMessages = 0;
-            nonCollector.notWrittenMessages = 0;
-            payloadCollector.notWrittenBytes = 0;
-            nonCollector.notWrittenBytes = 0;
         }
+
+        cPay.writtenMessages += cPay.notWrittenMessages;
+        cNon.writtenMessages += cNon.notWrittenMessages;
+        cPay.writtenBytes += cPay.notWrittenBytes;
+        cNon.writtenBytes += cNon.notWrittenBytes;
+        cPay.notWrittenMessages = 0;
+        cNon.notWrittenMessages = 0;
+        cPay.notWrittenBytes = 0;
+        cNon.notWrittenBytes = 0;
     }
 }
