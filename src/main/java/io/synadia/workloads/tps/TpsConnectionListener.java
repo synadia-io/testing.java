@@ -12,7 +12,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class TpsConnectionListener implements ConnectionListener {
 
     public AtomicBoolean disconnected = new AtomicBoolean(false);
-    public AtomicBoolean reconnected = new AtomicBoolean(false);
 
     private final String label;
     private final boolean receiver;
@@ -35,10 +34,6 @@ public class TpsConnectionListener implements ConnectionListener {
         }
         else if (type == Events.DISCONNECTED) {
             disconnected.set(true);
-            print = true;
-        }
-        else if (type == Events.RECONNECTED) {
-            reconnected.set(true);
             print = true;
         }
         else if (receiver && type == Events.RESUBSCRIBED) {

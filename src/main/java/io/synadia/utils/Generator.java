@@ -229,7 +229,7 @@ public class Generator {
         }
     }
 
-    private static String printSsh(Instance current, Kind kind, Gen gen) {
+    private static String printSsh(Instance current, Kind kind, Gen gen) throws IOException {
         if (!DO_NOT_MATCH.equals(gen.keyFile)) {
             String user = switch (kind) {
                 case SERVER -> gen.serverUser;
@@ -240,10 +240,23 @@ public class Generator {
                 + gen.keyFile + " "
                 + user
                 + "@" + current.publicDnsName;
+            StringBuilder sb = new StringBuilder();
             if (gen.windows) {
-                System.out.print("start ");
+                sb.append("start ");
             }
-            System.out.println(cmd);
+            sb.append(cmd);
+            System.out.println(sb);
+
+            if (gen.windows) {
+                String batchName = kind.name().substring(0, 1).toLowerCase()
+                    + current.name.substring(current.name.length() - 1)
+                    + ".bat";
+                System.out.println(batchName);
+                try (FileOutputStream out = new FileOutputStream(batchName)) {
+                    out.write(sb.toString().getBytes());
+                    out.flush();
+                }
+            }
             return cmd;
         }
         return null;

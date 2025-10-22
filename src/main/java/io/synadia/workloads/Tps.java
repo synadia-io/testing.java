@@ -191,7 +191,7 @@ public class Tps extends Workload {
             sendStats.startPhase2();
             sendWL.startPhase2();
 
-            while (!sendCL.reconnected.get()) {
+            while (nc.getStatus() != Connection.Status.CONNECTED) {
                 Debug.info(TPS_SENDER, "Waiting for Reconnect");
                 sleep(10);
             }
@@ -204,39 +204,44 @@ public class Tps extends Workload {
                 pending = nc.outgoingPendingMessageCount();
                 sleep(10);
             }
+
             Debug.info(TPS_SENDER, "Queue empty");
             sleep(100); // just for good measure
 
-            sendResults.add("\n" + TPS_SENDER);
-            sendResults.add("Before Disconnect...");
-            addSendResult("Buffered vs Socket Messages",
-                sendStats.pay.bufferedMessages, sendStats.pay.writtenMessages);
-            addSendResult("Buffered vs Socket Bytes",
-                sendStats.pay.bufferedBytes, sendStats.pay.writtenBytes);
+            populateSendResults();
+        }
+    }
 
-            sendResults.add("After Disconnect...");
-            addSendResult("Buffered vs Socket Messages",
-                sendStats.pay2.bufferedMessages, sendStats.pay2.writtenMessages);
-            addSendResult("Buffered vs Socket Bytes",
-                sendStats.pay2.bufferedBytes, sendStats.pay2.writtenBytes);
+    private void populateSendResults() {
+        sendResults.add("\n" + TPS_SENDER);
+        sendResults.add("Before Disconnect...");
+        addSendResult("Buffered vs Socket Messages",
+            sendStats.pay.bufferedMessages, sendStats.pay.writtenMessages);
+        addSendResult("Buffered vs Socket Bytes",
+            sendStats.pay.bufferedBytes, sendStats.pay.writtenBytes);
 
-            sendResults.add("Etc ...");
-            addSendResult("Control Messages Buffered", sendWL.getControlsBuffered());
-            addSendResult("Last Write Messages", sendStats.lastWriteMessages);
-            addSendResult("Last Write Bytes", sendStats.lastWriteBytes);
+        sendResults.add("After Disconnect...");
+        addSendResult("Buffered vs Socket Messages",
+            sendStats.pay2.bufferedMessages, sendStats.pay2.writtenMessages);
+        addSendResult("Buffered vs Socket Bytes",
+            sendStats.pay2.bufferedBytes, sendStats.pay2.writtenBytes);
 
-            addSendResult("Buffered Not Written Messages", sendStats.pay.notWrittenMessages);
-            addSendResult("Buffered Not Written Bytes", sendStats.pay.notWrittenBytes);
+        sendResults.add("Etc ...");
+        addSendResult("Control Messages Buffered", sendWL.getControlsBuffered());
+        addSendResult("Last Write Messages", sendStats.lastWriteMessages);
+        addSendResult("Last Write Bytes", sendStats.lastWriteBytes);
 
-            List<String> skipList = sendWL.getGapList();
-            if (skipList.isEmpty()) {
-                sendResults.add("  No Writer Gaps");
-            }
-            else {
-                sendResults.add("  Writer Gaps");
-                for (String s : skipList) {
-                    sendResults.add(" " + s);
-                }
+        addSendResult("Buffered Not Written Messages", sendStats.pay.notWrittenMessages);
+        addSendResult("Buffered Not Written Bytes", sendStats.pay.notWrittenBytes);
+
+        List<String> skipList = sendWL.getGapList();
+        if (skipList.isEmpty()) {
+            sendResults.add("  No Writer Gaps");
+        }
+        else {
+            sendResults.add("  Writer Gaps");
+            for (String s : skipList) {
+                sendResults.add(" " + s);
             }
         }
     }
