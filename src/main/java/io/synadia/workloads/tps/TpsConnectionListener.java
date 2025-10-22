@@ -7,6 +7,7 @@ import io.nats.client.Connection;
 import io.nats.client.ConnectionListener;
 import io.synadia.utils.Debug;
 
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class TpsConnectionListener implements ConnectionListener {
@@ -14,10 +15,12 @@ public class TpsConnectionListener implements ConnectionListener {
     public AtomicBoolean disconnected = new AtomicBoolean(false);
 
     private final String label;
+    private final List<String> servers;
     private final boolean receiver;
 
-    public TpsConnectionListener(String labelSuffix, boolean receiver) {
+    public TpsConnectionListener(String labelSuffix, List<String> servers, boolean receiver) {
         this.label = "CL-" + labelSuffix;
+        this.servers = servers;
         this.receiver = receiver;
     }
 
@@ -40,11 +43,13 @@ public class TpsConnectionListener implements ConnectionListener {
             print = true;
         }
         if (print) {
+            int ix = servers.indexOf(uriDetails);
+            String details = ix == -1 ? uriDetails : "server " + ix + " (" + uriDetails + ")";
             if (time == null) {
-                Debug.info(label, "%s(%s)", type.getEvent(), conn.getStatus(), uriDetails);
+                Debug.info(label, "%s(%s)", type.getEvent(), conn.getStatus(), details);
             }
             else {
-                Debug.info(label, "[%s]", Debug.simpleTime(time), "%s(%s)", type.getEvent(), conn.getStatus(), uriDetails);
+                Debug.info(label, "[%s]", Debug.simpleTime(time), "%s(%s)", type.getEvent(), conn.getStatus(), details);
             }
         }
     }

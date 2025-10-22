@@ -119,7 +119,7 @@ public class Tps extends Workload {
         sendStats = new TpsStatsCollector(payloadSize);
         sendWL = new TpsWriteListener(TPS_SENDER, TEST_SUBJECT, CONTROL_SUBJECT);
 
-        sendCL = new TpsConnectionListener(TPS_SENDER, false);
+        sendCL = new TpsConnectionListener(TPS_SENDER, params.servers, false);
         sendEL = new TpsErrorListener(TPS_SENDER);
 
         Options options = buildOptions(0)
@@ -267,7 +267,7 @@ public class Tps extends Workload {
 
     private void receive() throws IOException, InterruptedException {
         int firstServerIx = commandLine.args.isEmpty() ? 1 : Integer.parseInt(commandLine.args.getFirst());
-        receiveCL = new TpsConnectionListener(TPS_RECEIVER, true);
+        receiveCL = new TpsConnectionListener(TPS_RECEIVER, params.servers, true);
         receiveEL = new TpsErrorListener(TPS_RECEIVER);
 
         Options options = buildOptions(firstServerIx)
