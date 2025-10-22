@@ -14,6 +14,7 @@ import io.synadia.Workload;
 import io.synadia.utils.Debug;
 import io.synadia.workloads.tps.TpsConnectionListener;
 import io.synadia.workloads.tps.TpsErrorListener;
+import io.synadia.workloads.tps.TpsServerPool;
 import io.synadia.workloads.tps.TpsStatsCollector;
 
 import java.io.IOException;
@@ -127,6 +128,7 @@ public class Tps extends Workload {
             .statisticsCollector(sendStats)
             .connectionListener(sendCL)
             .errorListener(sendEL)
+            .serverPool(new TpsServerPool(TPS_SENDER))
             .build();
 
         reportConnectionOptions(TPS_SENDER, options);

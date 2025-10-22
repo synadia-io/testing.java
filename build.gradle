@@ -28,6 +28,7 @@ dependencies {
     implementation 'io.synadia:direct-batch:0.1.4'
     implementation 'org.jfree:jfreechart:1.5.5'
     implementation 'io.synadia:chaos-runner:0.0.7'
+    implementation 'org.jspecify:jspecify:1.0.0'
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.9.0'
 }
