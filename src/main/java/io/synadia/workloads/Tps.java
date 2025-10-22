@@ -196,8 +196,8 @@ public class Tps extends Workload {
 
             long pending = nc.outgoingPendingMessageCount();
             while (pending > 0) {
-                pending = nc.outgoingPendingMessageCount();
                 Debug.info(TPS_SENDER, "Waiting for %s queued messages to be sent...", pending);
+                pending = nc.outgoingPendingMessageCount();
                 sleep(10);
             }
             Debug.info(TPS_SENDER, "Queue empty");
