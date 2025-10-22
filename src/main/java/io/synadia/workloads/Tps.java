@@ -293,7 +293,7 @@ public class Tps extends Workload {
                 Debug.info(TPS_RECEIVER, "!!!!! Terminate Message NOT Received");
             }
 
-            receiveResults.addFirst(stringify("  Total Received Messages: %s", format3(receivedMessages.get())));
+            receiveResults.addFirst(stringify("  Total Received Messages: %s", format3(receivedMessages)));
             receiveResults.addFirst("\n" + TPS_RECEIVER);
 
             d.unsubscribe(TEST_SUBJECT);
