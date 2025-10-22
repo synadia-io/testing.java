@@ -37,7 +37,7 @@ public class Tps extends Workload {
     private static final String TPS_SENDER = "SENDER";
     private static final String TPS_RECEIVER = "RECEIVER";
     private static final String TEST_SUBJECT = "t";
-    private static final String TERMINATE_SUBJECT = "x";
+    private static final String CONTROL_SUBJECT = "x";
 
     // Common
     String action;
@@ -142,6 +142,9 @@ public class Tps extends Workload {
             long nextSecondStart = -1;
             long startNanos = System.nanoTime();
 
+            Debug.info(TPS_SENDER, "Publishing Control Start Message '%s'", CONTROL_SUBJECT);
+            nc.publish(CONTROL_SUBJECT, null);
+
             while (nc.getStatus() == Connection.Status.CONNECTED && !sendEL.connectionException && !sendCL.disconnected)
             {
                 // Check if we've moved to a new second
@@ -197,8 +200,8 @@ public class Tps extends Workload {
             Debug.info(TPS_SENDER, "Queue empty");
 
             // publish the end marker for the receiver
-            Debug.info(TPS_SENDER, "Publishing Terminate Message");
-            nc.publish(TERMINATE_SUBJECT, null);
+            Debug.info(TPS_SENDER, "Publishing Control Terminate Message '%s'", CONTROL_SUBJECT);
+            nc.publish(CONTROL_SUBJECT, null);
 
             sendResults.add("\n" + TPS_SENDER);
             sendResults.add("Before Disconnect...");
@@ -238,7 +241,8 @@ public class Tps extends Workload {
     // ----------------------------------------------------------------------------------------------------
     long receivedMessages = 0;
     long receivedLastMessageId = -1;
-    CountDownLatch terminate = new CountDownLatch(1);
+    int control = 0;
+    CountDownLatch controlLatch = new CountDownLatch(2);
     TpsConnectionListener receiveCL;
     TpsErrorListener receiveEL;
     AtomicBoolean receiverReady = new AtomicBoolean(false);
@@ -281,15 +285,20 @@ public class Tps extends Workload {
                 }
             });
 
-            d.subscribe(TERMINATE_SUBJECT, msg -> {
-                Debug.info(TPS_RECEIVER, "Received Terminate Message.");
-                terminate.countDown();
+            d.subscribe(CONTROL_SUBJECT, msg -> {
+                if (control++ == 0) {
+                    Debug.info(TPS_RECEIVER, "Received Control Start Message.");
+                }
+                else {
+                    Debug.info(TPS_RECEIVER, "Received Control Terminate Message.");
+                }
+                controlLatch.countDown();
             });
 
             sleep(50);
             receiverReady.set(true);
 
-            if (!terminate.await(10, TimeUnit.SECONDS)) {
+            if (!controlLatch.await(10, TimeUnit.SECONDS)) {
                 Debug.info(TPS_RECEIVER, "!!!!! Terminate Message NOT Received");
             }
 
