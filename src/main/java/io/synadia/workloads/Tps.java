@@ -355,25 +355,25 @@ public class Tps extends Workload {
         }
 
         long millis = readLong(jv, "nats.reconnect.wait.millis", -1);
-        if (millis != -1) {
+        if (millis > 0) {
             builder.reconnectWait(Duration.ofMillis(millis));
         }
         millis = readLong(jv, "nats.ping.interval.millis", -1);
-        if (millis != -1) {
+        if (millis > 0) {
             builder.pingInterval(Duration.ofMillis(millis));
         }
 
         builder.maxPingsOut(readInteger(jv, "nats.connection.max.ping.out", 2));
 
         millis = readLong(jv, "nats.socket.write.timeout.millis", -1);
-        if (millis != -1) {
+        if (millis > 0) {
             builder.socketWriteTimeout(millis);
         }
 
-//        millis = readLong(jv, "nats.socket.read.timeout.millis", -1);
-//        if (millis != -1) {
-//            builder.socketReadTimeoutMillis((int)millis);
-//        }
+        millis = readLong(jv, "nats.socket.read.timeout.millis", -1);
+        if (millis > 0) {
+            builder.socketReadTimeoutMillis((int)millis);
+        }
 
         return builder;
     }
@@ -421,6 +421,8 @@ public class Tps extends Workload {
         Debug.info(label, "pingInterval", o.getPingInterval());
         Debug.info(label, "maxPingsOut", o.getMaxPingsOut());
         Debug.info(label, "socketWriteTimeout", o.getSocketWriteTimeout());
-//        Debug.info(label, "socketReadTimeoutMillis", o.getSocketReadTimeoutMillis());
+        if (o.getSocketReadTimeoutMillis() > 0) {
+            Debug.info(label, "socketReadTimeoutMillis", o.getSocketReadTimeoutMillis());
+        }
     }
 }
