@@ -299,7 +299,7 @@ public class Tps extends Workload {
             sleep(50);
             receiverReady.set(true);
 
-            if (!controlLatch.await(10, TimeUnit.SECONDS)) {
+            if (!controlLatch.await(15, TimeUnit.SECONDS)) {
                 Debug.info(TPS_RECEIVER, "!!!!! Terminate Message NOT Received");
             }
 
