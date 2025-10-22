@@ -9,9 +9,11 @@ import io.nats.client.ErrorListener;
 import io.nats.client.Message;
 import io.synadia.utils.Debug;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 public class TpsErrorListener implements ErrorListener {
 
-    public volatile boolean connectionException = false;
+    public AtomicBoolean connectionException = new AtomicBoolean(false);
 
     private final String label;
 
@@ -26,7 +28,7 @@ public class TpsErrorListener implements ErrorListener {
     @Override
     public void errorOccurred(final Connection conn, final String error) {
         if (error.contains("Read channel closed")) {
-            connectionException = true;
+            connectionException.set(true);
         }
         Debug.info(label, "errorOccurred", string(conn), "Error: " + error);
     }
@@ -56,7 +58,7 @@ public class TpsErrorListener implements ErrorListener {
 
     @Override
     public void socketWriteTimeout(Connection conn) {
-        connectionException = true;
+        connectionException.set(true);
         Debug.info(label, "socketWriteTimeout", string(conn));
     }
 }

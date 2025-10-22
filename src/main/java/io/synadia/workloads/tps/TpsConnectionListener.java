@@ -7,9 +7,12 @@ import io.nats.client.Connection;
 import io.nats.client.ConnectionListener;
 import io.synadia.utils.Debug;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 public class TpsConnectionListener implements ConnectionListener {
 
-    public volatile boolean disconnected = false;
+    public AtomicBoolean disconnected = new AtomicBoolean(false);
+    public AtomicBoolean reconnected = new AtomicBoolean(false);
 
     private final String label;
 
@@ -31,7 +34,10 @@ public class TpsConnectionListener implements ConnectionListener {
             Debug.info(label, "[%s]", Debug.simpleTime(time), "%s(%s)", type.getEvent(), conn.getStatus(), uriDetails);
         }
         if (type == Events.DISCONNECTED) {
-            disconnected = true;
+            disconnected.set(true);
+        }
+        else if (type == Events.RECONNECTED) {
+            reconnected.set(true);
         }
     }
 }
