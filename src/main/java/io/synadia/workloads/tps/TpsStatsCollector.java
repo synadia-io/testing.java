@@ -40,7 +40,7 @@ public class TpsStatsCollector extends NoOpStatistics {
     }
 
     @Override
-    public void incrementOutBytes(long bytes) {
+    public void incrementOut(long bytes) {
         Collector c;
         if (phase1.get()) {
             if (bytes >= payloadSize) {
