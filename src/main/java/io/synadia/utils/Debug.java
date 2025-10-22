@@ -251,7 +251,7 @@ public abstract class Debug {
     }
 
     public static final ZoneId ZONE_ID_GMT = ZoneId.of("GMT");
-    public static final DateTimeFormatter SIMPLE_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss.SSSS");
+    public static final DateTimeFormatter SIMPLE_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
 
     public static String simpleTime(long javaTime) {
         return SIMPLE_TIME_FORMATTER.format(ZonedDateTime.ofInstant(Instant.ofEpochMilli(javaTime), ZONE_ID_GMT));

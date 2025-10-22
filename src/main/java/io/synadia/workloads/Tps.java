@@ -20,7 +20,6 @@ import java.io.IOException;
 import java.net.Socket;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -120,7 +119,7 @@ public class Tps extends Workload {
         sendStats = new TpsStatsCollector(payloadSize);
         sendWL = new TpsWriteListener(TPS_SENDER, TEST_SUBJECT, CONTROL_SUBJECT);
 
-        sendCL = new TpsConnectionListener(TPS_SENDER);
+        sendCL = new TpsConnectionListener(TPS_SENDER, false);
         sendEL = new TpsErrorListener(TPS_SENDER);
 
         Options options = buildOptions(0)
@@ -263,7 +262,7 @@ public class Tps extends Workload {
 
     private void receive() throws IOException, InterruptedException {
         int firstServerIx = commandLine.args.isEmpty() ? 1 : Integer.parseInt(commandLine.args.getFirst());
-        receiveCL = new TpsConnectionListener(TPS_RECEIVER);
+        receiveCL = new TpsConnectionListener(TPS_RECEIVER, true);
         receiveEL = new TpsErrorListener(TPS_RECEIVER);
 
         Options options = buildOptions(firstServerIx)
@@ -371,21 +370,23 @@ public class Tps extends Workload {
             builder.socketWriteTimeout(millis);
         }
 
-        millis = readLong(jv, "nats.socket.read.timeout.millis", -1);
-        if (millis != -1) {
-            builder.socketReadTimeoutMillis((int)millis);
-        }
+//        millis = readLong(jv, "nats.socket.read.timeout.millis", -1);
+//        if (millis != -1) {
+//            builder.socketReadTimeoutMillis((int)millis);
+//        }
 
         return builder;
     }
 
     private static String[] figureServers(List<String> paramsServers, int firstServerIx) {
+        if (firstServerIx == 0) {
+            return paramsServers.toArray(new String[0]);
+        }
         String firstServer = paramsServers.get(firstServerIx);
-        List<String> ordered = new ArrayList<>(paramsServers);
-        ordered.remove(firstServer);
-        Collections.shuffle(ordered);
-        ordered.addFirst(firstServer);
-        return ordered.toArray(new String[0]);
+        List<String> figured = new ArrayList<>(paramsServers);
+        figured.remove(firstServer);
+        figured.addFirst(firstServer);
+        return figured.toArray(new String[0]);
     }
 
     private void reportSocketBufferSize() {
@@ -420,6 +421,6 @@ public class Tps extends Workload {
         Debug.info(label, "pingInterval", o.getPingInterval());
         Debug.info(label, "maxPingsOut", o.getMaxPingsOut());
         Debug.info(label, "socketWriteTimeout", o.getSocketWriteTimeout());
-        Debug.info(label, "socketReadTimeoutMillis", o.getSocketReadTimeoutMillis());
+//        Debug.info(label, "socketReadTimeoutMillis", o.getSocketReadTimeoutMillis());
     }
 }
