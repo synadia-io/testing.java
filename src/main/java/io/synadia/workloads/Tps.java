@@ -193,7 +193,7 @@ public class Tps extends Workload {
             sendStats.startPhase2();
             sendWL.startPhase2();
 
-            while (nc.getStatus() != Connection.Status.CONNECTED) {
+            while (!sendCL.reconnected.get()) {
                 Debug.info(TPS_SENDER, "Waiting for Reconnect");
                 sleep(10);
             }
