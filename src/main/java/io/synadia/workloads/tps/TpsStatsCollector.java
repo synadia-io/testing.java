@@ -6,7 +6,7 @@ package io.synadia.workloads.tps;
 import io.nats.client.impl.NoOpStatistics;
 import io.synadia.utils.Debug;
 
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class TpsStatsCollector extends NoOpStatistics {
     public static class Collector {
@@ -24,37 +24,57 @@ public class TpsStatsCollector extends NoOpStatistics {
     public final Collector pay2 = new Collector();
     public final Collector non2 = new Collector();
 
+    public final Collector pay3 = new Collector();
+    public final Collector non3 = new Collector();
+
     public long lastWriteMessages = 0;
     public long lastWriteBytes = 0;
 
     public final int payloadSize;
-    public final AtomicBoolean phase1;
+    public final AtomicInteger phase;
 
     public TpsStatsCollector(int payloadSize) {
         this.payloadSize = payloadSize;
-        phase1 = new AtomicBoolean(true);
+        phase = new AtomicInteger(1);
     }
 
     public void startPhase2() {
-        phase1.set(false);
+        phase.set(2);
+    }
+
+    public void startPhase3() {
+        phase.set(3);
     }
 
     @Override
     public void incrementOut(long bytes) {
         Collector c;
-        if (phase1.get()) {
-            if (bytes >= payloadSize) {
-                c = pay;
-            }
-            else {
-                c = non;
-            }
-        }
-        else if (bytes >= payloadSize) {
-            c = pay2;
-        }
-        else {
-            c = non2;
+        switch (phase.get()) {
+            case 1:
+                if (bytes >= payloadSize) {
+                    c = pay;
+                }
+                else {
+                    c = non;
+                }
+                break;
+            case 2:
+                if (bytes >= payloadSize) {
+                    c = pay2;
+                }
+                else {
+                    c = non2;
+                }
+                break;
+            case 3:
+                if (bytes >= payloadSize) {
+                    c = pay3;
+                }
+                else {
+                    c = non3;
+                }
+                break;
+            default: return;
         }
         c.bufferedMessages++;
         c.bufferedBytes += bytes;
@@ -66,22 +86,26 @@ public class TpsStatsCollector extends NoOpStatistics {
     public void registerWrite(long bytes) {
         Collector cPay;
         Collector cNon;
-        if (phase1.get()) {
-            cPay = pay;
-            cNon = non;
-        }
-        else {
-            cPay = pay2;
-            cNon = non2;
-        }
-
-        if (phase1.get()) {
-            long notWrittenBytes = cPay.notWrittenBytes + cNon.notWrittenBytes;
-            if (notWrittenBytes > 0 && notWrittenBytes != bytes) {
-                Debug.info("STATS", "MISMATCH %s vs %s", notWrittenBytes, bytes);
-            }
-            lastWriteMessages = cPay.notWrittenMessages + cNon.notWrittenMessages;
-            lastWriteBytes = bytes;
+        switch (phase.get()) {
+            case 1:
+                cPay = pay;
+                cNon = non;
+                long notWrittenBytes = cPay.notWrittenBytes + cNon.notWrittenBytes;
+                if (notWrittenBytes > 0 && notWrittenBytes != bytes) {
+                    Debug.info("STATS", "MISMATCH %s vs %s", notWrittenBytes, bytes);
+                }
+                lastWriteMessages = cPay.notWrittenMessages + cNon.notWrittenMessages;
+                lastWriteBytes = bytes;
+                break;
+            case 2:
+                cPay = pay2;
+                cNon = non2;
+                break;
+            case 3:
+                cPay = pay3;
+                cNon = non3;
+                break;
+            default: return;
         }
 
         cPay.writtenMessages += cPay.notWrittenMessages;

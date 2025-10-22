@@ -197,8 +197,6 @@ public class Tps extends Workload {
                 Debug.info(TPS_SENDER, "Waiting for Reconnect");
                 sleep(10);
             }
-            Debug.info(TPS_SENDER, "Publishing Control Terminate Message");
-            nc.publish(CONTROL_SUBJECT, null);
 
             long pending = nc.outgoingPendingMessageCount();
             while (pending > 0) {
@@ -206,6 +204,12 @@ public class Tps extends Workload {
                 pending = nc.outgoingPendingMessageCount();
                 sleep(10);
             }
+
+            sendStats.startPhase3();
+            sendWL.startPhase3();
+
+            Debug.info(TPS_SENDER, "Publishing Control Terminate Message");
+            nc.publish(CONTROL_SUBJECT, null);
 
             Debug.info(TPS_SENDER, "Queue empty");
             sleep(100); // just for good measure
@@ -227,6 +231,12 @@ public class Tps extends Workload {
             sendStats.pay2.bufferedMessages, sendStats.pay2.writtenMessages);
         addSendResult("Buffered vs Socket Bytes   ",
             sendStats.pay2.bufferedBytes, sendStats.pay2.writtenBytes);
+
+        sendResults.add("Phase 3...");
+        addSendResult("Buffered vs Socket Messages",
+            sendStats.non3.bufferedMessages, sendStats.non3.writtenMessages);
+        addSendResult("Buffered vs Socket Bytes   ",
+            sendStats.non3.bufferedBytes, sendStats.non3.writtenBytes);
 
         sendResults.add("Etc ...");
         addSendResult("Control Messages Buffered", sendWL.getControlsBuffered());

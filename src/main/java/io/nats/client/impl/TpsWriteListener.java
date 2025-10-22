@@ -5,7 +5,6 @@ import io.synadia.utils.Debug;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -16,7 +15,7 @@ public class TpsWriteListener extends WriteListener {
     private final String label;
     private final String testSubject;
     private final String controlSubject;
-    private final AtomicBoolean phase1;
+    public final AtomicInteger phase;
     private final AtomicLong lastBufferedMessageId;
     private final AtomicInteger controlsBuffered;
     private final List<String> gapList;
@@ -26,14 +25,18 @@ public class TpsWriteListener extends WriteListener {
         this.label = "WL-" + labelSuffix;
         this.testSubject = testSubject;
         this.controlSubject = controlSubject;
-        phase1 = new AtomicBoolean(true);
+        phase = new AtomicInteger(1);
         lastBufferedMessageId = new AtomicLong(0);
         controlsBuffered = new AtomicInteger(0);
         gapList = new ArrayList<>();
     }
 
     public void startPhase2() {
-        phase1.set(false);
+        phase.set(2);
+    }
+
+    public void startPhase3() {
+        phase.set(3);
     }
 
     @Override
@@ -43,7 +46,7 @@ public class TpsWriteListener extends WriteListener {
             return;
         }
 
-        if (phase1.get() && msg.getSubject().equals(testSubject)) {
+        if (phase.get() == 1 && msg.getSubject().equals(testSubject)) {
             long mid = extractMessageId(msg);
             long expected = lastBufferedMessageId.incrementAndGet();
             if (expected == 1) {
