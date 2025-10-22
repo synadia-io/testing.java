@@ -202,6 +202,7 @@ public class Tps extends Workload {
             // publish the end marker for the receiver
             Debug.info(TPS_SENDER, "Publishing Control Terminate Message");
             nc.publish(CONTROL_SUBJECT, null);
+            sleep(100); // make sure this is published
 
             sendResults.add("\n" + TPS_SENDER);
             sendResults.add("Before Disconnect...");
