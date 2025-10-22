@@ -18,7 +18,7 @@ if (jnatsv == null || jnatsv.equals("")) {
     }
     catch (Exception ignore) {}
     if (jnatsv == null || jnatsv.equals("")) {
-        jnatsv = "2.23.1.wblx-SNAPSHOT"
+        jnatsv = "2.23.1.wbl3-SNAPSHOT"
     }
 }
 System.out.println("JNats ${jnatsv}");

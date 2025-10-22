@@ -22,6 +22,7 @@ public class TpsWriteListener extends WriteListener {
     private final List<String> gapList;
 
     public TpsWriteListener(String labelSuffix, String testSubject, String controlSubject) {
+        super(null);
         this.label = "WL-" + labelSuffix;
         this.testSubject = testSubject;
         this.controlSubject = controlSubject;
