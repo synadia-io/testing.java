@@ -307,7 +307,9 @@ public class Tps extends Workload {
             sleep(100);
             receiverStarted.set(true);
 
-            terminate.await(10, TimeUnit.SECONDS);
+            if (!terminate.await(10, TimeUnit.SECONDS)) {
+                Debug.info(TPS_RECEIVER, "!!!!! Terminate Message NOT Received");
+            }
 
             receiveResults.addFirst(Debug.stringify("  Total Received Messages: %s", format3(receivedMessages.get())));
             receiveResults.addFirst("\n" + TPS_RECEIVER);
