@@ -128,7 +128,7 @@ public class Tps extends Workload {
             .statisticsCollector(sendStats)
             .connectionListener(sendCL)
             .errorListener(sendEL)
-            .serverPool(new TpsServerPool(TPS_SENDER))
+            .serverPool(new TpsServerPool(TPS_SENDER, params.servers))
             .build();
 
         reportConnectionOptions(TPS_SENDER, options);
