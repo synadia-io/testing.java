@@ -1,7 +1,6 @@
-package io.synadia.workloads.tps;
+package io.nats.client.impl;
 
 import io.nats.client.WriteListener;
-import io.nats.client.impl.NatsMessage;
 import io.synadia.utils.Debug;
 
 import java.util.ArrayList;
@@ -53,7 +52,7 @@ public class TpsWriteListener extends WriteListener {
         }
         else if (msg.getSubject().equals(controlSubject)) {
             controlsBuffered.incrementAndGet();
-            Debug.info(label, "CONTROL", msg.consumeByteCount());
+            Debug.info(label, "CONTROL", msg.sizeInBytes);
         }
     }
 

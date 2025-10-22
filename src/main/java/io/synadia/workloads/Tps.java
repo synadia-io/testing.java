@@ -6,6 +6,7 @@ import io.nats.client.Nats;
 import io.nats.client.Options;
 import io.nats.client.impl.Headers;
 import io.nats.client.impl.NoOpStatistics;
+import io.nats.client.impl.TpsWriteListener;
 import io.nats.client.support.JsonValue;
 import io.synadia.CommandLine;
 import io.synadia.Params;
@@ -14,7 +15,6 @@ import io.synadia.utils.Debug;
 import io.synadia.workloads.tps.TpsConnectionListener;
 import io.synadia.workloads.tps.TpsErrorListener;
 import io.synadia.workloads.tps.TpsStatsCollector;
-import io.synadia.workloads.tps.TpsWriteListener;
 
 import java.io.IOException;
 import java.net.Socket;
