@@ -22,7 +22,7 @@ public class TpsErrorListener implements ErrorListener {
     }
 
     private String string(Connection conn) {
-        return "Connection(" + conn.hashCode() + ") " + conn.getStatus();
+        return "Connection {" + Integer.toHexString(conn.hashCode()).toUpperCase() + "} " + conn.getStatus();
     }
 
     @Override
