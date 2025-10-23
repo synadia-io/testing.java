@@ -35,9 +35,6 @@ public class TpsStatsCollector extends NoOpStatistics {
     public final Group pay2;
     public final Group non2;
 
-    public final Group pay3;
-    public final Group non3;
-
     public long lastWriteMessages;
     public long lastWriteBytes;
 
@@ -49,8 +46,6 @@ public class TpsStatsCollector extends NoOpStatistics {
         non = new Group();
         pay2 = new Group();
         non2 = new Group();
-        pay3 = new Group();
-        non3 = new Group();
         lastWriteMessages = 0;
         lastWriteBytes = 0;
         this.payloadSize = payloadSize;
@@ -59,10 +54,6 @@ public class TpsStatsCollector extends NoOpStatistics {
 
     public void startPhase2() {
         phase.set(2);
-    }
-
-    public void startPhase3() {
-        phase.set(3);
     }
 
     @Override
@@ -84,14 +75,6 @@ public class TpsStatsCollector extends NoOpStatistics {
                     }
                     else {
                         g = non2;
-                    }
-                    break;
-                case 3:
-                    if (bytes >= payloadSize) {
-                        g = pay3;
-                    }
-                    else {
-                        g = non3;
                     }
                     break;
                 default:
@@ -126,10 +109,6 @@ public class TpsStatsCollector extends NoOpStatistics {
                 case 2:
                     gPay = pay2;
                     gNon = non2;
-                    break;
-                case 3:
-                    gPay = pay3;
-                    gNon = non3;
                     break;
                 default:
                     return;

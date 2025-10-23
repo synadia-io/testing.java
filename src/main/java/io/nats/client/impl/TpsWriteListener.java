@@ -37,10 +37,6 @@ public class TpsWriteListener extends WriteListener {
         phase.set(2);
     }
 
-    public void startPhase3() {
-        phase.set(3);
-    }
-
     @Override
     public void buffered(NatsMessage msg) {
         if (msg.getSubject() == null) {

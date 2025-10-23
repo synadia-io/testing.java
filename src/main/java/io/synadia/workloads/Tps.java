@@ -107,12 +107,6 @@ public class Tps extends Workload {
         printSendResult("Buffered vs Socket Bytes   ",
             sendStats.pay2.bufferedBytes, sendStats.pay2.writtenBytes);
 
-        System.out.println("Phase 3...");
-        printSendResult("Buffered vs Socket Messages",
-            sendStats.non3.bufferedMessages, sendStats.non3.writtenMessages);
-        printSendResult("Buffered vs Socket Bytes   ",
-            sendStats.non3.bufferedBytes, sendStats.non3.writtenBytes);
-
         System.out.println("\nETC");
         printSendResult("Protocol Messages Buffered", sendWL.protocolsBuffered.get());
         printSendResult("Control Messages Buffered", sendWL.controlsBuffered.get());
@@ -232,25 +226,24 @@ public class Tps extends Workload {
                 sleep(10);
             }
 
-            waitForPending(nc, 5);
-            sendStats.pay2.debug(TPS_SENDER, "After Disconnect Payloads");
-
-            sendStats.startPhase3();
-            sendWL.startPhase3();
-
             Debug.info(TPS_SENDER, "Publishing Control Terminate Message");
             nc.publish(CONTROL_SUBJECT, TERMINATE_BYTES);
-            waitForPending(nc, 10);
 
-            sendStats.non3.debug(TPS_SENDER, "After Disconnect Control");
+            waitForPending(nc);
         }
     }
 
-    private void waitForPending(Connection nc, long seconds) {
+    private void waitForPending(Connection nc) {
         long pending = nc.outgoingPendingMessageCount();
-        long rounds = seconds * 100;
+        long rounds = 10000;
         Debug.info(TPS_SENDER, "Waiting for %s queued messages to be sent...", pending);
         while (rounds-- > 0 && pending > 0) {
+            if (nc.getStatus() != Connection.Status.CONNECTED) {
+                rounds = 10000;
+                sleep(1000);
+                continue;
+            }
+
             sleep(10);
             if (rounds % 100 == 0) {
                 Debug.info(TPS_SENDER, "Waiting for %s queued messages to be sent...", pending);
