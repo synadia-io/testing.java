@@ -24,7 +24,17 @@ import static io.nats.client.support.JsonValueUtils.readString;
 import static io.synadia.utils.Commons.*;
 
 public class Generator {
-    enum Kind {SERVER, CLIENT, FAILGROUND}
+    enum Kind {
+        SERVER("Server"),
+        CLIENT("Client"),
+        FAILGROUND("Failground");
+
+        public final String text;
+
+        Kind(String text) {
+            this.text = text;
+        }
+    }
 
     public static final String INPUT_DIR = "templates";
     public static final String SCRIPT_OUTPUT_DIR = "gen";
@@ -248,12 +258,18 @@ public class Generator {
             System.out.println(sb);
 
             if (gen.windows) {
+                String bcmd = sb.toString();
+                int at = bcmd.indexOf('@');
+                String addr = bcmd.substring(at + 1);
+                at = addr.indexOf('.');
+                addr = addr.substring(0, at);
+                String bnum = current.name.substring(current.name.length() - 1);
                 String batchName = kind.name().substring(0, 1).toLowerCase()
-                    + current.name.substring(current.name.length() - 1)
-                    + ".bat";
+                    + bnum + ".bat";
                 System.out.println(batchName);
+                bcmd = bcmd.replace("start ", "start \"" + kind.text + " " + bnum + " " + addr + "\" ");
                 try (FileOutputStream out = new FileOutputStream(batchName)) {
-                    out.write(sb.toString().getBytes());
+                    out.write(bcmd.getBytes());
                     out.flush();
                 }
             }
