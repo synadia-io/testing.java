@@ -211,7 +211,7 @@ public class Tps extends Workload {
             sendStats.startPhase3();
             sendWL.startPhase3();
 
-            Debug.info(TPS_SENDER, "Publishing Control Terminate Message");
+            Debug.info(TPS_SENDER, "Publishing Control Terminate Message", nc.getStatus());
             nc.publish(CONTROL_SUBJECT, null);
 
             populateSendResults();
