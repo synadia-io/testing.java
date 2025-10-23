@@ -36,7 +36,8 @@ public class Tps extends Workload {
     private static final String TPS_RECEIVER = "RECEIVER";
     private static final String TEST_SUBJECT = "test";
     private static final String CONTROL_SUBJECT = "ctrl";
-    private static final byte[] TERMINATE_BYTES = "terminate".getBytes();
+    private static final byte[] START_BYTES = new byte[] {1};
+    private static final byte[] TERMINATE_BYTES = new byte[] {0};
 
     // Common
     String action;
@@ -141,6 +142,9 @@ public class Tps extends Workload {
             long messagesThisSecond = 0;
             long nextSecondStart = -1;
             long startNanos = System.nanoTime();
+
+            Debug.info(TPS_SENDER, "Publishing Control Start Message");
+            nc.publish(CONTROL_SUBJECT, START_BYTES);
 
             while (nc.getStatus() == Connection.Status.CONNECTED
                 && !sendEL.connectionException.get() && !sendCL.disconnected.get())
@@ -314,7 +318,10 @@ public class Tps extends Workload {
             });
 
             d.subscribe(CONTROL_SUBJECT, msg -> {
-                if (Arrays.equals(TERMINATE_BYTES, msg.getData())) {
+                if (Arrays.equals(START_BYTES, msg.getData())) {
+                    Debug.info(TPS_RECEIVER, "Received Control Start Message.");
+                }
+                else if (Arrays.equals(TERMINATE_BYTES, msg.getData())) {
                     Debug.info(TPS_RECEIVER, "Received Control Terminate Message.");
                     waitingForTerminate.set(false);
                 }
