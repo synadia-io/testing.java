@@ -1,6 +1,6 @@
 {
   "target.tps": 10000,
-  "payload.size": 12288,
+  "payload.size": 1,
   "nats.connection.timeout.millis": 5000,
   "nats.ping.interval.millis": 5000,
   "nats.reconnect.wait.millis": 5000,
