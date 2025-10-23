@@ -4,6 +4,7 @@ import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
 import io.nats.client.Nats;
 import io.nats.client.Options;
+import io.nats.client.api.ServerInfo;
 import io.nats.client.impl.Headers;
 import io.nats.client.impl.NoOpStatistics;
 import io.nats.client.impl.TpsWriteListener;
@@ -36,8 +37,8 @@ public class Tps extends Workload {
 
     private static final String TPS_SENDER = "SENDER";
     private static final String TPS_RECEIVER = "RECEIVER";
-    private static final String TEST_SUBJECT = "test";
-    private static final String CONTROL_SUBJECT = "control";
+    private static final String TEST_SUBJECT = "tst";
+    private static final String CONTROL_SUBJECT = "ctrl";
 
     // Common
     String action;
@@ -134,6 +135,7 @@ public class Tps extends Workload {
         reportConnectionOptions(TPS_SENDER, options);
 
         try (Connection nc = Nats.connect(options)) {
+            reportNc(TPS_SENDER, nc);
 
             byte[] payload = new byte[payloadSize];
             Headers h = new Headers();
@@ -272,7 +274,7 @@ public class Tps extends Workload {
     // ----------------------------------------------------------------------------------------------------
     long receivedMessages = 0;
     long receivedLastMessageId = -1;
-    int control = 0;
+    boolean waitingForStart = true;
     CountDownLatch controlLatch = new CountDownLatch(2);
     TpsConnectionListener receiveCL;
     TpsErrorListener receiveEL;
@@ -292,6 +294,7 @@ public class Tps extends Workload {
         reportConnectionOptions(TPS_RECEIVER, options);
 
         try (Connection nc = Nats.connect(options)) {
+            reportNc(TPS_RECEIVER, nc);
 
             Dispatcher d = nc.createDispatcher();
 
@@ -317,8 +320,9 @@ public class Tps extends Workload {
             });
 
             d.subscribe(CONTROL_SUBJECT, msg -> {
-                if (control++ == 0) {
+                if (waitingForStart) {
                     Debug.info(TPS_RECEIVER, "Received Control Start Message.");
+                    waitingForStart = false;
                 }
                 else {
                     Debug.info(TPS_RECEIVER, "Received Control Terminate Message.");
@@ -442,5 +446,10 @@ public class Tps extends Workload {
         if (o.getSocketReadTimeoutMillis() > 0) {
             Debug.info(label, "socketReadTimeoutMillis", o.getSocketReadTimeoutMillis());
         }
+    }
+
+    private static void reportNc(String label, Connection nc) {
+        ServerInfo si = nc.getServerInfo();
+        Debug.info(label, "nc", si.getServerName(), si.getClientId());
     }
 }
