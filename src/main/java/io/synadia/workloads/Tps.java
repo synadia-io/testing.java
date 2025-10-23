@@ -205,14 +205,14 @@ public class Tps extends Workload {
                 sleep(10);
             }
 
+            Debug.info(TPS_SENDER, "Queue empty");
+            sleep(100); // just for good measure
+
             sendStats.startPhase3();
             sendWL.startPhase3();
 
             Debug.info(TPS_SENDER, "Publishing Control Terminate Message");
             nc.publish(CONTROL_SUBJECT, null);
-
-            Debug.info(TPS_SENDER, "Queue empty");
-            sleep(100); // just for good measure
 
             populateSendResults();
         }
