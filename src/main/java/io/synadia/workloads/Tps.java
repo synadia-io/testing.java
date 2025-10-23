@@ -152,7 +152,7 @@ public class Tps extends Workload {
     TpsErrorListener sendEL;
 
     private void send() throws IOException, InterruptedException {
-        pubId = new AtomicLong();
+        pubId = new AtomicLong(0);
         sendStats = new TpsStatsCollector(payloadSize);
         sendWL = new TpsWriteListener(TPS_SENDER, TEST_SUBJECT, CONTROL_SUBJECT);
 
@@ -271,7 +271,6 @@ public class Tps extends Workload {
     // ----------------------------------------------------------------------------------------------------
     long receivedMessages = 0;
     long receivedLastMessageId = -1;
-    AtomicBoolean waitingForTerminate = new AtomicBoolean(true);
     TpsConnectionListener receiveCL;
     TpsErrorListener receiveEL;
     AtomicBoolean receiverReady = new AtomicBoolean(false);
@@ -311,13 +310,20 @@ public class Tps extends Workload {
         try (Connection nc = Nats.connect(options)) {
             Dispatcher d = nc.createDispatcher();
 
-            AtomicLong lastTime = new AtomicLong(System.currentTimeMillis());
+            AtomicBoolean gapped = new AtomicBoolean(false);
+            CountDownLatch latch = new CountDownLatch(1);
+
             d.subscribe(TEST_SUBJECT, msg -> {
-                lastTime.set(System.currentTimeMillis());
                 if (++receivedMessages == 1) {
                     receivedLastMessageId = 1;
                     Debug.info(TPS_RECEIVER, "Started Receiving");
                     return;
+                }
+
+                if (gapped.get()) {
+                    if (receivedMessages == pubId.get()) {
+                        latch.countDown();
+                    }
                 }
 
                 long expected = receivedLastMessageId + 1;
@@ -329,10 +335,10 @@ public class Tps extends Workload {
                     Debug.info(TPS_RECEIVER, "******"
                         , "Got Message Id: %s but expected: %s", format3(mid), format3(expected)
                         , "Gap: %s", format3(gap));
+                    gapped.set(true);
                 }
             });
 
-            CountDownLatch latch = new CountDownLatch(1);
             d.subscribe(CONTROL_SUBJECT, msg -> {
                 if (Arrays.equals(TERMINATE_BYTES, msg.getData())) {
                     Debug.info(TPS_RECEIVER, "Received Control - Terminate Message.");
@@ -344,7 +350,7 @@ public class Tps extends Workload {
             receiverReady.set(true);
 
             Debug.info(TPS_RECEIVER, "Waiting for Terminate Message");
-            if (!latch.await(20, TimeUnit.SECONDS)) {
+            if (!latch.await(60, TimeUnit.SECONDS)) {
                 Debug.info(TPS_RECEIVER, "!!!!! Terminate Message NOT Received");
             }
         }
