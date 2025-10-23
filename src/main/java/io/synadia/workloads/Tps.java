@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.net.Socket;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -35,8 +36,10 @@ public class Tps extends Workload {
 
     private static final String TPS_SENDER = "SENDER";
     private static final String TPS_RECEIVER = "RECEIVER";
-    private static final String TEST_SUBJECT = "tst";
+    private static final String TEST_SUBJECT = "test";
     private static final String CONTROL_SUBJECT = "ctrl";
+    private static final byte[] START_BYTES = new byte[] {1};
+    private static final byte[] TERMINATE_BYTES = new byte[] {0};
 
     // Common
     String action;
@@ -144,7 +147,7 @@ public class Tps extends Workload {
             long startNanos = System.nanoTime();
 
             Debug.info(TPS_SENDER, "Publishing Control Start Message");
-            nc.publish(CONTROL_SUBJECT, null);
+            nc.publish(CONTROL_SUBJECT, START_BYTES);
 
             while (nc.getStatus() == Connection.Status.CONNECTED
                 && !sendEL.connectionException.get() && !sendCL.disconnected.get())
@@ -212,7 +215,7 @@ public class Tps extends Workload {
             sendWL.startPhase3();
 
             Debug.info(TPS_SENDER, "Publishing Control Terminate Message", nc.getStatus());
-            nc.publish(CONTROL_SUBJECT, null);
+            nc.publish(CONTROL_SUBJECT, TERMINATE_BYTES);
 
             populateSendResults();
         }
@@ -272,8 +275,7 @@ public class Tps extends Workload {
     // ----------------------------------------------------------------------------------------------------
     long receivedMessages = 0;
     long receivedLastMessageId = -1;
-    boolean waitingForStart = true;
-    boolean waitingForEnd = true;
+    AtomicBoolean waitingForTerminate = new AtomicBoolean(true);
     TpsConnectionListener receiveCL;
     TpsErrorListener receiveEL;
     AtomicBoolean receiverReady = new AtomicBoolean(false);
@@ -318,25 +320,24 @@ public class Tps extends Workload {
             });
 
             d.subscribe(CONTROL_SUBJECT, msg -> {
-                if (waitingForStart) {
+                if (Arrays.equals(START_BYTES, msg.getData())) {
                     Debug.info(TPS_RECEIVER, "Received Control Start Message.");
-                    waitingForStart = false;
                 }
-                else {
+                else if (Arrays.equals(TERMINATE_BYTES, msg.getData())) {
                     Debug.info(TPS_RECEIVER, "Received Control Terminate Message.");
-                    waitingForEnd = false;
+                    waitingForTerminate.set(false);
                 }
             });
 
             sleep(50);
             receiverReady.set(true);
 
-            int waits = 12;
-            while (waitingForEnd && waits-- > 0) {
-                sleep(1000);
+            int waits = 10;
+            while (waitingForTerminate.get() && waits-- > 0) {
                 Debug.info(TPS_RECEIVER, "Waiting for Terminate Message");
+                sleep(1000);
             }
-            if (waitingForEnd && waits < 1) {
+            if (waitingForTerminate.get() && waits < 1) {
                 Debug.info(TPS_RECEIVER, "!!!!! Terminate Message NOT Received");
             }
 
@@ -453,6 +454,6 @@ public class Tps extends Workload {
 
     private static void reportNc(String label, Connection nc) {
         ServerInfo si = nc.getServerInfo();
-        Debug.info(label, "nc", si.getServerName(), si.getClientId());
+        Debug.info(label, "nc:%s", si.getServerName(), "cid:%s", si.getClientId());
     }
 }
