@@ -22,6 +22,8 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -36,7 +38,6 @@ public class Tps extends Workload {
     private static final String TPS_RECEIVER = "RECEIVER";
     private static final String TEST_SUBJECT = "test";
     private static final String CONTROL_SUBJECT = "ctrl";
-    private static final byte[] START_BYTES = new byte[] {1};
     private static final byte[] TERMINATE_BYTES = new byte[] {0};
 
     // Common
@@ -176,9 +177,6 @@ public class Tps extends Workload {
             long nextSecondStart = -1;
             long startNanos = System.nanoTime();
 
-            Debug.info(TPS_SENDER, "Publishing Control Start Message");
-            nc.publish(CONTROL_SUBJECT, START_BYTES);
-
             while (nc.getStatus() == Connection.Status.CONNECTED
                 && !sendEL.connectionException.get() && !sendCL.disconnected.get())
             {
@@ -313,7 +311,9 @@ public class Tps extends Workload {
         try (Connection nc = Nats.connect(options)) {
             Dispatcher d = nc.createDispatcher();
 
+            AtomicLong lastTime = new AtomicLong(System.currentTimeMillis());
             d.subscribe(TEST_SUBJECT, msg -> {
+                lastTime.set(System.currentTimeMillis());
                 if (++receivedMessages == 1) {
                     receivedLastMessageId = 1;
                     Debug.info(TPS_RECEIVER, "Started Receiving");
@@ -332,29 +332,21 @@ public class Tps extends Workload {
                 }
             });
 
+            CountDownLatch latch = new CountDownLatch(1);
             d.subscribe(CONTROL_SUBJECT, msg -> {
-                if (Arrays.equals(START_BYTES, msg.getData())) {
-                    Debug.info(TPS_RECEIVER, "Received Control Start Message.");
-                }
-                else if (Arrays.equals(TERMINATE_BYTES, msg.getData())) {
-                    Debug.info(TPS_RECEIVER, "Received Control Terminate Message.");
-                    waitingForTerminate.set(false);
+                if (Arrays.equals(TERMINATE_BYTES, msg.getData())) {
+                    Debug.info(TPS_RECEIVER, "Received Control - Terminate Message.");
+                    latch.countDown();
                 }
             });
 
             sleep(50);
             receiverReady.set(true);
 
-            int waits = 10;
-            while (waitingForTerminate.get() && waits-- > 0) {
-                Debug.info(TPS_RECEIVER, "Waiting for Terminate Message");
-                sleep(1000);
-            }
-            if (waitingForTerminate.get() && waits < 1) {
+            Debug.info(TPS_RECEIVER, "Waiting for Terminate Message");
+            if (!latch.await(20, TimeUnit.SECONDS)) {
                 Debug.info(TPS_RECEIVER, "!!!!! Terminate Message NOT Received");
             }
-
-            d.unsubscribe(TEST_SUBJECT);
         }
     }
 
