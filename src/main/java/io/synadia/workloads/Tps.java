@@ -57,6 +57,9 @@ public class Tps extends Workload {
 
         targetTps = readInteger(params.jv, "target.tps", 10000);
         payloadSize = readInteger(params.jv, "payload.size", 12 * 1024);
+        if (commandLine.args.size() == 1) {
+            payloadSize = Integer.parseInt(commandLine.args.getFirst());
+        }
 
         reportApplicationOptions();
         reportSocketBufferSize();
