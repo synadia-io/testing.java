@@ -23,8 +23,6 @@ import java.net.Socket;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -275,7 +273,7 @@ public class Tps extends Workload {
     long receivedMessages = 0;
     long receivedLastMessageId = -1;
     boolean waitingForStart = true;
-    CountDownLatch controlLatch = new CountDownLatch(2);
+    boolean waitingForEnd = true;
     TpsConnectionListener receiveCL;
     TpsErrorListener receiveEL;
     AtomicBoolean receiverReady = new AtomicBoolean(false);
@@ -326,14 +324,19 @@ public class Tps extends Workload {
                 }
                 else {
                     Debug.info(TPS_RECEIVER, "Received Control Terminate Message.");
+                    waitingForEnd = false;
                 }
-                controlLatch.countDown();
             });
 
             sleep(50);
             receiverReady.set(true);
 
-            if (!controlLatch.await(12, TimeUnit.SECONDS)) {
+            int waits = 12;
+            while (waitingForEnd && waits-- > 0) {
+                sleep(1000);
+                Debug.info(TPS_RECEIVER, "Waiting for Terminate Message");
+            }
+            if (waitingForEnd && waits < 1) {
                 Debug.info(TPS_RECEIVER, "!!!!! Terminate Message NOT Received");
             }
 
