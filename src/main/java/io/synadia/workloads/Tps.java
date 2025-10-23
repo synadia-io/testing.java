@@ -216,6 +216,7 @@ public class Tps extends Workload {
 
             Debug.info(TPS_SENDER, "Publishing Control Terminate Message", nc.getStatus());
             nc.publish(CONTROL_SUBJECT, TERMINATE_BYTES);
+            sleep(100); // give time for terminate message to get sent
 
             populateSendResults();
         }
