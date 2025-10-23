@@ -68,14 +68,14 @@ public class Tps extends Workload {
     @Override
     public void runWorkload() throws Exception {
         Thread r = new Thread(() -> { try { receive(); } catch (Exception ignored) {} });
-        r.setName("main-R");
+        r.setName("R-main");
         r.start();
         while (!receiverReady.get()) {
             sleep(10);
         }
 
         Thread s = new Thread(() -> { try { send(); } catch (Exception ignored) {} });
-        s.setName("main-S");
+        s.setName("S-main");
         s.start();
 
         s.join();
@@ -224,6 +224,8 @@ public class Tps extends Workload {
                 }
             }
 
+            sendStats.pay.debug(TPS_SENDER, "Before Disconnect Payloads");
+
             sendStats.startPhase2();
             sendWL.startPhase2();
 
@@ -233,9 +235,12 @@ public class Tps extends Workload {
             }
 
             waitForPending(nc, 5);
+            sendStats.pay2.debug(TPS_SENDER, "After Disconnect Payloads");
 
             sendStats.startPhase3();
             sendWL.startPhase3();
+
+            sendStats.non3.debug(TPS_SENDER, "After Disconnect Control");
 
             Debug.info(TPS_SENDER, "Publishing Control Terminate Message");
             nc.publish(CONTROL_SUBJECT, TERMINATE_BYTES);
@@ -243,7 +248,7 @@ public class Tps extends Workload {
         }
     }
 
-    private static void waitForPending(Connection nc, long seconds) {
+    private void waitForPending(Connection nc, long seconds) {
         long pending = nc.outgoingPendingMessageCount();
         long rounds = seconds * 100;
         Debug.info(TPS_SENDER, "Waiting for %s queued messages to be sent...", pending);

@@ -8,24 +8,35 @@ import io.synadia.utils.Debug;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static io.nats.jsmulti.shared.Stats.format3;
+
 public class TpsStatsCollector extends NoOpStatistics {
-    public static class Collector {
+    public static class Group {
         public long bufferedMessages = 0;
         public long bufferedBytes = 0;
         public long writtenMessages = 0;
         public long writtenBytes = 0;
         public long notWrittenMessages = 0;
         public long notWrittenBytes = 0;
+
+        public void debug(String label, String note) {
+            long diff = bufferedMessages - writtenMessages;
+            Debug.info(label, note,
+                "Buffered vs Socket Messages: %s vs %s ... %s",
+                format3(bufferedMessages),
+                format3(writtenMessages),
+                format3(diff));
+        }
     }
 
-    public final Collector pay;
-    public final Collector non;
+    public final Group pay;
+    public final Group non;
 
-    public final Collector pay2;
-    public final Collector non2;
+    public final Group pay2;
+    public final Group non2;
 
-    public final Collector pay3;
-    public final Collector non3;
+    public final Group pay3;
+    public final Group non3;
 
     public long lastWriteMessages;
     public long lastWriteBytes;
@@ -34,12 +45,12 @@ public class TpsStatsCollector extends NoOpStatistics {
     public final AtomicInteger phase;
 
     public TpsStatsCollector(int payloadSize) {
-        pay = new Collector();
-        non = new Collector();
-        pay2 = new Collector();
-        non2 = new Collector();
-        pay3 = new Collector();
-        non3 = new Collector();
+        pay = new Group();
+        non = new Group();
+        pay2 = new Group();
+        non2 = new Group();
+        pay3 = new Group();
+        non3 = new Group();
         lastWriteMessages = 0;
         lastWriteBytes = 0;
         this.payloadSize = payloadSize;
@@ -57,39 +68,39 @@ public class TpsStatsCollector extends NoOpStatistics {
     @Override
     public void incrementOut(long bytes) {
         try {
-            Collector c;
+            Group g;
             switch (phase.get()) {
                 case 1:
                     if (bytes >= payloadSize) {
-                        c = pay;
+                        g = pay;
                     }
                     else {
-                        c = non;
+                        g = non;
                     }
                     break;
                 case 2:
                     if (bytes >= payloadSize) {
-                        c = pay2;
+                        g = pay2;
                     }
                     else {
-                        c = non2;
+                        g = non2;
                     }
                     break;
                 case 3:
                     if (bytes >= payloadSize) {
-                        c = pay3;
+                        g = pay3;
                     }
                     else {
-                        c = non3;
+                        g = non3;
                     }
                     break;
                 default:
                     return;
             }
-            c.bufferedMessages++;
-            c.bufferedBytes += bytes;
-            c.notWrittenMessages++;
-            c.notWrittenBytes += bytes;
+            g.bufferedMessages++;
+            g.bufferedBytes += bytes;
+            g.notWrittenMessages++;
+            g.notWrittenBytes += bytes;
         }
         catch (Exception e) {
             e.printStackTrace();
@@ -99,39 +110,39 @@ public class TpsStatsCollector extends NoOpStatistics {
     @Override
     public void registerWrite(long bytes) {
         try {
-            Collector cPay;
-            Collector cNon;
+            Group gPay;
+            Group gNon;
             switch (phase.get()) {
                 case 1:
-                    cPay = pay;
-                    cNon = non;
-                    long notWrittenBytes = cPay.notWrittenBytes + cNon.notWrittenBytes;
+                    gPay = pay;
+                    gNon = non;
+                    long notWrittenBytes = gPay.notWrittenBytes + gNon.notWrittenBytes;
                     if (notWrittenBytes > 0 && notWrittenBytes != bytes) {
                         Debug.info("STATS", "MISMATCH %s vs %s", notWrittenBytes, bytes);
                     }
-                    lastWriteMessages = cPay.notWrittenMessages + cNon.notWrittenMessages;
+                    lastWriteMessages = gPay.notWrittenMessages + gNon.notWrittenMessages;
                     lastWriteBytes = bytes;
                     break;
                 case 2:
-                    cPay = pay2;
-                    cNon = non2;
+                    gPay = pay2;
+                    gNon = non2;
                     break;
                 case 3:
-                    cPay = pay3;
-                    cNon = non3;
+                    gPay = pay3;
+                    gNon = non3;
                     break;
                 default:
                     return;
             }
 
-            cPay.writtenMessages += cPay.notWrittenMessages;
-            cNon.writtenMessages += cNon.notWrittenMessages;
-            cPay.writtenBytes += cPay.notWrittenBytes;
-            cNon.writtenBytes += cNon.notWrittenBytes;
-            cPay.notWrittenMessages = 0;
-            cNon.notWrittenMessages = 0;
-            cPay.notWrittenBytes = 0;
-            cNon.notWrittenBytes = 0;
+            gPay.writtenMessages += gPay.notWrittenMessages;
+            gNon.writtenMessages += gNon.notWrittenMessages;
+            gPay.writtenBytes += gPay.notWrittenBytes;
+            gNon.writtenBytes += gNon.notWrittenBytes;
+            gPay.notWrittenMessages = 0;
+            gNon.notWrittenMessages = 0;
+            gPay.notWrittenBytes = 0;
+            gNon.notWrittenBytes = 0;
         }
         catch (Exception e) {
             e.printStackTrace();
