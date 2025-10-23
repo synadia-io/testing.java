@@ -44,9 +44,6 @@ public class Tps extends Workload {
     int targetTps;
     int payloadSize;
 
-    List<String> sendResults = new ArrayList<>();
-    List<String> receiveResults = new ArrayList<>();
-
     @Override
     public void init(CommandLine commandLine) {
         this.workLabel = "TPS";
@@ -67,45 +64,78 @@ public class Tps extends Workload {
 
     @Override
     public void runWorkload() throws Exception {
-
-        switch (action) {
-            case "send": send(); break;
-            case "rec": receive(); break;
-            case "both":
-                // start the receiver first
-                Thread r = new Thread(() -> {
-                    try { receive(); } catch (Exception ignored) {}
-                });
-                r.setName("main-R");
-                r.start();
-
-                Thread s = new Thread(() -> {
-                    try { send(); } catch (Exception ignored) {}
-                });
-
-                while (!receiverReady.get()) {
-                    sleep(10);
-                }
-                s.setName("main-S");
-                s.start();
-
-                s.join();
-                r.join();
+        Thread r = new Thread(() -> { try { receive(); } catch (Exception ignored) {} });
+        r.setName("main-R");
+        r.start();
+        while (!receiverReady.get()) {
+            sleep(10);
         }
+
+        Thread s = new Thread(() -> { try { send(); } catch (Exception ignored) {} });
+        s.setName("main-S");
+        s.start();
+
+        s.join();
+        r.join();
 
         reportSocketBufferSize();
 
         sleep(100); // give callbacks time to finish
-        if (!receiveResults.isEmpty()) {
-            for (String r : receiveResults) {
-                System.out.println(r);
+
+        System.out.println("\n" + TPS_RECEIVER);
+        System.out.println(stringify("  Total Received Messages: %s", format3(receivedMessages)));
+        if (!gaps.isEmpty()) {
+            for (Gap g : gaps) {
+                g.print(payloadSize);
             }
         }
-        if (!sendResults.isEmpty()) {
-            for (String r : sendResults) {
-                System.out.println(r);
+
+        System.out.println("\n" + TPS_SENDER);
+        System.out.println("Before Disconnect...");
+        printSendResult("Buffered vs Socket Messages",
+            sendStats.pay.bufferedMessages, sendStats.pay.writtenMessages);
+        printSendResult("Buffered vs Socket Bytes   ",
+            sendStats.pay.bufferedBytes, sendStats.pay.writtenBytes);
+
+        System.out.println("After Disconnect...");
+        printSendResult("Buffered vs Socket Messages",
+            sendStats.pay2.bufferedMessages, sendStats.pay2.writtenMessages);
+        printSendResult("Buffered vs Socket Bytes   ",
+            sendStats.pay2.bufferedBytes, sendStats.pay2.writtenBytes);
+
+        System.out.println("Phase 3...");
+        printSendResult("Buffered vs Socket Messages",
+            sendStats.non3.bufferedMessages, sendStats.non3.writtenMessages);
+        printSendResult("Buffered vs Socket Bytes   ",
+            sendStats.non3.bufferedBytes, sendStats.non3.writtenBytes);
+
+        System.out.println("\nETC");
+        printSendResult("Protocol Messages Buffered", sendWL.protocolsBuffered.get());
+        printSendResult("Control Messages Buffered", sendWL.controlsBuffered.get());
+        printSendResult("Last Write Messages", sendStats.lastWriteMessages);
+        printSendResult("Last Write Bytes   ", sendStats.lastWriteBytes);
+
+        printSendResult("Buffered Not Written Messages", sendStats.pay.notWrittenMessages);
+        printSendResult("Buffered Not Written Bytes   ", sendStats.pay.notWrittenBytes);
+
+        if (sendWL.gapList.isEmpty()) {
+            System.out.println("  No Writer Gaps");
+        }
+        else {
+            System.out.println("  Writer Gaps");
+            for (String g : sendWL.gapList) {
+                System.out.println(" " + g);
             }
         }
+    }
+
+    private void printSendResult(String s, Number n) {
+        System.out.println(stringify("  " + s + ": %s", format3(n)));
+    }
+
+    private void printSendResult(String s, Number n1, Number n2) {
+        long diff = n1.longValue() - n2.longValue();
+        System.out.println(stringify("  " + s + ": %s vs %s ... %s", format3(n1), format3(n2), format3(diff)));
     }
 
     // ----------------------------------------------------------------------------------------------------
@@ -190,6 +220,7 @@ public class Tps extends Workload {
                     }
                 }
             }
+
             sendStats.startPhase2();
             sendWL.startPhase2();
 
@@ -198,76 +229,35 @@ public class Tps extends Workload {
                 sleep(10);
             }
 
-            long pending = nc.outgoingPendingMessageCount();
-            int report = 0;
-            while (pending > 0) {
-                if (report-- == 0) {
-                    Debug.info(TPS_SENDER, "Waiting for %s queued messages to be sent...", pending);
-                    report = 50;
-                }
-                pending = nc.outgoingPendingMessageCount();
-                sleep(10);
-            }
-            Debug.info(TPS_SENDER, "Queue empty");
+            waitForPending(nc, 5);
 
             sendStats.startPhase3();
             sendWL.startPhase3();
 
             Debug.info(TPS_SENDER, "Publishing Control Terminate Message");
             nc.publish(CONTROL_SUBJECT, TERMINATE_BYTES);
-            sleep(100); // give time for terminate message to get sent
-
-            populateSendResults();
+            waitForPending(nc, 10);
         }
     }
 
-    private void populateSendResults() {
-        sendResults.add("\n" + TPS_SENDER);
-        sendResults.add("Before Disconnect...");
-        addSendResult("Buffered vs Socket Messages",
-            sendStats.pay.bufferedMessages, sendStats.pay.writtenMessages);
-        addSendResult("Buffered vs Socket Bytes   ",
-            sendStats.pay.bufferedBytes, sendStats.pay.writtenBytes);
-
-        sendResults.add("After Disconnect...");
-        addSendResult("Buffered vs Socket Messages",
-            sendStats.pay2.bufferedMessages, sendStats.pay2.writtenMessages);
-        addSendResult("Buffered vs Socket Bytes   ",
-            sendStats.pay2.bufferedBytes, sendStats.pay2.writtenBytes);
-
-        sendResults.add("Phase 3...");
-        addSendResult("Buffered vs Socket Messages",
-            sendStats.non3.bufferedMessages, sendStats.non3.writtenMessages);
-        addSendResult("Buffered vs Socket Bytes   ",
-            sendStats.non3.bufferedBytes, sendStats.non3.writtenBytes);
-
-        sendResults.add("Etc ...");
-        addSendResult("Protocol Messages Buffered", sendWL.protocolsBuffered.get());
-        addSendResult("Control Messages Buffered", sendWL.controlsBuffered.get());
-        addSendResult("Last Write Messages", sendStats.lastWriteMessages);
-        addSendResult("Last Write Bytes   ", sendStats.lastWriteBytes);
-
-        addSendResult("Buffered Not Written Messages", sendStats.pay.notWrittenMessages);
-        addSendResult("Buffered Not Written Bytes   ", sendStats.pay.notWrittenBytes);
-
-        if (sendWL.gapList.isEmpty()) {
-            sendResults.add("  No Writer Gaps");
+    private static void waitForPending(Connection nc, long seconds) {
+        long pending = nc.outgoingPendingMessageCount();
+        long rounds = seconds * 100;
+        Debug.info(TPS_SENDER, "Waiting for %s queued messages to be sent...", pending);
+        while (rounds-- > 0 && pending > 0) {
+            sleep(10);
+            if (rounds % 100 == 0) {
+                Debug.info(TPS_SENDER, "Waiting for %s queued messages to be sent...", pending);
+            }
+            pending = nc.outgoingPendingMessageCount();
+        }
+        pending = nc.outgoingPendingMessageCount();
+        if (pending > 0) {
+            Debug.info(TPS_SENDER, "!!!!! Queue Failed to Empty: %s", pending);
         }
         else {
-            sendResults.add("  Writer Gaps");
-            for (String s : sendWL.gapList) {
-                sendResults.add(" " + s);
-            }
+            Debug.info(TPS_SENDER, "Queue empty");
         }
-    }
-
-    private void addSendResult(String s, Number n) {
-        sendResults.add(stringify("  " + s + ": %s", format3(n)));
-    }
-
-    private void addSendResult(String s, Number n1, Number n2) {
-        long diff = n1.longValue() - n2.longValue();
-        sendResults.add(stringify("  " + s + ": %s vs %s ... %s", format3(n1), format3(n2), format3(diff)));
     }
 
     // ----------------------------------------------------------------------------------------------------
@@ -279,6 +269,25 @@ public class Tps extends Workload {
     TpsConnectionListener receiveCL;
     TpsErrorListener receiveEL;
     AtomicBoolean receiverReady = new AtomicBoolean(false);
+    List<Gap> gaps = new ArrayList<>();
+
+    static class Gap {
+        final long expected;
+        final long mid;
+
+        public Gap(long expected, long mid) {
+            this.expected = expected;
+            this.mid = mid;
+        }
+
+        public void print(int payloadSize) {
+            System.out.println(stringify("  Received Gap Message: %s", format3(mid)));
+            System.out.println(stringify("  Expected Gap Message: %s", format3(expected)));
+            long diff = mid - expected;
+            System.out.println(stringify("  Gap: %s", diff));
+            System.out.println(stringify("  Gap Bytes (Approximate): %s", format3(diff * payloadSize)));
+        }
+    }
 
     private void receive() throws IOException, InterruptedException {
         int firstServerIx = commandLine.args.isEmpty() ? 1 : Integer.parseInt(commandLine.args.getFirst());
@@ -307,13 +316,11 @@ public class Tps extends Workload {
                 long mid = extractMessageId(msg);
                 receivedLastMessageId = mid;
                 if (mid != expected) {
+                    gaps.add(new Gap(expected, mid));
                     long gap = mid - expected;
-                    receiveResults.add(stringify("  Received Gap Message: %s", format3(mid)));
-                    receiveResults.add(stringify("  Expected Gap Message: %s", format3(expected)));
-                    receiveResults.add(stringify("  Gap: %s", gap));
                     Debug.info(TPS_RECEIVER, "******"
                         , "Got Message Id: %s but expected: %s", format3(mid), format3(expected)
-                        , "Loss of %s", format3(gap));
+                        , "Gap: %s", format3(gap));
                 }
             });
 
@@ -338,9 +345,6 @@ public class Tps extends Workload {
             if (waitingForTerminate.get() && waits < 1) {
                 Debug.info(TPS_RECEIVER, "!!!!! Terminate Message NOT Received");
             }
-
-            receiveResults.addFirst(stringify("  Total Received Messages: %s", format3(receivedMessages)));
-            receiveResults.addFirst("\n" + TPS_RECEIVER);
 
             d.unsubscribe(TEST_SUBJECT);
         }

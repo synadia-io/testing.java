@@ -56,75 +56,85 @@ public class TpsStatsCollector extends NoOpStatistics {
 
     @Override
     public void incrementOut(long bytes) {
-        Collector c;
-        switch (phase.get()) {
-            case 1:
-                if (bytes >= payloadSize) {
-                    c = pay;
-                }
-                else {
-                    c = non;
-                }
-                break;
-            case 2:
-                if (bytes >= payloadSize) {
-                    c = pay2;
-                }
-                else {
-                    c = non2;
-                }
-                break;
-            case 3:
-                if (bytes >= payloadSize) {
-                    c = pay3;
-                }
-                else {
-                    c = non3;
-                }
-                break;
-            default:
-                return;
+        try {
+            Collector c;
+            switch (phase.get()) {
+                case 1:
+                    if (bytes >= payloadSize) {
+                        c = pay;
+                    }
+                    else {
+                        c = non;
+                    }
+                    break;
+                case 2:
+                    if (bytes >= payloadSize) {
+                        c = pay2;
+                    }
+                    else {
+                        c = non2;
+                    }
+                    break;
+                case 3:
+                    if (bytes >= payloadSize) {
+                        c = pay3;
+                    }
+                    else {
+                        c = non3;
+                    }
+                    break;
+                default:
+                    return;
+            }
+            c.bufferedMessages++;
+            c.bufferedBytes += bytes;
+            c.notWrittenMessages++;
+            c.notWrittenBytes += bytes;
         }
-        c.bufferedMessages++;
-        c.bufferedBytes += bytes;
-        c.notWrittenMessages++;
-        c.notWrittenBytes += bytes;
+        catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
     public void registerWrite(long bytes) {
-        Collector cPay;
-        Collector cNon;
-        switch (phase.get()) {
-            case 1:
-                cPay = pay;
-                cNon = non;
-                long notWrittenBytes = cPay.notWrittenBytes + cNon.notWrittenBytes;
-                if (notWrittenBytes > 0 && notWrittenBytes != bytes) {
-                    Debug.info("STATS", "MISMATCH %s vs %s", notWrittenBytes, bytes);
-                }
-                lastWriteMessages = cPay.notWrittenMessages + cNon.notWrittenMessages;
-                lastWriteBytes = bytes;
-                break;
-            case 2:
-                cPay = pay2;
-                cNon = non2;
-                break;
-            case 3:
-                cPay = pay3;
-                cNon = non3;
-                break;
-            default:
-                return;
-        }
+        try {
+            Collector cPay;
+            Collector cNon;
+            switch (phase.get()) {
+                case 1:
+                    cPay = pay;
+                    cNon = non;
+                    long notWrittenBytes = cPay.notWrittenBytes + cNon.notWrittenBytes;
+                    if (notWrittenBytes > 0 && notWrittenBytes != bytes) {
+                        Debug.info("STATS", "MISMATCH %s vs %s", notWrittenBytes, bytes);
+                    }
+                    lastWriteMessages = cPay.notWrittenMessages + cNon.notWrittenMessages;
+                    lastWriteBytes = bytes;
+                    break;
+                case 2:
+                    cPay = pay2;
+                    cNon = non2;
+                    break;
+                case 3:
+                    cPay = pay3;
+                    cNon = non3;
+                    break;
+                default:
+                    return;
+            }
 
-        cPay.writtenMessages += cPay.notWrittenMessages;
-        cNon.writtenMessages += cNon.notWrittenMessages;
-        cPay.writtenBytes += cPay.notWrittenBytes;
-        cNon.writtenBytes += cNon.notWrittenBytes;
-        cPay.notWrittenMessages = 0;
-        cNon.notWrittenMessages = 0;
-        cPay.notWrittenBytes = 0;
-        cNon.notWrittenBytes = 0;
+            cPay.writtenMessages += cPay.notWrittenMessages;
+            cNon.writtenMessages += cNon.notWrittenMessages;
+            cPay.writtenBytes += cPay.notWrittenBytes;
+            cNon.writtenBytes += cNon.notWrittenBytes;
+            cPay.notWrittenMessages = 0;
+            cNon.notWrittenMessages = 0;
+            cPay.notWrittenBytes = 0;
+            cNon.notWrittenBytes = 0;
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }
