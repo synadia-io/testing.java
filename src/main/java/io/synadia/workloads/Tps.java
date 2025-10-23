@@ -240,11 +240,11 @@ public class Tps extends Workload {
             sendStats.startPhase3();
             sendWL.startPhase3();
 
-            sendStats.non3.debug(TPS_SENDER, "After Disconnect Control");
-
             Debug.info(TPS_SENDER, "Publishing Control Terminate Message");
             nc.publish(CONTROL_SUBJECT, TERMINATE_BYTES);
             waitForPending(nc, 10);
+
+            sendStats.non3.debug(TPS_SENDER, "After Disconnect Control");
         }
     }
 
