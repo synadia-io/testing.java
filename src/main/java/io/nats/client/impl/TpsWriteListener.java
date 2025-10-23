@@ -41,23 +41,28 @@ public class TpsWriteListener extends WriteListener {
 
     @Override
     public void buffered(NatsMessage msg) {
-        if (msg.getSubject().equals(controlSubject)) {
-            controlsBuffered.incrementAndGet();
-            return;
-        }
+        try {
+            if (msg.getSubject().equals(controlSubject)) {
+                controlsBuffered.incrementAndGet();
+                return;
+            }
 
-        if (phase.get() == 1 && msg.getSubject().equals(testSubject)) {
-            long mid = extractMessageId(msg);
-            long expected = lastBufferedMessageId.incrementAndGet();
-            if (expected == 1) {
-                Debug.info(label, "buffering started");
+            if (phase.get() == 1 && msg.getSubject().equals(testSubject)) {
+                long mid = extractMessageId(msg);
+                long expected = lastBufferedMessageId.incrementAndGet();
+                if (expected == 1) {
+                    Debug.info(label, "buffering started");
+                }
+                else if (mid != expected) {
+                    long diff = mid - expected;
+                    gapList.add("expected:" + expected + ", received:" + mid + ", diff" + diff);
+                    Debug.info(label, "!!!!! buffered message id gap", "expected: %s", format3(expected), "actual: %s ", format3(mid), "difference: %s", diff);
+                }
+                lastBufferedMessageId.set(mid);
             }
-            else if (mid != expected) {
-                long diff = mid - expected;
-                gapList.add("expected:" + expected + ", received:" + mid + ", diff" + diff);
-                Debug.info(label, "!!!!! buffered message id gap", "expected: %s", format3(expected), "actual: %s ", format3(mid), "difference: %s", diff);
-            }
-            lastBufferedMessageId.set(mid);
+        }
+        catch (Exception e) {
+            e.printStackTrace();
         }
     }
 

@@ -22,7 +22,7 @@ public class TpsServerPool extends NatsServerPool {
     @Override
     public @Nullable NatsUri nextServer() {
         NatsUri nuri = super.nextServer();
-        int ix = servers.indexOf(nuri.toString());
+        int ix = servers.indexOf(nuri == null ? "xxx" : nuri.toString());
         if (ix == -1) {
             Debug.info(label, "nextServer: %s", nuri);
         }
