@@ -39,8 +39,8 @@ public class TpsConnectionListener implements ConnectionListener {
         boolean print = false;
         String cid = null;
         if (type == Events.CONNECTED || type == Events.CLOSED) {
-            print = true;
             cid = id(conn);
+            print = true;
         }
         else if (type == Events.DISCONNECTED) {
             disconnected.set(true);
@@ -48,6 +48,7 @@ public class TpsConnectionListener implements ConnectionListener {
         }
         else if (type == Events.RECONNECTED) {
             reconnected.set(true);
+            cid = id(conn);
             print = true;
         }
         else if (receiver && type == Events.RESUBSCRIBED) {
