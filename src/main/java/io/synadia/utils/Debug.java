@@ -305,15 +305,15 @@ public abstract class Debug {
         boolean notFirst = false;
         StringBuilder sb = new StringBuilder();
         for (int i = (skipFirst ? 1 : 0); i < extras.length; i++) {
-            if (notFirst) {
-                sb.append(SEP);
-            }
-            else {
-                notFirst = true;
-            }
-
             Object xi = extras[i];
             if (xi != null) {
+                if (notFirst) {
+                    sb.append(SEP);
+                }
+                else {
+                    notFirst = true;
+                }
+
                 String xtra = getString(indent, extras[i]);
                 while (xtra.contains("%s")) {
                     xtra = xtra.replaceFirst(REPLACE, getString(indent, extras[++i]));
