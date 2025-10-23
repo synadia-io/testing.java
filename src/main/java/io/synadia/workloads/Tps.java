@@ -239,20 +239,20 @@ public class Tps extends Workload {
             sendStats.non3.bufferedBytes, sendStats.non3.writtenBytes);
 
         sendResults.add("Etc ...");
-        addSendResult("Control Messages Buffered", sendWL.getControlsBuffered());
+        addSendResult("Protocol Messages Buffered", sendWL.protocolsBuffered.get());
+        addSendResult("Control Messages Buffered", sendWL.controlsBuffered.get());
         addSendResult("Last Write Messages", sendStats.lastWriteMessages);
         addSendResult("Last Write Bytes   ", sendStats.lastWriteBytes);
 
         addSendResult("Buffered Not Written Messages", sendStats.pay.notWrittenMessages);
         addSendResult("Buffered Not Written Bytes   ", sendStats.pay.notWrittenBytes);
 
-        List<String> skipList = sendWL.getGapList();
-        if (skipList.isEmpty()) {
+        if (sendWL.gapList.isEmpty()) {
             sendResults.add("  No Writer Gaps");
         }
         else {
             sendResults.add("  Writer Gaps");
-            for (String s : skipList) {
+            for (String s : sendWL.gapList) {
                 sendResults.add(" " + s);
             }
         }

@@ -17,9 +17,9 @@ public class TpsWriteListener extends WriteListener {
     private final String controlSubject;
     public final AtomicInteger phase;
     private final AtomicLong lastBufferedMessageId;
-    private final AtomicInteger protocolsBuffered;
-    private final AtomicInteger controlsBuffered;
-    private final List<String> gapList;
+    public final AtomicInteger protocolsBuffered;
+    public final AtomicInteger controlsBuffered;
+    public final List<String> gapList;
 
     public TpsWriteListener(String labelSuffix, String testSubject, String controlSubject) {
         super(null);
@@ -70,17 +70,5 @@ public class TpsWriteListener extends WriteListener {
         catch (Exception e) {
             e.printStackTrace();
         }
-    }
-
-    public long getLastBufferedMessageId() {
-        return lastBufferedMessageId.get();
-    }
-
-    public int getControlsBuffered() {
-        return controlsBuffered.get();
-    }
-
-    public List<String> getGapList() {
-        return gapList;
     }
 }
