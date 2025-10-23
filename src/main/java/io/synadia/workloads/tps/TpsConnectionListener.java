@@ -10,6 +10,8 @@ import io.synadia.utils.Debug;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static io.synadia.workloads.tps.TpsUtils.id;
+
 public class TpsConnectionListener implements ConnectionListener {
 
     private final String label;
@@ -35,8 +37,10 @@ public class TpsConnectionListener implements ConnectionListener {
     @Override
     public void connectionEvent(Connection conn, Events type, Long time, String uriDetails) {
         boolean print = false;
+        String cid = null;
         if (type == Events.CONNECTED || type == Events.CLOSED) {
             print = true;
+            cid = id(conn);
         }
         else if (type == Events.DISCONNECTED) {
             disconnected.set(true);
@@ -53,10 +57,10 @@ public class TpsConnectionListener implements ConnectionListener {
             int ix = servers.indexOf(uriDetails);
             String details = ix == -1 ? uriDetails : "server " + ix + " (" + uriDetails + ")";
             if (time == null) {
-                Debug.info(label, "%s(%s)", type.getEvent(), conn.getStatus(), details);
+                Debug.info(label, "%s->%s", type.getEvent(), conn.getStatus(), details, cid);
             }
             else {
-                Debug.info(label, "[%s]", Debug.simpleTime(time), "%s(%s)", type.getEvent(), conn.getStatus(), details);
+                Debug.info(label, "%s->%s @ %s", type.getEvent(), conn.getStatus(), Debug.simpleTime(time), details, cid);
             }
         }
     }

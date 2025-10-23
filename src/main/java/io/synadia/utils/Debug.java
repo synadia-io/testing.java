@@ -299,7 +299,7 @@ public abstract class Debug {
         }
 
         if (extras.length == 1) {
-            return skipFirst ? null : getString(indent, extras[0]);
+            return skipFirst || extras[0] == null ? null : getString(indent, extras[0]);
         }
 
         boolean notFirst = false;
@@ -312,14 +312,17 @@ public abstract class Debug {
                 notFirst = true;
             }
 
-            String xtra = getString(indent, extras[i]);
-            while (xtra.contains("%s")) {
-                xtra = xtra.replaceFirst(REPLACE, getString(indent, extras[++i]));
+            Object xi = extras[i];
+            if (xi != null) {
+                String xtra = getString(indent, extras[i]);
+                while (xtra.contains("%s")) {
+                    xtra = xtra.replaceFirst(REPLACE, getString(indent, extras[++i]));
+                }
+                sb.append(xtra);
             }
-            sb.append(xtra);
         }
 
-        return sb.length() == 0 ? null : sb.toString();
+        return sb.isEmpty() ? null : sb.toString();
     }
 
     public static String getString(int indent, Object o) {

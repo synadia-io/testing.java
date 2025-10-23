@@ -4,7 +4,6 @@ import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
 import io.nats.client.Nats;
 import io.nats.client.Options;
-import io.nats.client.api.ServerInfo;
 import io.nats.client.impl.Headers;
 import io.nats.client.impl.NoOpStatistics;
 import io.nats.client.impl.TpsWriteListener;
@@ -15,7 +14,6 @@ import io.synadia.Workload;
 import io.synadia.utils.Debug;
 import io.synadia.workloads.tps.TpsConnectionListener;
 import io.synadia.workloads.tps.TpsErrorListener;
-import io.synadia.workloads.tps.TpsServerPool;
 import io.synadia.workloads.tps.TpsStatsCollector;
 
 import java.io.IOException;
@@ -78,6 +76,7 @@ public class Tps extends Workload {
                 Thread r = new Thread(() -> {
                     try { receive(); } catch (Exception ignored) {}
                 });
+                r.setName("main-R");
                 r.start();
 
                 Thread s = new Thread(() -> {
@@ -87,6 +86,7 @@ public class Tps extends Workload {
                 while (!receiverReady.get()) {
                     sleep(10);
                 }
+                s.setName("main-S");
                 s.start();
 
                 s.join();
@@ -130,14 +130,11 @@ public class Tps extends Workload {
             .statisticsCollector(sendStats)
             .connectionListener(sendCL)
             .errorListener(sendEL)
-            .serverPool(new TpsServerPool(TPS_SENDER, params.servers))
             .build();
 
         reportConnectionOptions(TPS_SENDER, options);
 
         try (Connection nc = Nats.connect(options)) {
-            reportNc(TPS_SENDER, nc);
-
             byte[] payload = new byte[payloadSize];
             Headers h = new Headers();
 
@@ -214,7 +211,7 @@ public class Tps extends Workload {
             sendStats.startPhase3();
             sendWL.startPhase3();
 
-            Debug.info(TPS_SENDER, "Publishing Control Terminate Message", nc.getStatus());
+            Debug.info(TPS_SENDER, "Publishing Control Terminate Message");
             nc.publish(CONTROL_SUBJECT, TERMINATE_BYTES);
             sleep(100); // give time for terminate message to get sent
 
@@ -295,8 +292,6 @@ public class Tps extends Workload {
         reportConnectionOptions(TPS_RECEIVER, options);
 
         try (Connection nc = Nats.connect(options)) {
-            reportNc(TPS_RECEIVER, nc);
-
             Dispatcher d = nc.createDispatcher();
 
             d.subscribe(TEST_SUBJECT, msg -> {
@@ -451,10 +446,5 @@ public class Tps extends Workload {
         if (o.getSocketReadTimeoutMillis() > 0) {
             Debug.info(label, "socketReadTimeoutMillis", o.getSocketReadTimeoutMillis());
         }
-    }
-
-    private static void reportNc(String label, Connection nc) {
-        ServerInfo si = nc.getServerInfo();
-        Debug.info(label, "nc:%s", si.getServerName(), "cid:%s", si.getClientId());
     }
 }

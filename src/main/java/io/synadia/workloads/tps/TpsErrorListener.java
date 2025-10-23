@@ -11,6 +11,8 @@ import io.synadia.utils.Debug;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static io.synadia.workloads.tps.TpsUtils.id;
+
 public class TpsErrorListener implements ErrorListener {
 
     public AtomicBoolean connectionException = new AtomicBoolean(false);
@@ -21,21 +23,17 @@ public class TpsErrorListener implements ErrorListener {
         this.label = "EL-" + labelSuffix;
     }
 
-    private String string(Connection conn) {
-        return "Connection[" + Integer.toHexString(conn.hashCode()).toUpperCase() + "]";
-    }
-
     @Override
     public void errorOccurred(final Connection conn, final String error) {
         if (error.contains("Read channel closed")) {
             connectionException.set(true);
         }
-        Debug.info(label, "errorOccurred", string(conn), "Error: " + error);
+        Debug.info(label, id(conn), "errorOccurred: %s", error);
     }
 
     @Override
     public void exceptionOccurred(final Connection conn, final Exception exp) {
-        Debug.info(label, "exceptionOccurred:", string(conn), exp);
+        Debug.info(label, id(conn), "exceptionOccurred: %s", exp);
         if (exp.getMessage().contains("NullPointerException")) {
             System.out.println("\n---------------------------------");
             exp.printStackTrace(System.out);
@@ -48,17 +46,17 @@ public class TpsErrorListener implements ErrorListener {
 
     @Override
     public void slowConsumerDetected(final Connection conn, final Consumer consumer) {
-        Debug.info(label, "slowConsumerDetected", string(conn), consumer);
+        Debug.info(label, id(conn), "slowConsumerDetected: %s", consumer);
     }
 
     @Override
     public void messageDiscarded(final Connection conn, final Message msg) {
-        Debug.info(label, "messageDiscarded", string(conn), "Message: " + msg);
+        Debug.info(label, id(conn), "messageDiscarded: %s" + msg);
     }
 
     @Override
     public void socketWriteTimeout(Connection conn) {
         connectionException.set(true);
-        Debug.info(label, "socketWriteTimeout", string(conn));
+        Debug.info(label, id(conn), "socketWriteTimeout");
     }
 }

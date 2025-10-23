@@ -1,5 +1,6 @@
 package io.synadia.workloads.tps;
 
+import io.nats.client.Connection;
 import io.nats.client.Message;
 import io.nats.client.impl.Headers;
 
@@ -37,5 +38,9 @@ public class TpsUtils {
         catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    public static String id(Connection conn) {
+        return Integer.toHexString(conn.hashCode()).toUpperCase() + "/" + conn.getServerInfo().getClientId();
     }
 }
