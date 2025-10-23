@@ -17,6 +17,7 @@ public class TpsWriteListener extends WriteListener {
     private final String controlSubject;
     public final AtomicInteger phase;
     private final AtomicLong lastBufferedMessageId;
+    private final AtomicInteger protocolsBuffered;
     private final AtomicInteger controlsBuffered;
     private final List<String> gapList;
 
@@ -27,6 +28,7 @@ public class TpsWriteListener extends WriteListener {
         this.controlSubject = controlSubject;
         phase = new AtomicInteger(1);
         lastBufferedMessageId = new AtomicLong(0);
+        protocolsBuffered = new AtomicInteger(0);
         controlsBuffered = new AtomicInteger(0);
         gapList = new ArrayList<>();
     }
@@ -42,6 +44,10 @@ public class TpsWriteListener extends WriteListener {
     @Override
     public void buffered(NatsMessage msg) {
         try {
+            if (msg.getSubject() == null) {
+                protocolsBuffered.incrementAndGet();
+                return;
+            }
             if (msg.getSubject().equals(controlSubject)) {
                 controlsBuffered.incrementAndGet();
                 return;
