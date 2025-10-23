@@ -22,13 +22,7 @@ public class TpsErrorListener implements ErrorListener {
     }
 
     private String string(Connection conn) {
-        try {
-            return "Connection[" + Integer.toHexString(conn.hashCode()).toUpperCase() + "]";
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-            return "Connection[" + conn.hashCode() + "]";
-        }
+        return "Connection[" + Integer.toHexString(conn.hashCode()).toUpperCase() + "]";
     }
 
     @Override
@@ -41,19 +35,14 @@ public class TpsErrorListener implements ErrorListener {
 
     @Override
     public void exceptionOccurred(final Connection conn, final Exception exp) {
-        try {
-            Debug.info(label, "exceptionOccurred:", string(conn), exp);
-            if (exp.getMessage().contains("NullPointerException")) {
-                System.out.println("\n---------------------------------");
-                exp.printStackTrace(System.out);
-                System.out.println("---------------------------------\n");
-            }
-            if (exp.getCause() != null) {
-                Debug.info(label, "            cause:", exp.getCause());
-            }
+        Debug.info(label, "exceptionOccurred:", string(conn), exp);
+        if (exp.getMessage().contains("NullPointerException")) {
+            System.out.println("\n---------------------------------");
+            exp.printStackTrace(System.out);
+            System.out.println("---------------------------------\n");
         }
-        catch (Exception e) {
-            e.printStackTrace();
+        if (exp.getCause() != null) {
+            Debug.info(label, "            cause:", exp.getCause());
         }
     }
 

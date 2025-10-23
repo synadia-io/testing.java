@@ -34,35 +34,30 @@ public class TpsConnectionListener implements ConnectionListener {
 
     @Override
     public void connectionEvent(Connection conn, Events type, Long time, String uriDetails) {
-        try {
-            boolean print = false;
-            if (type == Events.CONNECTED || type == Events.CLOSED) {
-                print = true;
-            }
-            else if (type == Events.DISCONNECTED) {
-                disconnected.set(true);
-                print = true;
-            }
-            else if (type == Events.RECONNECTED) {
-                reconnected.set(true);
-                print = true;
-            }
-            else if (receiver && type == Events.RESUBSCRIBED) {
-                print = true;
-            }
-            if (print) {
-                int ix = servers.indexOf(uriDetails);
-                String details = ix == -1 ? uriDetails : "server " + ix + " (" + uriDetails + ")";
-                if (time == null) {
-                    Debug.info(label, "%s(%s)", type.getEvent(), conn.getStatus(), details);
-                }
-                else {
-                    Debug.info(label, "[%s]", Debug.simpleTime(time), "%s(%s)", type.getEvent(), conn.getStatus(), details);
-                }
-            }
+        boolean print = false;
+        if (type == Events.CONNECTED || type == Events.CLOSED) {
+            print = true;
         }
-        catch (Exception e) {
-            e.printStackTrace();
+        else if (type == Events.DISCONNECTED) {
+            disconnected.set(true);
+            print = true;
+        }
+        else if (type == Events.RECONNECTED) {
+            reconnected.set(true);
+            print = true;
+        }
+        else if (receiver && type == Events.RESUBSCRIBED) {
+            print = true;
+        }
+        if (print) {
+            int ix = servers.indexOf(uriDetails);
+            String details = ix == -1 ? uriDetails : "server " + ix + " (" + uriDetails + ")";
+            if (time == null) {
+                Debug.info(label, "%s(%s)", type.getEvent(), conn.getStatus(), details);
+            }
+            else {
+                Debug.info(label, "[%s]", Debug.simpleTime(time), "%s(%s)", type.getEvent(), conn.getStatus(), details);
+            }
         }
     }
 }

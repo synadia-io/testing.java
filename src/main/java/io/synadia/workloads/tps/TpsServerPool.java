@@ -30,7 +30,6 @@ public class TpsServerPool extends NatsServerPool {
             String details = "server " + ix + " (" + nuri + ")";
             Debug.info(label, "nextServer: %s", details);
         }
-
         return nuri;
     }
 }
