@@ -236,6 +236,7 @@ public class Generator {
     private static void printNatsCli(Instance instance) {
         for (int x = 0; x < instance.ports.size(); x++) {
             System.out.println("nats s list -a -s nats://" + instance.publicIpAddr + ":" + instance.ports.get(x));
+            System.out.println("curl http://" + instance.publicIpAddr + ":8222/healthz");
         }
     }
 

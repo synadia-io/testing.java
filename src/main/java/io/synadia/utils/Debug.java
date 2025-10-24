@@ -21,8 +21,6 @@ import java.util.List;
 import static io.nats.client.support.DateTimeUtils.toRfc3339;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-// MODIFIED 10/17/2025
-
 @SuppressWarnings("SameParameterValue")
 public abstract class Debug {
 
@@ -31,18 +29,20 @@ public abstract class Debug {
     }
 
     public static final int NO_TIME = 0;
-    public static final int MILLIS_TIME = 1;
-    public static final int SIMPLE_TIME = 2;
-    public static final int RFC_DATE_TIME = 3;
-    public static final int RFC_TIME = 4;
+    public static final int SIMPLE_TIME = 1;
+    public static final int RFC_DATE_TIME = 2;
+    public static final int RFC_TIME = 3;
+    public static final int MILLIS_TIME = 4;
 
-    public static final String SEP = " | ";
-    public static final String DIV = "/";
-    public static final String PAD = "                                                                                                                                                                                                                                                                                                                                                                                                                                    ";
-    public static final String REPLACE = "\\Q%s\\E";
+    public static String SEP = " | ";
+    public static String PART_SEP = " / ";
+    public static String DIV = "/";
+    public static String PAD = "                                                                                                                                                                                                                                                                                                                                                                                                                                    ";
+    public static String REPLACE = "\\Q%s\\E";
     public static boolean DO_NOT_TRUNCATE = true;
     public static boolean PRINT_THREAD_ID = true;
     public static int TIME_TYPE = SIMPLE_TIME;
+    public static String DEFAULT_MESSAGE_LABEL = "MSG";
     public static boolean PAUSE = false;
     public static DebugPrinter DEBUG_PRINTER = System.out::println;
     public static int MAX_DATA_DISPLAY = 50;
@@ -50,11 +50,11 @@ public abstract class Debug {
     private Debug() {}  /* ensures cannot be constructed */
 
     public static void msg(Message msg) {
-        info(null, msg, true, null);
+        info(DEFAULT_MESSAGE_LABEL, msg, true, null);
     }
 
     public static void msg(Message msg, Object... extras) {
-        info(null, msg, true, extras, false);
+        info(DEFAULT_MESSAGE_LABEL, msg, true, extras, false);
     }
 
     public static void msg(String label, Message msg, Object... extras) {
@@ -108,7 +108,7 @@ public abstract class Debug {
     public static void info(String label, Object... extras) {
         if (PAUSE) { return; }
         if (extras == null || extras.length == 0) {
-            info(label, null, false, null);
+            info(label, null, false, null, false);
         }
         else if (extras[0] instanceof NatsMessage) {
             info(label, (NatsMessage)extras[0], true, extras, true);
@@ -122,10 +122,10 @@ public abstract class Debug {
         if (PAUSE) { return; }
         String start;
         if (TIME_TYPE > NO_TIME && PRINT_THREAD_ID) {
-            start = "[" + getThreadName() + "@" + time() + "] ";
+            start = "[" + getThreadName() + "@" + time(TIME_TYPE) + "] ";
         }
-        else if (TIME_TYPE > NO_TIME){
-            start = "[" + time() + "] ";
+        else if (TIME_TYPE > NO_TIME) {
+            start = "[" + time(TIME_TYPE) + "] ";
         }
         else if (PRINT_THREAD_ID){
             start = "[" + getThreadName() + "] ";
@@ -164,18 +164,12 @@ public abstract class Debug {
             return;
         }
 
-        if (msg.isStatusMessage()) {
-            DEBUG_PRINTER.println(label + sidString(msg) + msgInfoString(msg) + msg.getStatus() + extra);
+        if (msg.getSubject() == null) {
+            DEBUG_PRINTER.println(label + SEP + protocolMsgString(msg) + extra);
+            return;
         }
-        else if (msg.isJetStream()) {
-            DEBUG_PRINTER.println(label + sidString(msg) + msgInfoString(msg) + dataString(msg) + replyToString(msg) + extra);
-        }
-        else if (msg.getSubject() == null) {
-            DEBUG_PRINTER.println(label + sidString(msg) + msg + extra);
-        }
-        else {
-            DEBUG_PRINTER.println(label + sidString(msg) + msgInfoString(msg) + dataString(msg) + replyToString(msg) + extra);
-        }
+
+        DEBUG_PRINTER.println(label + SEP + messageString(msg));
         debugHdr(indent, msg);
     }
 
@@ -184,29 +178,62 @@ public abstract class Debug {
     }
 
     private static String messageString(Message msg) {
-        return sidString(msg) + msgInfoString(msg) + dataString(msg) + replyToString(msg);
-    }
+        String sid = sidString(msg);
+        sid = sid == null ? "" : sid + PART_SEP;
 
-    public static void warn(String label, Object... extras) {
-        info(label, extras);
-    }
+        if (msg.getSubject() == null) {
+            return sid + protocolMsgString(msg);
+        }
 
-    public static void warn(String label, Message msg, boolean forMsg, String extra) {
-        info(label, msg, forMsg, extra);
+        if (msg.isStatusMessage()) {
+            return sid + msgInfoString(msg) + PART_SEP + msg.getStatus();
+        }
+
+        return sid + msgInfoString(msg) + PART_SEP + dataString(msg) + PART_SEP + replyToString(msg);
     }
 
     public static String sidString(Message msg) {
-        return msg.getSID() == null ? SEP : " sid:" + msg.getSID() + SEP;
+        return msg.getSID() == null ? null : "sid:" + msg.getSID();
+    }
+
+    private static String protocolMsgString(Message msg) {
+        String s = msg.toString();
+        int at1 = s.indexOf('|');
+        int at2 = s.indexOf(' ', at1 + 2);
+        return at2 == -1 ? s : s.substring(0, at2);
     }
 
     public static String msgInfoString(Message msg) {
         if (msg.isJetStream()) {
             return msg.metaData().streamSequence()
                 + DIV + msg.metaData().consumerSequence()
-                + SEP + msg.getSubject()
-                + SEP;
+                + PART_SEP + msg.getSubject();
         }
-        return msg.getSubject() + SEP;
+        return msg.getSubject();
+    }
+
+    public static String dataString(Message msg) {
+        byte[] data = msg.getData();
+        if (data == null || data.length == 0) {
+            return "<no data>";
+        }
+
+        if (data[0] < 32) {
+            // this must be actual binary data, probably filler test data
+            return "<binary " + data.length + " byte(s)>";
+        }
+
+        String s = new String(data, UTF_8);
+        if (DO_NOT_TRUNCATE) {
+            return s;
+        }
+
+        int at = s.indexOf("io.nats.jetstream.api");
+        if (at == -1) {
+            return s.length() > MAX_DATA_DISPLAY ? s.substring(0, MAX_DATA_DISPLAY) + "..." : s;
+        }
+        int at2 = s.indexOf('"', at);
+        return s.substring(at, at2);
     }
 
     public static String replyToString(Message msg) {
@@ -215,22 +242,22 @@ public abstract class Debug {
             return "ss:" + meta.streamSequence() + ' '
                 + "cc:" + meta.consumerSequence() + ' '
                 + "dlvr:" + meta.deliveredCount() + ' '
-                + "pnd:" + meta.pendingCount()
-                + SEP;
+                + "pnd:" + meta.pendingCount();
         }
-        if (msg.getReplyTo() == null) {
-            return "<no reply>";
-        }
-        return msg.getReplyTo();
+        return msg.getReplyTo() == null ? "<no reply>" : msg.getReplyTo();
     }
 
     public static String time() {
-        return switch (TIME_TYPE) {
-            case RFC_DATE_TIME -> rfcDateTime();
-            case RFC_TIME -> rfcTime();
-            case SIMPLE_TIME -> simpleTime();
-            default -> "" + System.currentTimeMillis();
-        };
+        return simpleTime();
+    }
+
+    public static String time(int type) {
+        switch (type) {
+            case RFC_DATE_TIME: return rfcDateTime();
+            case RFC_TIME: return rfcTime();
+            case MILLIS_TIME: return "" + System.currentTimeMillis();
+            case SIMPLE_TIME: default: return simpleTime();
+        }
     }
 
     // RFC 2025-02-15T14:09:45
@@ -263,30 +290,6 @@ public abstract class Debug {
 
     public static String simpleTime(ZonedDateTime zdt) {
         return SIMPLE_TIME_FORMATTER.format(zdt);
-    }
-
-    public static String dataString(Message msg) {
-        byte[] data = msg.getData();
-        if (data == null || data.length == 0) {
-            return "<no data>" + SEP;
-        }
-
-        if (data[0] < 32) {
-            // this must be actual binary data, probably filler test data
-            return "<binary " + data.length + " bytes>" + SEP;
-        }
-
-        String s = new String(data, UTF_8);
-        if (DO_NOT_TRUNCATE) {
-            return s + SEP;
-        }
-
-        int at = s.indexOf("io.nats.jetstream.api");
-        if (at == -1) {
-            return s.length() > MAX_DATA_DISPLAY ? s.substring(0, MAX_DATA_DISPLAY) + "..." : s;
-        }
-        int at2 = s.indexOf('"', at);
-        return s.substring(at, at2) + SEP;
     }
 
     public static String stringify(Object... extras) {
@@ -322,82 +325,81 @@ public abstract class Debug {
             }
         }
 
-        return sb.isEmpty() ? null : sb.toString();
+        return sb.length() == 0 ? null : sb.toString();
+    }
+
+    public static String getString(Object o) {
+        return getString(0, o);
     }
 
     public static String getString(int indent, Object o) {
-        switch (o) {
-            case null -> {
-                return "null";
-            }
-            case Message msg -> {
-                if (msg.getSubject() == null) {
-                    return msg.toString();
-                }
-                return msgInfoString(msg) + dataString(msg) + replyToString(msg);
-            }
-            case ConsumerInfo consumerInfo -> {
-                return consumerInfoString(consumerInfo);
-            }
-            case SequenceInfo sequenceInfo -> {
-                return sequenceInfoString(sequenceInfo);
-            }
-            case NatsJetStreamMetaData natsJetStreamMetaData -> {
-                return metaDataString(natsJetStreamMetaData);
-            }
-            case ServerInfo serverInfo -> {
-                return serverInfoString(indent, serverInfo);
-            }
-            case ZonedDateTime zonedDateTime -> {
-                return DateTimeUtils.toRfc3339(zonedDateTime);
-            }
-            case ConsumerConfiguration consumerConfiguration -> {
-                return formatted(consumerConfiguration);
-            }
-            case Headers h -> {
-                boolean notFirst = false;
-                StringBuilder sb = new StringBuilder("[");
-                for (String key : h.keySet()) {
-                    if (notFirst) {
-                        sb.append(',');
-                    }
-                    else {
-                        notFirst = true;
-                    }
-                    sb.append(key).append("=").append(h.get(key));
-                }
-                return sb.append(']').toString();
-            }
-            case JsonSerializable jsonSerializable -> {
-                return jsonSerializable.toJson();
-            }
-            case byte[] bytes -> {
-                if (bytes.length == 0) {
-                    return "<byte[0]>";
-                }
-                return new String(bytes);
-            }
-            case String[] strings -> {
-                StringBuilder sb = new StringBuilder();
-                boolean first = true;
-                for (String s : strings) {
-                    if (first) {
-                        first = false;
-                    }
-                    else {
-                        sb.append(", ");
-                    }
-                    sb.append('\'')
-                        .append(s == null ? "<null>" : (s.isEmpty() ? "<empty>" : s))
-                        .append('\'');
-                }
-                return sb.toString();
-            }
-            default -> {
-                String s = o.toString();
-                return s.isEmpty() ? "<empty>" : s;
-            }
+        if (o == null) {
+            return "null";
         }
+        if (o instanceof Message) {
+            return messageString((Message)o);
+        }
+        if (o instanceof ConsumerInfo) {
+            return consumerInfoString((ConsumerInfo)o);
+        }
+        if (o instanceof SequenceInfo) {
+            return sequenceInfoString((SequenceInfo)o);
+        }
+        if (o instanceof ServerInfo) {
+            return serverInfoString(indent, (ServerInfo)o);
+        }
+        if (o instanceof NatsJetStreamMetaData) {
+            return metaDataString((NatsJetStreamMetaData)o);
+        }
+        if (o instanceof ZonedDateTime) {
+            return DateTimeUtils.toRfc3339((ZonedDateTime)o);
+        }
+        if (o instanceof ConsumerConfiguration) {
+            return formatted((ConsumerConfiguration)o);
+        }
+        if (o instanceof Headers) {
+            Headers h = (Headers)o;
+            boolean notFirst = false;
+            StringBuilder sb = new StringBuilder("[");
+            for (String key : h.keySet()) {
+                if (notFirst) {
+                    sb.append(',');
+                }
+                else {
+                    notFirst = true;
+                }
+                sb.append(key).append("=").append(h.get(key));
+            }
+            return sb.append(']').toString();
+        }
+        if (o instanceof JsonSerializable) {
+            return ((JsonSerializable)o).toJson();
+        }
+        if (o instanceof byte[]) {
+            byte[] bytes = (byte[])o;
+            if (bytes.length == 0) {
+                return "<byte[0]>";
+            }
+            return new String((byte[])o);
+        }
+        if (o instanceof String[]) {
+            StringBuilder sb = new StringBuilder();
+            boolean first = true;
+            for (String s : (String[])o) {
+                if (first) {
+                    first = false;
+                }
+                else {
+                    sb.append(", ");
+                }
+                sb.append('\'')
+                    .append(s == null ? "<null>" : (s.isEmpty() ? "<empty>" : s))
+                    .append('\'');
+            }
+            return sb.toString();
+        }
+        String s = o.toString();
+        return s.isEmpty() ? "<empty>" : s;
     }
 
     public static void debugHdr(int indent, Message msg) {

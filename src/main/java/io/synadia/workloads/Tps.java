@@ -20,9 +20,10 @@ import java.io.IOException;
 import java.net.Socket;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -37,13 +38,13 @@ public class Tps extends Workload {
     private static final String TPS_SENDER = "SENDER";
     private static final String TPS_RECEIVER = "RECEIVER";
     private static final String TEST_SUBJECT = "test";
-    private static final String CONTROL_SUBJECT = "ctrl";
-    private static final byte[] TERMINATE_BYTES = new byte[] {0};
+    private static final String TERMINATE_SUBJECT = "term";
 
     // Common
     String action;
     int targetTps;
     int payloadSize;
+    ScheduledExecutorService scheduler;
 
     @Override
     public void init(CommandLine commandLine) {
@@ -68,6 +69,8 @@ public class Tps extends Workload {
 
     @Override
     public void runWorkload() throws Exception {
+        scheduler = Executors.newScheduledThreadPool(1);
+
         Thread r = new Thread(() -> { try { receive(); } catch (Exception ignored) {} });
         r.setName("R-main");
         r.start();
@@ -81,6 +84,8 @@ public class Tps extends Workload {
 
         s.join();
         r.join();
+
+        scheduler.shutdown();
 
         reportSocketBufferSize();
 
@@ -148,7 +153,7 @@ public class Tps extends Workload {
     private void send() throws IOException, InterruptedException {
         pubId = new AtomicLong(0);
         sendStats = new TpsStatsCollector(payloadSize);
-        sendWL = new TpsWriteListener(TPS_SENDER, TEST_SUBJECT, CONTROL_SUBJECT);
+        sendWL = new TpsWriteListener(TPS_SENDER, TEST_SUBJECT, TERMINATE_SUBJECT);
 
         sendCL = new TpsConnectionListener(TPS_SENDER, params.servers, false);
         sendEL = new TpsErrorListener(TPS_SENDER);
@@ -227,7 +232,7 @@ public class Tps extends Workload {
             }
 
             Debug.info(TPS_SENDER, "Publishing Control Terminate Message");
-            nc.publish(CONTROL_SUBJECT, TERMINATE_BYTES);
+            nc.publish(TERMINATE_SUBJECT, null);
 
             waitForPending(nc);
         }
@@ -303,19 +308,15 @@ public class Tps extends Workload {
         try (Connection nc = Nats.connect(options)) {
             Dispatcher d = nc.createDispatcher();
 
-            AtomicBoolean gapped = new AtomicBoolean(false);
             CountDownLatch latch = new CountDownLatch(1);
 
-            AtomicLong rf = new AtomicLong(1000);
             d.subscribe(TEST_SUBJECT, msg -> {
                 if (++receivedMessages == 1) {
                     receivedLastMessageId = 1;
                     Debug.info(TPS_RECEIVER, "Started Receiving");
-                    return;
-                }
-
-                if (receivedMessages % rf.get() == 0) {
-                    Debug.info(TPS_RECEIVER, "Received %s", receivedMessages);
+                    scheduler.scheduleAtFixedRate(
+                        () -> {Debug.info(TPS_RECEIVER, "Received %s", receivedMessages);},
+                        1, 1, TimeUnit.SECONDS);
                     return;
                 }
 
@@ -328,15 +329,12 @@ public class Tps extends Workload {
                     Debug.info(TPS_RECEIVER, "******"
                         , "Got Message Id: %s but expected: %s", format3(mid), format3(expected)
                         , "Gap: %s", format3(gap));
-                    rf.set(500);
                 }
             });
 
-            d.subscribe(CONTROL_SUBJECT, msg -> {
-                if (Arrays.equals(TERMINATE_BYTES, msg.getData())) {
-                    Debug.info(TPS_RECEIVER, "Received Control - Terminate Message.");
-                    latch.countDown();
-                }
+            d.subscribe(TERMINATE_SUBJECT, msg -> {
+                Debug.info(TPS_RECEIVER, "Received Control - Terminate Message.");
+                latch.countDown();
             });
 
             sleep(50);

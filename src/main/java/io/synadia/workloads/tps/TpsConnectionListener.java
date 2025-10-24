@@ -58,10 +58,10 @@ public class TpsConnectionListener implements ConnectionListener {
             int ix = servers.indexOf(uriDetails);
             String details = ix == -1 ? uriDetails : "server " + ix + " (" + uriDetails + ")";
             if (time == null) {
-                Debug.info(label, "%s->%s", type.getEvent(), conn.getStatus(), details, cid);
+                Debug.info(label, "%s -> %s", type.getEvent(), conn.getStatus(), details, cid);
             }
             else {
-                Debug.info(label, "%s->%s @ %s", type.getEvent(), conn.getStatus(), Debug.simpleTime(time), details, cid);
+                Debug.info(label, "%s -> %s @ %s", type.getEvent(), conn.getStatus(), Debug.simpleTime(time), details, cid);
             }
         }
     }
