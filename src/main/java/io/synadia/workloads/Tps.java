@@ -306,6 +306,7 @@ public class Tps extends Workload {
             AtomicBoolean gapped = new AtomicBoolean(false);
             CountDownLatch latch = new CountDownLatch(1);
 
+            AtomicLong rf = new AtomicLong(1000);
             d.subscribe(TEST_SUBJECT, msg -> {
                 if (++receivedMessages == 1) {
                     receivedLastMessageId = 1;
@@ -313,10 +314,9 @@ public class Tps extends Workload {
                     return;
                 }
 
-                if (gapped.get()) {
-                    if (receivedMessages == pubId.get()) {
-                        latch.countDown();
-                    }
+                if (receivedMessages % rf.get() == 0) {
+                    Debug.info(TPS_RECEIVER, "Received %s", receivedMessages);
+                    return;
                 }
 
                 long expected = receivedLastMessageId + 1;
@@ -328,7 +328,7 @@ public class Tps extends Workload {
                     Debug.info(TPS_RECEIVER, "******"
                         , "Got Message Id: %s but expected: %s", format3(mid), format3(expected)
                         , "Gap: %s", format3(gap));
-                    gapped.set(true);
+                    rf.set(500);
                 }
             });
 
