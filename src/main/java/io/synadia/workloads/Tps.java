@@ -21,10 +21,7 @@ import java.net.Socket;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -39,6 +36,7 @@ public class Tps extends Workload {
     private static final String TPS_RECEIVER = "RECEIVER";
     private static final String TEST_SUBJECT = "test";
     private static final String TERMINATE_SUBJECT = "term";
+    private static final String TEST_QUEUE = "q";
 
     // Common
     String action;
@@ -71,9 +69,16 @@ public class Tps extends Workload {
     public void runWorkload() throws Exception {
         scheduler = Executors.newScheduledThreadPool(1);
 
-        Thread r = new Thread(() -> { try { receive(); } catch (Exception ignored) {} });
-        r.setName("R-main");
-        r.start();
+        Thread r1 = new Thread(() -> { try { receive(1); } catch (Exception ignored) {} });
+        r1.setName("R1-main");
+        r1.start();
+        while (!receiverReady.get()) {
+            sleep(10);
+        }
+
+        Thread r2 = new Thread(() -> { try { receive(2); } catch (Exception ignored) {} });
+        r2.setName("R1-main");
+        r2.start();
         while (!receiverReady.get()) {
             sleep(10);
         }
@@ -83,7 +88,8 @@ public class Tps extends Workload {
         s.start();
 
         s.join();
-        r.join();
+        r1.join();
+        r2.join();
 
         scheduler.shutdown();
 
@@ -91,11 +97,20 @@ public class Tps extends Workload {
 
         sleep(100); // give callbacks time to finish
 
+        List<Long> drained = new ArrayList<>();
+        messageIds.drainTo(drained);
+        drained.sort(Long::compareTo);
+
         System.out.println("\n" + TPS_RECEIVER);
         System.out.println(stringify("  Total Received Messages: %s", format3(receivedMessages)));
-        if (!gaps.isEmpty()) {
-            for (Gap g : gaps) {
-                g.print(payloadSize);
+        long expected = drained.getFirst();
+        for (Long mid : drained) {
+            if (mid != expected) {
+                System.out.println(stringify("  Received Gap Message: %s", format3(mid)));
+                System.out.println(stringify("  Expected Gap Message: %s", format3(expected)));
+                long diff = mid - expected;
+                System.out.println(stringify("  Gap: %s", diff));
+                System.out.println(stringify("  Gap Bytes (Approximate): %s", format3(diff * payloadSize)));
             }
         }
 
@@ -272,30 +287,12 @@ public class Tps extends Workload {
     TpsConnectionListener receiveCL;
     TpsErrorListener receiveEL;
     AtomicBoolean receiverReady = new AtomicBoolean(false);
-    List<Gap> gaps = new ArrayList<>();
+    LinkedBlockingQueue<Long> messageIds = new LinkedBlockingQueue<>();
 
-    static class Gap {
-        final long expected;
-        final long mid;
-
-        public Gap(long expected, long mid) {
-            this.expected = expected;
-            this.mid = mid;
-        }
-
-        public void print(int payloadSize) {
-            System.out.println(stringify("  Received Gap Message: %s", format3(mid)));
-            System.out.println(stringify("  Expected Gap Message: %s", format3(expected)));
-            long diff = mid - expected;
-            System.out.println(stringify("  Gap: %s", diff));
-            System.out.println(stringify("  Gap Bytes (Approximate): %s", format3(diff * payloadSize)));
-        }
-    }
-
-    private void receive() throws IOException, InterruptedException {
-        int firstServerIx = commandLine.args.isEmpty() ? 1 : Integer.parseInt(commandLine.args.getFirst());
-        receiveCL = new TpsConnectionListener(TPS_RECEIVER, params.servers, true);
-        receiveEL = new TpsErrorListener(TPS_RECEIVER);
+    private void receive(int firstServerIx) throws IOException, InterruptedException {
+        String label = TPS_RECEIVER + "-" + firstServerIx;
+        receiveCL = new TpsConnectionListener(label, params.servers, true);
+        receiveEL = new TpsErrorListener(label);
 
         Options options = buildOptions(firstServerIx)
             .statisticsCollector(new NoOpStatistics())
@@ -303,46 +300,35 @@ public class Tps extends Workload {
             .errorListener(receiveEL)
             .build();
 
-        reportConnectionOptions(TPS_RECEIVER, options);
+        reportConnectionOptions(label, options);
 
         try (Connection nc = Nats.connect(options)) {
             Dispatcher d = nc.createDispatcher();
 
             CountDownLatch latch = new CountDownLatch(1);
 
-            d.subscribe(TEST_SUBJECT, msg -> {
+            d.subscribe(TEST_SUBJECT, TEST_QUEUE, msg -> {
+                messageIds.add(extractMessageId(msg));
                 if (++receivedMessages == 1) {
                     receivedLastMessageId = 1;
-                    Debug.info(TPS_RECEIVER, "Started Receiving");
+                    Debug.info(label, "Started Receiving");
                     scheduler.scheduleAtFixedRate(
-                        () -> {Debug.info(TPS_RECEIVER, "Received %s", receivedMessages);},
+                        () -> {Debug.info(label, "Received %s", receivedMessages);},
                         1, 1, TimeUnit.SECONDS);
-                    return;
-                }
-
-                long expected = receivedLastMessageId + 1;
-                long mid = extractMessageId(msg);
-                receivedLastMessageId = mid;
-                if (mid != expected) {
-                    gaps.add(new Gap(expected, mid));
-                    long gap = mid - expected;
-                    Debug.info(TPS_RECEIVER, "******"
-                        , "Got Message Id: %s but expected: %s", format3(mid), format3(expected)
-                        , "Gap: %s", format3(gap));
                 }
             });
 
             d.subscribe(TERMINATE_SUBJECT, msg -> {
-                Debug.info(TPS_RECEIVER, "Received Control - Terminate Message.");
+                Debug.info(label, "Received Control - Terminate Message.");
                 latch.countDown();
             });
 
             sleep(50);
             receiverReady.set(true);
 
-            Debug.info(TPS_RECEIVER, "Waiting for Terminate Message");
+            Debug.info(label, "Waiting for Terminate Message");
             if (!latch.await(60, TimeUnit.SECONDS)) {
-                Debug.info(TPS_RECEIVER, "!!!!! Terminate Message NOT Received");
+                Debug.info(label, "!!!!! Terminate Message NOT Received");
             }
         }
     }
