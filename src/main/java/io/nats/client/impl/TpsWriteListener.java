@@ -39,12 +39,12 @@ public class TpsWriteListener extends WriteListener {
     @Override
     public void buffered(NatsMessage msg, NatsConnectionWriter.Mode mode) {
         if (msg.getSubject() == null) {
-            Debug.info(label, mode, msg);
+            Debug.info(label, mode, "Mode.%s", msg);
             protocolsBuffered.incrementAndGet();
             return;
         }
         if (msg.getSubject().equals(controlSubject)) {
-            Debug.info(label, mode, msg);
+            Debug.info(label, mode, "Mode.%s", msg);
             controlsBuffered.incrementAndGet();
             return;
         }
