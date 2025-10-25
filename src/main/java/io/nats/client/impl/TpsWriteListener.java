@@ -1,6 +1,5 @@
 package io.nats.client.impl;
 
-import io.nats.client.WriteListener;
 import io.synadia.utils.Debug;
 
 import java.util.ArrayList;
@@ -38,7 +37,7 @@ public class TpsWriteListener extends WriteListener {
     }
 
     @Override
-    public void buffered(NatsMessage msg) {
+    public void buffered(NatsMessage msg, NatsConnectionWriter.Mode mode) {
         if (msg.getSubject() == null) {
             Debug.info(label, msg);
             protocolsBuffered.incrementAndGet();
