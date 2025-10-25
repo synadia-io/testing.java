@@ -112,6 +112,7 @@ public class Tps extends Workload {
                 System.out.println(stringify("  Gap: %s", diff));
                 System.out.println(stringify("  Gap Bytes (Approximate): %s", format3(diff * payloadSize)));
             }
+            expected = mid + 1;
         }
 
         System.out.println("\n" + TPS_SENDER);
