@@ -37,6 +37,7 @@ public class Tps extends Workload {
     private static final String TEST_SUBJECT = "test";
     private static final String TERMINATE_SUBJECT = "term";
     private static final String TEST_QUEUE = "q";
+    private static final int RECEIVERS = 4;
 
     // Common
     String action;
@@ -70,15 +71,15 @@ public class Tps extends Workload {
         scheduler = Executors.newScheduledThreadPool(1);
 
         List<Thread> threads = new ArrayList<>();
-        for (int ix = 0; ix < 4; ix++) {
+        for (int ix = 0; ix < RECEIVERS; ix++) {
             int fix = ix;
             Thread r = new Thread(() -> { try { receive(fix); } catch (Exception ignored) {} });
             r.setName("R" + ix + "main");
             r.start();
             threads.add(r);
         }
-        for (int ix = 0; ix < threads.size(); ix++) {
-            AtomicBoolean ready = receiversReady.get(ix);
+        for (int ix = 0; ix < RECEIVERS; ix++) {
+            AtomicBoolean ready = receivers.get(ix).ready;
             while (!ready.get()) {
                 sleep(10);
             }
@@ -103,8 +104,19 @@ public class Tps extends Workload {
         messageIds.drainTo(drained);
         drained.sort(Long::compareTo);
 
+        // ----------------------------------------------------------------------------------------------------
+        // Report Receivers
+        // ----------------------------------------------------------------------------------------------------
         System.out.println("\n" + TPS_RECEIVER);
-        System.out.println(stringify("  Total Received Messages: %s", format3(receivedMessages)));
+        long receivedMessages = 0;
+        for (int ix = 0; ix < RECEIVERS; ix++) {
+            long rm = receivers.get(ix).receivedMessages;
+            receivedMessages += rm;
+            System.out.println(stringify("  Receiver %s Received Messages: %s", ix, format3(rm)));
+        }
+        System.out.println("  ------------------------------- -----");
+        System.out.println(stringify("  Total Received Messages:      %s", format3(receivedMessages)));
+
         long expected = drained.getFirst();
         for (Long mid : drained) {
             if (mid != expected) {
@@ -117,6 +129,9 @@ public class Tps extends Workload {
             expected = mid + 1;
         }
 
+        // ----------------------------------------------------------------------------------------------------
+        // Report Sender
+        // ----------------------------------------------------------------------------------------------------
         System.out.println("\n" + TPS_SENDER);
         System.out.println("Before Disconnect...");
         printSendResult("Buffered vs Socket Messages",
@@ -285,25 +300,29 @@ public class Tps extends Workload {
     // ----------------------------------------------------------------------------------------------------
     // Receiver
     // ----------------------------------------------------------------------------------------------------
-    long receivedMessages = 0;
-    long receivedLastMessageId = -1;
-    TpsConnectionListener receiveCL;
-    TpsErrorListener receiveEL;
+    static class Receiver {
+        long receivedMessages;
+        TpsConnectionListener receiveCL;
+        TpsErrorListener receiveEL;
+        AtomicBoolean ready = new AtomicBoolean(false);
+    }
+
     LinkedBlockingQueue<Long> messageIds = new LinkedBlockingQueue<>();
-    List<AtomicBoolean> receiversReady = new ArrayList<>();
+    List<Receiver> receivers = new ArrayList<>();
 
     private void receive(int ix) throws IOException, InterruptedException {
-        AtomicBoolean ready = new AtomicBoolean(false);
-        receiversReady.add(ready);
+        Receiver r = new Receiver();
+        receivers.add(r);
+
         String label = TPS_RECEIVER + "-" + ix;
-        receiveCL = new TpsConnectionListener(label, params.servers, true);
-        receiveEL = new TpsErrorListener(label);
+        r.receiveCL = new TpsConnectionListener(label, params.servers, true);
+        r.receiveEL = new TpsErrorListener(label);
 
         int s = ix % 2 == 0 ? 1 : 2;
         Options options = buildOptions(s)
             .statisticsCollector(new NoOpStatistics())
-            .connectionListener(receiveCL)
-            .errorListener(receiveEL)
+            .connectionListener(r.receiveCL)
+            .errorListener(r.receiveEL)
             .build();
 
         try (Connection nc = Nats.connect(options)) {
@@ -313,11 +332,10 @@ public class Tps extends Workload {
 
             d.subscribe(TEST_SUBJECT, TEST_QUEUE, msg -> {
                 messageIds.add(extractMessageId(msg));
-                if (++receivedMessages == 1) {
-                    receivedLastMessageId = 1;
+                if (++r.receivedMessages == 1) {
                     Debug.info(label, "Started Receiving");
                     scheduler.scheduleAtFixedRate(
-                        () -> {Debug.info(label, "Received %s", receivedMessages);},
+                        () -> {Debug.info(label, "Received %s", r.receivedMessages);},
                         1, 1, TimeUnit.SECONDS);
                 }
             });
@@ -328,9 +346,8 @@ public class Tps extends Workload {
             });
 
             sleep(50);
-            ready.set(true);
+            r.ready.set(true);
 
-            Debug.info(label, "Waiting for Terminate Message");
             if (!latch.await(60, TimeUnit.SECONDS)) {
                 Debug.info(label, "!!!!! Terminate Message NOT Received");
             }
