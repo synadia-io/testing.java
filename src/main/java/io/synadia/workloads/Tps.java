@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static io.nats.client.support.JsonValueUtils.*;
 import static io.nats.jsmulti.shared.Stats.format3;
+import static io.nats.jsmulti.shared.Stats.format3Right;
 import static io.synadia.utils.Debug.stringify;
 import static io.synadia.workloads.tps.TpsUtils.*;
 
@@ -122,10 +123,10 @@ public class Tps extends Workload {
         for (int ix = 0; ix < RECEIVERS; ix++) {
             long rm = receivers.get(ix).receivedMessages;
             receivedMessages += rm;
-            System.out.println(stringify("  Receiver %s Received Messages:   %s", ix, format3(rm)));
+            System.out.println(stringify("  Receiver %s Received Messages: %s", ix, format3Right(rm, 7)));
         }
-        System.out.println("  ----------------------------- --------");
-        System.out.println(stringify("  Total Received Messages:      %s", format3(receivedMessages)));
+        System.out.println("  ------------------------------ -------");
+        System.out.println(stringify("  Total Received Messages:       %s", format3Right(receivedMessages, 7)));
 
         long expected = drained.getFirst();
         for (Long mid : drained) {

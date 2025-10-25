@@ -528,6 +528,10 @@ public class Stats {
         return format3(n, true);
     }
 
+    public static String format3Right(Number n, int width) {
+        return String.format("%" + width + "s", Stats.format3(n, true));
+    }
+
     public static String format3NoGrouping(Number n) {
         return format3(n, false);
     }
