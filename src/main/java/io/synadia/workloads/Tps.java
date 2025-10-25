@@ -87,7 +87,6 @@ public class Tps extends Workload {
         scheduler.scheduleAtFixedRate(
             () -> {
                 long receivedMessages = 0;
-                Debug.info("!!!!!", RECEIVERS, receivers.size());
                 for (int ix = 0; ix < RECEIVERS; ix++) {
                     long rm = receivers.get(ix).receivedMessages;
                     receivedMessages += rm;
@@ -123,10 +122,10 @@ public class Tps extends Workload {
         for (int ix = 0; ix < RECEIVERS; ix++) {
             long rm = receivers.get(ix).receivedMessages;
             receivedMessages += rm;
-            System.out.println(stringify("  Receiver %s Received Messages: %s", ix, format3(rm)));
+            System.out.println(stringify("  Receiver %s Received Messages:   %s", ix, format3(rm)));
         }
         System.out.println("  ----------------------------- --------");
-        System.out.println(stringify("  Total Received Messages:     %s", format3(receivedMessages)));
+        System.out.println(stringify("  Total Received Messages:      %s", format3(receivedMessages)));
 
         long expected = drained.getFirst();
         for (Long mid : drained) {
