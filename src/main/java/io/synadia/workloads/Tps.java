@@ -84,6 +84,17 @@ public class Tps extends Workload {
                 sleep(10);
             }
         }
+        scheduler.scheduleAtFixedRate(
+            () -> {
+                long receivedMessages = 0;
+                for (int ix = 0; ix < RECEIVERS; ix++) {
+                    long rm = receivers.get(ix).receivedMessages;
+                    receivedMessages += rm;
+                }
+                Debug.info(TPS_RECEIVER, "Received %s", receivedMessages);
+                },
+            1, 1, TimeUnit.SECONDS);
+
 
         Thread s = new Thread(() -> { try { send(); } catch (Exception ignored) {} });
         s.setName("S-main");
@@ -114,8 +125,8 @@ public class Tps extends Workload {
             receivedMessages += rm;
             System.out.println(stringify("  Receiver %s Received Messages: %s", ix, format3(rm)));
         }
-        System.out.println("  ------------------------------- -----");
-        System.out.println(stringify("  Total Received Messages:      %s", format3(receivedMessages)));
+        System.out.println("  ----------------------------- --------");
+        System.out.println(stringify("  Total Received Messages:     %s", format3(receivedMessages)));
 
         long expected = drained.getFirst();
         for (Long mid : drained) {
@@ -334,9 +345,6 @@ public class Tps extends Workload {
                 messageIds.add(extractMessageId(msg));
                 if (++r.receivedMessages == 1) {
                     Debug.info(label, "Started Receiving");
-                    scheduler.scheduleAtFixedRate(
-                        () -> {Debug.info(label, "Received %s", r.receivedMessages);},
-                        2, 2, TimeUnit.SECONDS);
                 }
             });
 
