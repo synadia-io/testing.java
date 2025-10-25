@@ -69,18 +69,19 @@ public class Tps extends Workload {
     public void runWorkload() throws Exception {
         scheduler = Executors.newScheduledThreadPool(1);
 
-        Thread r1 = new Thread(() -> { try { receive(1); } catch (Exception ignored) {} });
-        r1.setName("R1-main");
-        r1.start();
-        while (!receiverReady.get()) {
-            sleep(10);
+        List<Thread> threads = new ArrayList<>();
+        for (int ix = 0; ix < 4; ix++) {
+            int fix = ix;
+            Thread r = new Thread(() -> { try { receive(fix); } catch (Exception ignored) {} });
+            r.setName("R" + ix + "main");
+            r.start();
+            threads.add(r);
         }
-
-        Thread r2 = new Thread(() -> { try { receive(2); } catch (Exception ignored) {} });
-        r2.setName("R1-main");
-        r2.start();
-        while (!receiverReady.get()) {
-            sleep(10);
+        for (int ix = 0; ix < threads.size(); ix++) {
+            AtomicBoolean ready = receiversReady.get(ix);
+            while (!ready.get()) {
+                sleep(10);
+            }
         }
 
         Thread s = new Thread(() -> { try { send(); } catch (Exception ignored) {} });
@@ -88,8 +89,9 @@ public class Tps extends Workload {
         s.start();
 
         s.join();
-        r1.join();
-        r2.join();
+        for (Thread t : threads) {
+            t.join();
+        }
 
         scheduler.shutdown();
 
@@ -287,15 +289,18 @@ public class Tps extends Workload {
     long receivedLastMessageId = -1;
     TpsConnectionListener receiveCL;
     TpsErrorListener receiveEL;
-    AtomicBoolean receiverReady = new AtomicBoolean(false);
     LinkedBlockingQueue<Long> messageIds = new LinkedBlockingQueue<>();
+    List<AtomicBoolean> receiversReady = new ArrayList<>();
 
-    private void receive(int firstServerIx) throws IOException, InterruptedException {
-        String label = TPS_RECEIVER + "-" + firstServerIx;
+    private void receive(int ix) throws IOException, InterruptedException {
+        AtomicBoolean ready = new AtomicBoolean(false);
+        receiversReady.add(ready);
+        String label = TPS_RECEIVER + "-" + ix;
         receiveCL = new TpsConnectionListener(label, params.servers, true);
         receiveEL = new TpsErrorListener(label);
 
-        Options options = buildOptions(firstServerIx)
+        int s = ix % 2 == 0 ? 1 : 2;
+        Options options = buildOptions(s)
             .statisticsCollector(new NoOpStatistics())
             .connectionListener(receiveCL)
             .errorListener(receiveEL)
@@ -323,7 +328,7 @@ public class Tps extends Workload {
             });
 
             sleep(50);
-            receiverReady.set(true);
+            ready.set(true);
 
             Debug.info(label, "Waiting for Terminate Message");
             if (!latch.await(60, TimeUnit.SECONDS)) {
