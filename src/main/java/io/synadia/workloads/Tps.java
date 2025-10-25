@@ -131,7 +131,7 @@ public class Tps extends Workload {
         long expected = drained.getFirst();
         for (Long mid : drained) {
             if (mid != expected) {
-                System.out.println(stringify("  Received Gap Message: %s", format3(mid)));
+                System.out.println(stringify("\n  Received Gap Message: %s", format3(mid)));
                 System.out.println(stringify("  Expected Gap Message: %s", format3(expected)));
                 long diff = mid - expected;
                 System.out.println(stringify("  Gap: %s", diff));
