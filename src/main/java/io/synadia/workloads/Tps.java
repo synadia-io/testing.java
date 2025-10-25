@@ -93,7 +93,7 @@ public class Tps extends Workload {
                 }
                 Debug.info(TPS_RECEIVER, "Received %s", receivedMessages);
                 },
-            1, 1, TimeUnit.SECONDS);
+            2, 1, TimeUnit.SECONDS);
 
 
         Thread s = new Thread(() -> { try { send(); } catch (Exception ignored) {} });
