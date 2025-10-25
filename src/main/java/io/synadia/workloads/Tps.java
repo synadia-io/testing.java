@@ -301,8 +301,6 @@ public class Tps extends Workload {
             .errorListener(receiveEL)
             .build();
 
-        reportConnectionOptions(label, options);
-
         try (Connection nc = Nats.connect(options)) {
             Dispatcher d = nc.createDispatcher();
 
