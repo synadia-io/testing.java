@@ -74,6 +74,7 @@ public class Tps extends Workload {
         List<Thread> threads = new ArrayList<>();
         for (int ix = 0; ix < RECEIVERS; ix++) {
             int fix = ix;
+            receivers.add(new Receiver());
             Thread r = new Thread(() -> { try { receive(fix); } catch (Exception ignored) {} });
             r.setName("R" + ix + "main");
             r.start();
@@ -322,7 +323,7 @@ public class Tps extends Workload {
     List<Receiver> receivers = new ArrayList<>();
 
     private void receive(int ix) throws IOException, InterruptedException {
-        Receiver r = new Receiver();
+        Receiver r = receivers.get(ix);
         receivers.add(r);
 
         String label = TPS_RECEIVER + "-" + ix;
