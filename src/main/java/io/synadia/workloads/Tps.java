@@ -38,12 +38,12 @@ public class Tps extends Workload {
     private static final String TEST_SUBJECT = "test";
     private static final String TERMINATE_SUBJECT = "term";
     private static final String TEST_QUEUE = "q";
-    private static final int RECEIVERS = 4;
 
     // Common
     String action;
     int targetTps;
     int payloadSize;
+    int numReceivers = 4;
     ScheduledExecutorService scheduler;
 
     @Override
@@ -58,7 +58,9 @@ public class Tps extends Workload {
         this.action = commandLine.action;
 
         targetTps = readInteger(params.jv, "target.tps", 10000);
-        payloadSize = readInteger(params.jv, "payload.size", 12 * 1024);
+        payloadSize = commandLine.getIntArg("p", readInteger(params.jv, "payload.size", 12 * 1024));
+        numReceivers = commandLine.getIntArg("r", readInteger(params.jv, "num.receivers", 2));
+
         if (commandLine.args.size() == 1) {
             payloadSize = Integer.parseInt(commandLine.args.getFirst());
         }
@@ -70,19 +72,19 @@ public class Tps extends Workload {
     @Override
     public void runWorkload() throws Exception {
         scheduler = Executors.newScheduledThreadPool(1);
-        for (int ix = 0; ix < RECEIVERS; ix++) {
+        for (int ix = 0; ix < numReceivers; ix++) {
             receivers.add(new Receiver());
         }
 
         List<Thread> threads = new ArrayList<>();
-        for (int ix = 0; ix < RECEIVERS; ix++) {
+        for (int ix = 0; ix < numReceivers; ix++) {
             int fix = ix;
             Thread r = new Thread(() -> { try { receive(fix); } catch (Exception ignored) {} });
             r.setName("R" + ix + "main");
             r.start();
             threads.add(r);
         }
-        for (int ix = 0; ix < RECEIVERS; ix++) {
+        for (int ix = 0; ix < numReceivers; ix++) {
             AtomicBoolean ready = receivers.get(ix).ready;
             while (!ready.get()) {
                 sleep(10);
@@ -91,7 +93,7 @@ public class Tps extends Workload {
         scheduler.scheduleAtFixedRate(
             () -> {
                 long receivedMessages = 0;
-                for (int ix = 0; ix < RECEIVERS; ix++) {
+                for (int ix = 0; ix < numReceivers; ix++) {
                     long rm = receivers.get(ix).receivedMessages;
                     receivedMessages += rm;
                 }
@@ -123,7 +125,7 @@ public class Tps extends Workload {
         // ----------------------------------------------------------------------------------------------------
         System.out.println("\n" + TPS_RECEIVER);
         long receivedMessages = 0;
-        for (int ix = 0; ix < RECEIVERS; ix++) {
+        for (int ix = 0; ix < numReceivers; ix++) {
             long rm = receivers.get(ix).receivedMessages;
             receivedMessages += rm;
             System.out.println(stringify("  Receiver %s Received Messages:  %s", ix, format3Right(rm, 7)));

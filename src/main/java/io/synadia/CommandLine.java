@@ -84,6 +84,25 @@ public class CommandLine {
         return b.toJsonValue();
     }
 
+    public String getArg(String key) {
+        String query = key + "=";
+        for (String arg : args) {
+            if (arg.startsWith(query)) {
+                int at = arg.indexOf('=');
+                if (at == -1 || (at + 1 == arg.length())) {
+                    return arg;
+                }
+                return arg.substring(at + 1);
+            }
+        }
+        return null;
+    }
+
+    public int getIntArg(String key, int dflt) {
+        String val = getArg(key);
+        return val == null ? dflt : Integer.parseInt(val);
+    }
+
     public void debug() {
         if (id != null) {
             Debug.info(COMMAND_LINE, "id", id);
