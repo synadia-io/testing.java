@@ -70,11 +70,13 @@ public class Tps extends Workload {
     @Override
     public void runWorkload() throws Exception {
         scheduler = Executors.newScheduledThreadPool(1);
+        for (int ix = 0; ix < RECEIVERS; ix++) {
+            receivers.add(new Receiver());
+        }
 
         List<Thread> threads = new ArrayList<>();
         for (int ix = 0; ix < RECEIVERS; ix++) {
             int fix = ix;
-            receivers.add(new Receiver());
             Thread r = new Thread(() -> { try { receive(fix); } catch (Exception ignored) {} });
             r.setName("R" + ix + "main");
             r.start();
