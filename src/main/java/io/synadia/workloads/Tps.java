@@ -336,7 +336,7 @@ public class Tps extends Workload {
                     Debug.info(label, "Started Receiving");
                     scheduler.scheduleAtFixedRate(
                         () -> {Debug.info(label, "Received %s", r.receivedMessages);},
-                        1, 1, TimeUnit.SECONDS);
+                        2, 2, TimeUnit.SECONDS);
                 }
             });
 
