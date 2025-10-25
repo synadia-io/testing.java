@@ -123,10 +123,10 @@ public class Tps extends Workload {
         for (int ix = 0; ix < RECEIVERS; ix++) {
             long rm = receivers.get(ix).receivedMessages;
             receivedMessages += rm;
-            System.out.println(stringify("  Receiver %s Received Messages: %s", ix, format3Right(rm, 7)));
+            System.out.println(stringify("  Receiver %s Received Messages:  %s", ix, format3Right(rm, 7)));
         }
-        System.out.println("  ------------------------------ -------");
-        System.out.println(stringify("  Total Received Messages:       %s", format3Right(receivedMessages, 7)));
+                      System.out.println("  ------------------------------ -------");
+            System.out.println(stringify("  Total Received Messages:       %s", format3Right(receivedMessages, 7)));
 
         long expected = drained.getFirst();
         for (Long mid : drained) {
