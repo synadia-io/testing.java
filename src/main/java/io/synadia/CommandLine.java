@@ -20,6 +20,8 @@ import io.synadia.utils.Debug;
 import java.util.ArrayList;
 import java.util.List;
 
+import static io.nats.jsmulti.shared.Utils.parseInt;
+
 public class CommandLine {
 
     private static final String COMMAND_LINE = "Command Line";
@@ -100,7 +102,7 @@ public class CommandLine {
 
     public int getIntArg(String key, int dflt) {
         String val = getArg(key);
-        return val == null ? dflt : Integer.parseInt(val);
+        return val == null ? dflt : parseInt(val);
     }
 
     public void debug() {
