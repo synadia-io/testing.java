@@ -78,7 +78,14 @@ public class Tps extends Workload {
             payloadSize = Integer.parseInt(commandLine.args.getFirst());
         }
 
-        reportApplicationOptions();
+        Debug.info(workLabel, "----- Application Options -----");
+        Debug.info(workLabel, "Servers", params.servers.toArray(new String[0]));
+        Debug.info(workLabel, "Target TPS", targetTps);
+        Debug.info(workLabel, "Payload Size", payloadSize);
+        Debug.info(workLabel, "Num Receivers", numReceivers);
+        Debug.info(workLabel, "Send Buffer Size", sendBufferSize);
+        Debug.info(workLabel, "Send Outgoing Queue Max", mmioq);
+
         reportSocketBufferSize();
     }
 
@@ -226,8 +233,6 @@ public class Tps extends Workload {
             .connectionListener(sendCL)
             .errorListener(sendEL)
             .build();
-
-        reportConnectionOptions(TPS_SENDER, options);
 
         try (Connection nc = Nats.connect(options)) {
             byte[] payload = new byte[payloadSize];
@@ -406,33 +411,8 @@ public class Tps extends Workload {
             Debug.info(workLabel, "Send Buffer %s bytes", socket.getSendBufferSize());
             socket.close();
         }
-        catch (IOException ignore) {}
-    }
-
-    private void reportApplicationOptions() {
-        Debug.info(workLabel, "----- Application Options -----");
-        Debug.info(workLabel, "targetTps", targetTps);
-        Debug.info(workLabel, "subject", TEST_SUBJECT);
-        Debug.info(workLabel, "messageIdKey", MESSAGE_ID_KEY);
-        Debug.info(workLabel, "payloadSize", payloadSize);
-    }
-
-    private void reportConnectionOptions(String label, Options o) {
-        Debug.info(label, "----- Connection Options -----");
-        Debug.info(label, "servers", o.getServers());
-        Debug.info(label, "connectionTimeout", o.getConnectionTimeout());
-        Debug.info(label, "maxReconnects", o.getMaxReconnect());
-        Debug.info(label, "reconnectBufferSize", o.getReconnectBufferSize());
-        Debug.info(label, "bufferSize", o.getBufferSize());
-        Debug.info(label, "maxMessagesInOutgoingQueue", o.getMaxMessagesInOutgoingQueue());
-        Debug.info(label, "receiveBufferSize", o.getReceiveBufferSize());
-        Debug.info(label, "sendBufferSize", o.getSendBufferSize());
-        Debug.info(label, "reconnectWait", o.getReconnectWait());
-        Debug.info(label, "pingInterval", o.getPingInterval());
-        Debug.info(label, "maxPingsOut", o.getMaxPingsOut());
-        Debug.info(label, "socketWriteTimeout", o.getSocketWriteTimeout());
-        if (o.getSocketReadTimeoutMillis() > 0) {
-            Debug.info(label, "socketReadTimeoutMillis", o.getSocketReadTimeoutMillis());
+        catch (IOException ioe) {
+            Debug.info(workLabel, "Exception Reporting Socket Buffer Size", ioe);
         }
     }
 }
