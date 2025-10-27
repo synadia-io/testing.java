@@ -149,11 +149,9 @@ public class CommandLine {
                         case "--arg":
                             if (++ix < args.length) {
                                 if (args[ix].equals("--arg")) {
-                                    ix = args.length; // stops the loop because we encountered --arg --arg
+                                    break;
                                 }
-                                else {
-                                    _args.add(asString(args[ix]));
-                                }
+                                _args.add(asString(args[ix]));
                             }
                             break;
                         case "":

@@ -1,1 +1,1 @@
-java -cp "build/libs/*" io.synadia.Runner --workload Tps --params params<PathSep>params.json --params params<PathSep>tps.json --arg <Arg>1 --arg <Arg>2 --arg <Arg>2 --arg <Arg>3 --arg <Arg>4
+java -cp "build/libs/*" io.synadia.Runner --workload Tps --params params<PathSep>params.json --params params<PathSep>tps.json --arg <Arg>1 --arg <Arg>2 --arg <Arg>3 --arg <Arg>4
