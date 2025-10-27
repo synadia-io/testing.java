@@ -74,10 +74,6 @@ public class Tps extends Workload {
         sendBufferSize = commandLine.getIntArg("b", readInteger(params.jv, "nats.connection.send.buffer", -1));
         mmioq = Math.max(targetTps, Options.DEFAULT_MAX_MESSAGES_IN_OUTGOING_QUEUE);
 
-        if (commandLine.args.size() == 1) {
-            payloadSize = Integer.parseInt(commandLine.args.getFirst());
-        }
-
         Debug.info(workLabel, "----- Application Options -----");
         Debug.info(workLabel, "Servers", params.servers.toArray(new String[0]));
         Debug.info(workLabel, "Target TPS", targetTps);

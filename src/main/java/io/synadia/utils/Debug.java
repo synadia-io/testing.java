@@ -61,47 +61,44 @@ public abstract class Debug {
         info(label, msg, true, extras, false);
     }
 
-    public static void stackTrace(String label) {
+    public static void stackTrace(String label, Object... extras) {
         if (PAUSE) { return; }
         try {
             throw new Exception();
         }
         catch (Exception e) {
-            stackTrace(label, e);
+            stackTrace(label, e, extras);
         }
     }
 
-    public static void stackTrace(String label, Throwable t) {
+    public static Object[] grow(String insert, Object[] original) {
+        Object[] result = new Object[original.length + 1];
+        result[0] = insert;
+        System.arraycopy(original, 0, result, 1, original.length);
+        return result;
+    }
+
+    public static void stackTrace(String label, Throwable t, Object... extras) {
         if (PAUSE) { return; }
         String m = t.getMessage();
         if (m == null) {
-            info(label, "Stack Trace");
+            info(label, grow("Stack Trace", extras));
         }
         else {
-            info(label, "Stack Trace", t.getMessage());
+            info(label, grow(t.getMessage(), extras));
         }
-        boolean compress = false;
         StackTraceElement[] elements = t.getStackTrace();
         for (int i = 0; i < elements.length; i++) {
             String ts = elements[i].toString();
+            if (ts.startsWith("io.synadia.utils.Debug.stackTrace")) {
+                continue;
+            }
             if (i > 0) {
-                if (ts.startsWith("io.nats")) {
-                    if (compress) {
-                        info(label, ">  ...");
-                    }
-                    info(label, ">  " + ts);
-                    compress = false;
-                }
-                else {
-                    compress = true;
+                if (ts.startsWith("java")) {
+                    break;
                 }
             }
-            if (ts.startsWith("java")) {
-                break;
-            }
-        }
-        if (compress) {
-            info(label, ">  ...");
+            info(label, ">  " + ts);
         }
     }
 

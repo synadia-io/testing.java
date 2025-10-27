@@ -16,8 +16,7 @@ public class Runner {
             System.exit(0);
         }
         catch (Exception e) {
-            Debug.stackTrace("RUNNER " + commandLine.workload + " [" + className + "]", e);
-            e.printStackTrace();
+            Debug.stackTrace("RUNNER", e, commandLine.workload + " [" + className + "]");
             System.exit(-1);
         }
     }
