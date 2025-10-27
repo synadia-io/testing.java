@@ -7,7 +7,6 @@ import io.nats.client.Options;
 import io.nats.client.impl.Headers;
 import io.nats.client.impl.NoOpStatistics;
 import io.nats.client.impl.TpsWriteListener;
-import io.nats.client.support.JsonValue;
 import io.synadia.CommandLine;
 import io.synadia.Params;
 import io.synadia.Workload;
@@ -18,14 +17,13 @@ import io.synadia.workloads.tps.TpsStatsCollector;
 
 import java.io.IOException;
 import java.net.Socket;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static io.nats.client.support.JsonValueUtils.*;
+import static io.nats.client.support.JsonValueUtils.readInteger;
 import static io.nats.jsmulti.shared.Stats.format3;
 import static io.nats.jsmulti.shared.Stats.format3Right;
 import static io.synadia.utils.Debug.stringify;
@@ -33,18 +31,33 @@ import static io.synadia.workloads.tps.TpsUtils.*;
 
 public class Tps extends Workload {
 
+    // Labels
     private static final String TPS_SENDER = "SENDER";
     private static final String TPS_RECEIVER = "RECEIVER";
+
+    // Run values
     private static final String TEST_SUBJECT = "test";
     private static final String TERMINATE_SUBJECT = "term";
     private static final String TEST_QUEUE = "q";
 
-    // Common
-    String action;
+    // argument defaults
+    private static final int DEFAULT_TPS = 10_000;
+    private static final int DEFAULT_PAYLOAD = 12 * 1024;
+    private static final int CONNECTION_TIMEOUT_MILLIS = 5000;
+
+    // arguments
     int targetTps;
     int payloadSize;
-    int numReceivers = 4;
-    ScheduledExecutorService scheduler;
+    int numReceivers = 1;
+    int sendBufferSize = 1;
+    int mmioq;
+
+    // common
+    final ScheduledExecutorService scheduler;
+
+    public Tps() {
+        scheduler = Executors.newScheduledThreadPool(1);
+    }
 
     @Override
     public void init(CommandLine commandLine) {
@@ -55,11 +68,11 @@ public class Tps extends Workload {
         Debug.info("Environment", "JNats %s", Nats.CLIENT_VERSION);
         commandLine.debug();
 
-        this.action = commandLine.action;
-
-        targetTps = readInteger(params.jv, "target.tps", 10000);
-        payloadSize = commandLine.getIntArg("p", readInteger(params.jv, "payload.size", 12 * 1024));
-        numReceivers = commandLine.getIntArg("r", readInteger(params.jv, "num.receivers", 2));
+        targetTps = commandLine.getIntArg("t", readInteger(params.jv, "target.tps", DEFAULT_TPS));
+        payloadSize = commandLine.getIntArg("p", readInteger(params.jv, "payload.size", DEFAULT_PAYLOAD));
+        numReceivers = commandLine.getIntArg("r", readInteger(params.jv, "num.receivers", 1));
+        sendBufferSize = commandLine.getIntArg("b", readInteger(params.jv, "nats.connection.send.buffer", -1));
+        mmioq = Math.max(targetTps, Options.DEFAULT_MAX_MESSAGES_IN_OUTGOING_QUEUE);
 
         if (commandLine.args.size() == 1) {
             payloadSize = Integer.parseInt(commandLine.args.getFirst());
@@ -71,16 +84,15 @@ public class Tps extends Workload {
 
     @Override
     public void runWorkload() throws Exception {
-        scheduler = Executors.newScheduledThreadPool(1);
         for (int ix = 0; ix < numReceivers; ix++) {
             receivers.add(new Receiver());
         }
 
         List<Thread> threads = new ArrayList<>();
         for (int ix = 0; ix < numReceivers; ix++) {
-            int fix = ix;
-            Thread r = new Thread(() -> { try { receive(fix); } catch (Exception ignored) {} });
-            r.setName("R" + ix + "main");
+            int finalIx = ix;
+            Thread r = new Thread(() -> { try { receive(finalIx); } catch (Exception ignored) {} });
+            r.setName("R-" + ix + "-main");
             r.start();
             threads.add(r);
         }
@@ -90,6 +102,7 @@ public class Tps extends Workload {
                 sleep(10);
             }
         }
+
         scheduler.scheduleAtFixedRate(
             () -> {
                 long receivedMessages = 0;
@@ -97,8 +110,8 @@ public class Tps extends Workload {
                     long rm = receivers.get(ix).receivedMessages;
                     receivedMessages += rm;
                 }
-                Debug.info(TPS_RECEIVER, "Received %s", receivedMessages);
-                },
+                Debug.info(TPS_RECEIVER, "Total Received Messages: %s", receivedMessages);
+            },
             1, 1, TimeUnit.SECONDS);
 
         Thread s = new Thread(() -> { try { send(); } catch (Exception ignored) {} });
@@ -130,8 +143,8 @@ public class Tps extends Workload {
             receivedMessages += rm;
             System.out.println(stringify("  Receiver %s Received Messages:  %s", ix, format3Right(rm, 7)));
         }
-                      System.out.println("  ------------------------------ -------");
-            System.out.println(stringify("  Total Received Messages:       %s", format3Right(receivedMessages, 7)));
+        System.out.println("  ------------------------------ -------");
+        System.out.println(stringify("  Total Received Messages:       %s", format3Right(receivedMessages, 7)));
 
         long expected = drained.getFirst();
         for (Long mid : drained) {
@@ -167,10 +180,7 @@ public class Tps extends Workload {
         printSendResult("Buffered Not Written Messages", sendStats.pay.notWrittenMessages);
         printSendResult("Buffered Not Written Bytes   ", sendStats.pay.notWrittenBytes);
 
-        if (sendWL.gapList.isEmpty()) {
-            System.out.println("  No Writer Gaps");
-        }
-        else {
+        if (!sendWL.gapList.isEmpty()) {
             System.out.println("  Writer Gaps");
             for (String g : sendWL.gapList) {
                 System.out.println(" " + g);
@@ -204,7 +214,13 @@ public class Tps extends Workload {
         sendCL = new TpsConnectionListener(TPS_SENDER, params.servers, false);
         sendEL = new TpsErrorListener(TPS_SENDER);
 
-        Options options = buildOptions(0)
+        Options options  = new Options.Builder()
+            .servers(figureServers(params.servers, 0))
+            .ignoreDiscoveredServers()
+            .noRandomize()
+            .connectionTimeout(CONNECTION_TIMEOUT_MILLIS)
+            .sendBufferSize(sendBufferSize)
+            .maxMessagesInOutgoingQueue(mmioq)
             .writeListener(sendWL)
             .statisticsCollector(sendStats)
             .connectionListener(sendCL)
@@ -331,8 +347,13 @@ public class Tps extends Workload {
         r.receiveCL = new TpsConnectionListener(label, params.servers, true);
         r.receiveEL = new TpsErrorListener(label);
 
-        int s = ix % 2 == 0 ? 1 : 2;
-        Options options = buildOptions(s)
+        int sIx = ix % 2 == 0 ? 1 : 2;
+
+        Options options  = new Options.Builder()
+            .servers(figureServers(params.servers, sIx))
+            .ignoreDiscoveredServers()
+            .noRandomize()
+            .connectionTimeout(CONNECTION_TIMEOUT_MILLIS)
             .statisticsCollector(new NoOpStatistics())
             .connectionListener(r.receiveCL)
             .errorListener(r.receiveEL)
@@ -367,59 +388,6 @@ public class Tps extends Workload {
     // ----------------------------------------------------------------------------------------------------
     // Helpers
     // ----------------------------------------------------------------------------------------------------
-    private Options.Builder buildOptions(int firstServerIx) {
-        JsonValue jv = params.jv;
-
-        String[] servers = figureServers(params.servers, firstServerIx);
-
-        int mmiq = Math.max(targetTps, readInteger(jv, "nats.connection.outgoing.max.messages", Options.DEFAULT_MAX_MESSAGES_IN_OUTGOING_QUEUE));
-
-        Options.Builder builder  = new Options.Builder()
-            .servers(servers)
-            .ignoreDiscoveredServers()
-            .noRandomize()
-            .connectionTimeout(readLong(jv, "nats.connection.timeout.millis", 5000))
-            .maxReconnects(readInteger(jv, "nats.max.reconnects", -1))
-            .reconnectBufferSize(readLong(jv, "nats.connection.max.buffer", 500000000))
-            .bufferSize(readInteger(jv, "nats.connection.io.buffer", Options.DEFAULT_BUFFER_SIZE))
-            .maxMessagesInOutgoingQueue(mmiq);
-
-        // Conditionally set receive buffer size based on separate flag
-        boolean receiveBufferEnabled = readBoolean(jv, "nats.receive.buffer.enabled", false);
-        if (receiveBufferEnabled) {
-            builder.receiveBufferSize(readInteger(jv, "nats.connection.receive.buffer", 87380));
-        }
-
-        // Conditionally set send buffer size based on separate flag
-        boolean sendBufferEnabled = readBoolean(jv, "nats.send.buffer.enabled", false);
-        if (sendBufferEnabled) {
-            builder.sendBufferSize(readInteger(jv, "nats.connection.send.buffer", 16384));
-        }
-
-        long millis = readLong(jv, "nats.reconnect.wait.millis", -1);
-        if (millis > 0) {
-            builder.reconnectWait(Duration.ofMillis(millis));
-        }
-        millis = readLong(jv, "nats.ping.interval.millis", -1);
-        if (millis > 0) {
-            builder.pingInterval(Duration.ofMillis(millis));
-        }
-
-        builder.maxPingsOut(readInteger(jv, "nats.connection.max.ping.out", 2));
-
-        millis = readLong(jv, "nats.socket.write.timeout.millis", -1);
-        if (millis > 0) {
-            builder.socketWriteTimeout(millis);
-        }
-
-        millis = readLong(jv, "nats.socket.read.timeout.millis", -1);
-        if (millis > 0) {
-            builder.socketReadTimeoutMillis((int)millis);
-        }
-
-        return builder;
-    }
-
     private static String[] figureServers(List<String> paramsServers, int firstServerIx) {
         if (firstServerIx == 0) {
             return paramsServers.toArray(new String[0]);
