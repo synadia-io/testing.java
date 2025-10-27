@@ -35,9 +35,6 @@ public class TpsStatsCollector extends NoOpStatistics {
     public final Group pay2;
     public final Group non2;
 
-    public long lastWriteMessages;
-    public long lastWriteBytes;
-
     public final int payloadSize;
     public final AtomicInteger phase;
 
@@ -46,8 +43,6 @@ public class TpsStatsCollector extends NoOpStatistics {
         non = new Group();
         pay2 = new Group();
         non2 = new Group();
-        lastWriteMessages = 0;
-        lastWriteBytes = 0;
         this.payloadSize = payloadSize;
         phase = new AtomicInteger(1);
     }
@@ -99,12 +94,6 @@ public class TpsStatsCollector extends NoOpStatistics {
                 case 1:
                     gPay = pay;
                     gNon = non;
-                    long notWrittenBytes = gPay.notWrittenBytes + gNon.notWrittenBytes;
-                    if (notWrittenBytes > 0 && notWrittenBytes != bytes) {
-                        Debug.info("STATS", "MISMATCH %s vs %s", notWrittenBytes, bytes);
-                    }
-                    lastWriteMessages = gPay.notWrittenMessages + gNon.notWrittenMessages;
-                    lastWriteBytes = bytes;
                     break;
                 case 2:
                     gPay = pay2;

@@ -164,9 +164,6 @@ public class Tps extends Workload {
         System.out.println("\nETC");
         printSendResult("Protocol Messages Buffered", sendWL.protocolsBuffered.get());
         printSendResult("Control Messages Buffered", sendWL.controlsBuffered.get());
-        printSendResult("Last Write Messages", sendStats.lastWriteMessages);
-        printSendResult("Last Write Bytes   ", sendStats.lastWriteBytes);
-
         printSendResult("Buffered Not Written Messages", sendStats.pay.notWrittenMessages);
         printSendResult("Buffered Not Written Bytes   ", sendStats.pay.notWrittenBytes);
 
