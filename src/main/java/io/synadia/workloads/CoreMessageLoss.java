@@ -123,7 +123,7 @@ public class CoreMessageLoss extends Workload {
                 Debug.info(TPS_RECEIVER, "Total Received Messages: %s", receivedMessages);
                 if (System.currentTimeMillis() - lastReceive.get() > WAIT_FOR_MESSAGES) {
                     Debug.info(TPS_RECEIVER, "RECEIVER TIMEOUT: %s", System.currentTimeMillis() - lastReceive.get());
-                    for (AtomicBoolean l : latches) {
+                    for (AtomicBoolean l : shouldEnds) {
                         l.set(true);
                     }
                 }
@@ -302,7 +302,8 @@ public class CoreMessageLoss extends Workload {
             Debug.info(TPS_SENDER, "Publishing Control Terminate Message");
             nc.publish(TERMINATE_SUBJECT, null);
 
-            waitForPending(nc);
+            sleep(2000); // gives enough time for messages to get published
+            Debug.info(TPS_SENDER, "Done");
         }
     }
 
@@ -340,14 +341,14 @@ public class CoreMessageLoss extends Workload {
     AtomicLong lastReceive = new AtomicLong(System.currentTimeMillis());
     LinkedBlockingQueue<Long> messageIds = new LinkedBlockingQueue<>();
     List<Receiver> receivers = new ArrayList<>();
-    List<AtomicBoolean> latches = new ArrayList<>();
+    List<AtomicBoolean> shouldEnds = new ArrayList<>();
 
     private void receive(int rx) {
         Receiver r = receivers.get(rx);
         receivers.add(r);
 
-        AtomicBoolean latch = new AtomicBoolean(false);
-        latches.add(latch);
+        AtomicBoolean shouldEnd = new AtomicBoolean(false);
+        shouldEnds.add(shouldEnd);
 
         String label = TPS_RECEIVER + "-" + rx;
         r.receiveCL = new CmlConnectionListener(label, params.servers, true);
@@ -378,13 +379,13 @@ public class CoreMessageLoss extends Workload {
 
             d.subscribe(TERMINATE_SUBJECT, msg -> {
                 Debug.info(label, "Received Control - Terminate Message.");
-                latch.set(true);
+                shouldEnd.set(true);
             });
 
             sleep(50);
             r.ready.set(true);
 
-            while (!latch.get()) {
+            while (!shouldEnd.get()) {
                 sleep(200);
             }
         }
