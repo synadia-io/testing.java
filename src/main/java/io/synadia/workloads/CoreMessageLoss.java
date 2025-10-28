@@ -395,7 +395,7 @@ public class CoreMessageLoss extends Workload {
             sleep(50);
             r.ready.set(true);
 
-            long wait = 10000;
+            long wait = 30000;
             while (wait > 0) {
                 sleep(100);
                 if (r.done.get()) {
