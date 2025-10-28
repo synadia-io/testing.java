@@ -117,7 +117,7 @@ public class CoreMessageLoss extends Workload {
                     long rm = receivers.get(ix).receivedMessages;
                     receivedMessages += rm;
                 }
-                Debug.info(TPS_RECEIVER, "Total Received Messages: %s", receivedMessages);
+                Debug.info(TPS_RECEIVER, "Total Received Messages: %s", receivedMessages, System.currentTimeMillis() - lastReceive.get());
                 if (System.currentTimeMillis() - lastReceive.get() > WAIT_FOR_MESSAGES) {
                     for (CountDownLatch l : latches) {
                         l.countDown();
