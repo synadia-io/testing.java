@@ -123,8 +123,8 @@ public class CoreMessageLoss extends Workload {
                 Debug.info(TPS_RECEIVER, "Total Received Messages: %s", receivedMessages);
                 if (System.currentTimeMillis() - lastReceive.get() > WAIT_FOR_MESSAGES) {
                     Debug.info(TPS_RECEIVER, "RECEIVER TIMEOUT: %s", System.currentTimeMillis() - lastReceive.get());
-                    for (AtomicBoolean l : shouldEnds) {
-                        l.set(true);
+                    for (Receiver r : receivers) {
+                        r.done.set(true);
                     }
                 }
             },
@@ -342,20 +342,17 @@ public class CoreMessageLoss extends Workload {
         CmlConnectionListener receiveCL;
         CmlErrorListener receiveEL;
         AtomicBoolean ready = new AtomicBoolean(false);
+        AtomicBoolean done = new AtomicBoolean(false);
     }
 
     AtomicLong highestMessageId = new AtomicLong(0);
     AtomicLong lastReceive = new AtomicLong(System.currentTimeMillis());
     LinkedBlockingQueue<Long> messageIds = new LinkedBlockingQueue<>();
     List<Receiver> receivers = new ArrayList<>();
-    List<AtomicBoolean> shouldEnds = new ArrayList<>();
 
     private void receive(int rx) {
         Receiver r = receivers.get(rx);
         receivers.add(r);
-
-        AtomicBoolean shouldEnd = new AtomicBoolean(false);
-        shouldEnds.add(shouldEnd);
 
         String label = TPS_RECEIVER + "-" + rx;
         r.receiveCL = new CmlConnectionListener(label, params.servers, true);
@@ -386,13 +383,13 @@ public class CoreMessageLoss extends Workload {
 
             d.subscribe(TERMINATE_SUBJECT, msg -> {
                 Debug.info(label, "Received Control - Terminate Message.");
-                shouldEnd.set(true);
+                r.done.set(true);
             });
 
             sleep(50);
             r.ready.set(true);
 
-            while (!shouldEnd.get()) {
+            while (!r.done.get()) {
                 sleep(200);
             }
         }
