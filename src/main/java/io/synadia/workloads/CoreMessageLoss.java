@@ -18,7 +18,10 @@ import java.io.IOException;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -98,7 +101,7 @@ public class CoreMessageLoss extends Workload {
         List<Thread> threads = new ArrayList<>();
         for (int rx = 0; rx < numReceivers; rx++) {
             int finalRx = rx;
-            Thread r = new Thread(() -> { try { receive(finalRx); } catch (Exception ignored) {} });
+            Thread r = new Thread(() -> receive(finalRx));
             r.setName("R-" + rx + "-main");
             r.start();
             threads.add(r);
@@ -117,10 +120,11 @@ public class CoreMessageLoss extends Workload {
                     long rm = receivers.get(ix).receivedMessages;
                     receivedMessages += rm;
                 }
-                Debug.info(TPS_RECEIVER, "Total Received Messages: %s", receivedMessages, System.currentTimeMillis() - lastReceive.get());
+                Debug.info(TPS_RECEIVER, "Total Received Messages: %s", receivedMessages);
                 if (System.currentTimeMillis() - lastReceive.get() > WAIT_FOR_MESSAGES) {
-                    for (CountDownLatch l : latches) {
-                        l.countDown();
+                    Debug.info(TPS_RECEIVER, "Total Received Messages: %s", receivedMessages, System.currentTimeMillis() - lastReceive.get());
+                    for (AtomicBoolean l : latches) {
+                        l.set(true);
                     }
                 }
             },
@@ -335,20 +339,18 @@ public class CoreMessageLoss extends Workload {
     AtomicLong lastReceive = new AtomicLong(System.currentTimeMillis());
     LinkedBlockingQueue<Long> messageIds = new LinkedBlockingQueue<>();
     List<Receiver> receivers = new ArrayList<>();
-    List<CountDownLatch> latches = new ArrayList<>();
+    List<AtomicBoolean> latches = new ArrayList<>();
 
-    private void receive(int rx) throws IOException, InterruptedException {
+    private void receive(int rx) {
         Receiver r = receivers.get(rx);
         receivers.add(r);
 
-        CountDownLatch latch = new CountDownLatch(1);
+        AtomicBoolean latch = new AtomicBoolean(false);
         latches.add(latch);
 
         String label = TPS_RECEIVER + "-" + rx;
         r.receiveCL = new CmlConnectionListener(label, params.servers, true);
         r.receiveEL = new CmlErrorListener(label);
-
-        int sIx = rx % 2 == 0 ? 1 : 2;
 
         Options options  = new Options.Builder()
             .server(params.servers.get(rx % 2 == 0 ? 2 : 1))
@@ -375,15 +377,22 @@ public class CoreMessageLoss extends Workload {
 
             d.subscribe(TERMINATE_SUBJECT, msg -> {
                 Debug.info(label, "Received Control - Terminate Message.");
-                latch.countDown();
+                latch.set(true);
             });
 
             sleep(50);
             r.ready.set(true);
 
-            if (!latch.await(60, TimeUnit.SECONDS)) {
-                Debug.info(label, "!!!!! Terminate Message NOT Received");
+            while (!latch.get()) {
+                sleep(200);
             }
+        }
+        catch (InterruptedException e) {
+            Debug.info(label, e);
+            Thread.currentThread().interrupt();
+        }
+        catch (IOException e) {
+            Debug.stackTrace(label, e);
         }
     }
 
