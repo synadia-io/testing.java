@@ -38,6 +38,7 @@ public class CoreMessageLoss extends Workload {
     private static final String TEST_SUBJECT = "test";
     private static final String TERMINATE_SUBJECT = "term";
     private static final String TEST_QUEUE = "q";
+    private static final long WAIT_FOR_MESSAGES = 5000;
 
     // argument defaults
     private static final int DEFAULT_TPS = 10_000;
@@ -117,7 +118,7 @@ public class CoreMessageLoss extends Workload {
                     receivedMessages += rm;
                 }
                 Debug.info(TPS_RECEIVER, "Total Received Messages: %s", receivedMessages);
-                if (System.currentTimeMillis() - lastReceive.get() > 5000) {
+                if (System.currentTimeMillis() - lastReceive.get() > WAIT_FOR_MESSAGES) {
                     for (CountDownLatch l : latches) {
                         l.countDown();
                     }
