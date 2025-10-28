@@ -302,15 +302,30 @@ public class CoreMessageLoss extends Workload {
             Debug.info(TPS_SENDER, "Publishing Control Terminate Message");
             nc.publish(TERMINATE_SUBJECT, null);
 
-            int sleeps = 1;
-            while (sendStats.getTotalPayloadBufferedMessages() < pubId.get()) {
-                if (--sleeps == 0) {
-                    sleeps = 10;
-                    Debug.info(TPS_SENDER, "Payload Buffered Messages So Far: " + sendStats.getTotalPayloadBufferedMessages());
-                }
+            wait(10,
+                () -> sendStats.getTotalPayloadBufferedMessages() < pubId.get(),
+                () -> Debug.info(TPS_SENDER, "Payload Buffered Messages So Far: " + sendStats.getTotalPayloadBufferedMessages())
+            );
+            Debug.info(TPS_SENDER, "Done");
+        }
+    }
+
+    interface Test {
+        boolean test();
+    }
+
+    private static void wait(int max, Test test, Runnable messager) {
+        int m = max + 1;
+        int sleeps = 1;
+        while (m > 0 && !test.test()) {
+            if (--sleeps == 0) {
+                sleeps = 10;
+                m--;
+                messager.run();
+            }
+            if (m > 0) {
                 sleep(100);
             }
-            Debug.info(TPS_SENDER, "Done");
         }
     }
 
@@ -389,9 +404,11 @@ public class CoreMessageLoss extends Workload {
             sleep(50);
             r.ready.set(true);
 
-            while (!r.done.get()) {
-                sleep(200);
-            }
+            wait(10,
+                () -> !r.done.get(),
+                () -> Debug.info(label, "Waiting...")
+            );
+            Debug.info(label, "Done");
         }
         catch (InterruptedException e) {
             Debug.info(label, e);
