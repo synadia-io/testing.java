@@ -122,7 +122,7 @@ public class CoreMessageLoss extends Workload {
                 }
                 Debug.info(TPS_RECEIVER, "Total Received Messages: %s", receivedMessages);
                 if (System.currentTimeMillis() - lastReceive.get() > WAIT_FOR_MESSAGES) {
-                    Debug.info(TPS_RECEIVER, "Total Received Messages: %s", receivedMessages, System.currentTimeMillis() - lastReceive.get());
+                    Debug.info(TPS_RECEIVER, "RECEIVER TIMEOUT: %s", System.currentTimeMillis() - lastReceive.get());
                     for (AtomicBoolean l : latches) {
                         l.set(true);
                     }
@@ -145,13 +145,18 @@ public class CoreMessageLoss extends Workload {
 
         sleep(100); // give callbacks time to finish
 
+        reportReceivers();
+        reportSender();
+    }
+
+    private void reportReceivers() {
+        // ----------------------------------------------------------------------------------------------------
+        // Report Receivers
+        // ----------------------------------------------------------------------------------------------------
         List<Long> drained = new ArrayList<>();
         messageIds.drainTo(drained);
         drained.sort(Long::compareTo);
 
-        // ----------------------------------------------------------------------------------------------------
-        // Report Receivers
-        // ----------------------------------------------------------------------------------------------------
         System.out.println("\n" + TPS_RECEIVER);
         long receivedMessages = 0;
         for (int ix = 0; ix < numReceivers; ix++) {
@@ -175,7 +180,9 @@ public class CoreMessageLoss extends Workload {
             }
             expected = mid + 1;
         }
+    }
 
+    private void reportSender() {
         // ----------------------------------------------------------------------------------------------------
         // Report Sender
         // ----------------------------------------------------------------------------------------------------
