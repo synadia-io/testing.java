@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Synadia Communications Inc. All Rights Reserved.
 // See LICENSE and NOTICE file for details.
 
-package io.synadia.workloads.tps;
+package io.synadia.workloads.cml;
 
 import io.nats.client.Connection;
 import io.nats.client.Consumer;
@@ -11,15 +11,15 @@ import io.synadia.utils.Debug;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static io.synadia.workloads.tps.TpsUtils.id;
+import static io.synadia.workloads.cml.CmlUtils.id;
 
-public class TpsErrorListener implements ErrorListener {
+public class CmlErrorListener implements ErrorListener {
 
     public AtomicBoolean connectionException = new AtomicBoolean(false);
 
     private final String label;
 
-    public TpsErrorListener(String labelSuffix) {
+    public CmlErrorListener(String labelSuffix) {
         this.label = "EL-" + labelSuffix;
     }
 

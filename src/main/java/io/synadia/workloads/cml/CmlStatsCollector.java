@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Synadia Communications Inc. All Rights Reserved.
 // See LICENSE and NOTICE file for details.
 
-package io.synadia.workloads.tps;
+package io.synadia.workloads.cml;
 
 import io.nats.client.impl.NoOpStatistics;
 import io.synadia.utils.Debug;
@@ -10,7 +10,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.nats.jsmulti.shared.Stats.format3;
 
-public class TpsStatsCollector extends NoOpStatistics {
+public class CmlStatsCollector extends NoOpStatistics {
     public static class Group {
         public long bufferedMessages = 0;
         public long bufferedBytes = 0;
@@ -38,7 +38,7 @@ public class TpsStatsCollector extends NoOpStatistics {
     public final int payloadSize;
     public final AtomicInteger phase;
 
-    public TpsStatsCollector(int payloadSize) {
+    public CmlStatsCollector(int payloadSize) {
         pay = new Group();
         non = new Group();
         pay2 = new Group();

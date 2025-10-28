@@ -1,0 +1,1 @@
+java -cp "build/libs/*" io.synadia.Runner --workload CoreMessageLoss --params params<PathSep>params.json --params params<PathSep>cml.json --arg <Arg>1 --arg <Arg>2 --arg <Arg>3 --arg <Arg>4 --arg <Arg>5 --arg

@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Synadia Communications Inc. All Rights Reserved.
 // See LICENSE and NOTICE file for details.
 
-package io.synadia.workloads.tps;
+package io.synadia.workloads.cml;
 
 import io.nats.client.Connection;
 import io.nats.client.ConnectionListener;
@@ -10,9 +10,9 @@ import io.synadia.utils.Debug;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static io.synadia.workloads.tps.TpsUtils.id;
+import static io.synadia.workloads.cml.CmlUtils.id;
 
-public class TpsConnectionListener implements ConnectionListener {
+public class CmlConnectionListener implements ConnectionListener {
 
     private final String label;
     private final List<String> servers;
@@ -21,7 +21,7 @@ public class TpsConnectionListener implements ConnectionListener {
     public final AtomicBoolean disconnected;
     public final AtomicBoolean reconnected;
 
-    public TpsConnectionListener(String labelSuffix, List<String> servers, boolean receiver) {
+    public CmlConnectionListener(String labelSuffix, List<String> servers, boolean receiver) {
         this.label = "CL-" + labelSuffix;
         this.servers = servers;
         this.receiver = receiver;

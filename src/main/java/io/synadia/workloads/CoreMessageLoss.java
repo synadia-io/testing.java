@@ -6,14 +6,13 @@ import io.nats.client.Nats;
 import io.nats.client.Options;
 import io.nats.client.impl.Headers;
 import io.nats.client.impl.NoOpStatistics;
-import io.nats.client.impl.TpsWriteListener;
 import io.synadia.CommandLine;
 import io.synadia.Params;
 import io.synadia.Workload;
 import io.synadia.utils.Debug;
-import io.synadia.workloads.tps.TpsConnectionListener;
-import io.synadia.workloads.tps.TpsErrorListener;
-import io.synadia.workloads.tps.TpsStatsCollector;
+import io.synadia.workloads.cml.CmlConnectionListener;
+import io.synadia.workloads.cml.CmlErrorListener;
+import io.synadia.workloads.cml.CmlStatsCollector;
 
 import java.io.IOException;
 import java.net.Socket;
@@ -27,9 +26,9 @@ import static io.nats.client.support.JsonValueUtils.readInteger;
 import static io.nats.jsmulti.shared.Stats.format3;
 import static io.nats.jsmulti.shared.Stats.format3Right;
 import static io.synadia.utils.Debug.stringify;
-import static io.synadia.workloads.tps.TpsUtils.*;
+import static io.synadia.workloads.cml.CmlUtils.*;
 
-public class Tps extends Workload {
+public class CoreMessageLoss extends Workload {
 
     // Labels
     private static final String TPS_SENDER = "SENDER";
@@ -50,12 +49,13 @@ public class Tps extends Workload {
     int payloadSize;
     int numReceivers = 1;
     int sendBufferSize = 1;
-    int mmioq;
+    long connectionTimeoutMillis = 5000;
+    int maxMessagesInOutgoingQueue;
 
     // common
     final ScheduledExecutorService scheduler;
 
-    public Tps() {
+    public CoreMessageLoss() {
         scheduler = Executors.newScheduledThreadPool(1);
     }
 
@@ -71,8 +71,10 @@ public class Tps extends Workload {
         targetTps = commandLine.getIntArg("t", readInteger(params.jv, "target.tps", DEFAULT_TPS));
         payloadSize = commandLine.getIntArg("p", readInteger(params.jv, "payload.size", DEFAULT_PAYLOAD));
         numReceivers = commandLine.getIntArg("r", readInteger(params.jv, "num.receivers", 1));
-        sendBufferSize = commandLine.getIntArg("b", readInteger(params.jv, "nats.connection.send.buffer", -1));
-        mmioq = Math.max(targetTps, Options.DEFAULT_MAX_MESSAGES_IN_OUTGOING_QUEUE);
+        sendBufferSize = commandLine.getIntArg("b", readInteger(params.jv, "send.buffer.size", -1));
+        connectionTimeoutMillis = commandLine.getIntArg("c", readInteger(params.jv, "connection.timeout.millis", -1));
+        int mmiq = targetTps * 125 / 100; // 125 % of target tps
+        maxMessagesInOutgoingQueue = Math.max(mmiq, Options.DEFAULT_MAX_MESSAGES_IN_OUTGOING_QUEUE);
 
         Debug.info(workLabel, "----- Application Options -----");
         Debug.info(workLabel, "Servers", params.servers.toArray(new String[0]));
@@ -80,7 +82,8 @@ public class Tps extends Workload {
         Debug.info(workLabel, "Payload Size", payloadSize);
         Debug.info(workLabel, "Num Receivers", numReceivers);
         Debug.info(workLabel, "Send Buffer Size", sendBufferSize);
-        Debug.info(workLabel, "Send Outgoing Queue Max", mmioq);
+        Debug.info(workLabel, "Max Messages In Outgoing Queue", maxMessagesInOutgoingQueue);
+        Debug.info(workLabel, "Connection Timeout Millis", connectionTimeoutMillis);
 
         reportSocketBufferSize();
     }
@@ -92,10 +95,10 @@ public class Tps extends Workload {
         }
 
         List<Thread> threads = new ArrayList<>();
-        for (int ix = 0; ix < numReceivers; ix++) {
-            int finalIx = ix;
-            Thread r = new Thread(() -> { try { receive(finalIx); } catch (Exception ignored) {} });
-            r.setName("R-" + ix + "-main");
+        for (int rx = 0; rx < numReceivers; rx++) {
+            int finalRx = rx;
+            Thread r = new Thread(() -> { try { receive(finalRx); } catch (Exception ignored) {} });
+            r.setName("R-" + rx + "-main");
             r.start();
             threads.add(r);
         }
@@ -166,36 +169,23 @@ public class Tps extends Workload {
         // ----------------------------------------------------------------------------------------------------
         System.out.println("\n" + TPS_SENDER);
         System.out.println("Before Disconnect...");
-        printSendResult("Buffered vs Socket Messages",
+        printSendResultAndDiff("Buffered vs Socket Messages",
             sendStats.pay.bufferedMessages, sendStats.pay.writtenMessages);
-        printSendResult("Buffered vs Socket Bytes   ",
+        printSendResultAndDiff("Buffered vs Socket Bytes   ",
             sendStats.pay.bufferedBytes, sendStats.pay.writtenBytes);
 
         System.out.println("After Disconnect...");
-        printSendResult("Buffered vs Socket Messages",
+        printSendResultAndDiff("Buffered vs Socket Messages",
             sendStats.pay2.bufferedMessages, sendStats.pay2.writtenMessages);
-        printSendResult("Buffered vs Socket Bytes   ",
+        printSendResultAndDiff("Buffered vs Socket Bytes   ",
             sendStats.pay2.bufferedBytes, sendStats.pay2.writtenBytes);
-
-        System.out.println("\nETC");
-        printSendResult("Protocol Messages Buffered", sendWL.protocolsBuffered.get());
-        printSendResult("Control Messages Buffered", sendWL.controlsBuffered.get());
-        printSendResult("Buffered Not Written Messages", sendStats.pay.notWrittenMessages);
-        printSendResult("Buffered Not Written Bytes   ", sendStats.pay.notWrittenBytes);
-
-        if (!sendWL.gapList.isEmpty()) {
-            System.out.println("  Writer Gaps");
-            for (String g : sendWL.gapList) {
-                System.out.println(" " + g);
-            }
-        }
     }
 
     private void printSendResult(String s, Number n) {
         System.out.println(stringify("  " + s + ": %s", format3(n)));
     }
 
-    private void printSendResult(String s, Number n1, Number n2) {
+    private void printSendResultAndDiff(String s, Number n1, Number n2) {
         long diff = n1.longValue() - n2.longValue();
         System.out.println(stringify("  " + s + ": %s vs %s ... %s", format3(n1), format3(n2), format3(diff)));
     }
@@ -204,27 +194,24 @@ public class Tps extends Workload {
     // Sender
     // ----------------------------------------------------------------------------------------------------
     AtomicLong pubId;
-    TpsStatsCollector sendStats;
-    TpsWriteListener sendWL;
-    TpsConnectionListener sendCL;
-    TpsErrorListener sendEL;
+    CmlStatsCollector sendStats;
+    CmlConnectionListener sendCL;
+    CmlErrorListener sendEL;
 
     private void send() throws IOException, InterruptedException {
         pubId = new AtomicLong(0);
-        sendStats = new TpsStatsCollector(payloadSize);
-        sendWL = new TpsWriteListener(TPS_SENDER, TEST_SUBJECT, TERMINATE_SUBJECT);
+        sendStats = new CmlStatsCollector(payloadSize);
 
-        sendCL = new TpsConnectionListener(TPS_SENDER, params.servers, false);
-        sendEL = new TpsErrorListener(TPS_SENDER);
+        sendCL = new CmlConnectionListener(TPS_SENDER, params.servers, false);
+        sendEL = new CmlErrorListener(TPS_SENDER);
 
         Options options  = new Options.Builder()
-            .servers(figureServers(params.servers, 0))
+            .servers(params.servers.toArray(new String[0]))
             .ignoreDiscoveredServers()
             .noRandomize()
             .connectionTimeout(CONNECTION_TIMEOUT_MILLIS)
             .sendBufferSize(sendBufferSize)
-            .maxMessagesInOutgoingQueue(mmioq)
-            .writeListener(sendWL)
+            .maxMessagesInOutgoingQueue(maxMessagesInOutgoingQueue)
             .statisticsCollector(sendStats)
             .connectionListener(sendCL)
             .errorListener(sendEL)
@@ -287,7 +274,6 @@ public class Tps extends Workload {
             sendStats.pay.debug(TPS_SENDER, "Before Disconnect Payloads");
 
             sendStats.startPhase2();
-            sendWL.startPhase2();
 
             while (!sendCL.reconnected.get()) {
                 Debug.info(TPS_SENDER, "Waiting for Reconnect");
@@ -332,26 +318,26 @@ public class Tps extends Workload {
     // ----------------------------------------------------------------------------------------------------
     static class Receiver {
         long receivedMessages;
-        TpsConnectionListener receiveCL;
-        TpsErrorListener receiveEL;
+        CmlConnectionListener receiveCL;
+        CmlErrorListener receiveEL;
         AtomicBoolean ready = new AtomicBoolean(false);
     }
 
     LinkedBlockingQueue<Long> messageIds = new LinkedBlockingQueue<>();
     List<Receiver> receivers = new ArrayList<>();
 
-    private void receive(int ix) throws IOException, InterruptedException {
-        Receiver r = receivers.get(ix);
+    private void receive(int rx) throws IOException, InterruptedException {
+        Receiver r = receivers.get(rx);
         receivers.add(r);
 
-        String label = TPS_RECEIVER + "-" + ix;
-        r.receiveCL = new TpsConnectionListener(label, params.servers, true);
-        r.receiveEL = new TpsErrorListener(label);
+        String label = TPS_RECEIVER + "-" + rx;
+        r.receiveCL = new CmlConnectionListener(label, params.servers, true);
+        r.receiveEL = new CmlErrorListener(label);
 
-        int sIx = ix % 2 == 0 ? 1 : 2;
+        int sIx = rx % 2 == 0 ? 1 : 2;
 
         Options options  = new Options.Builder()
-            .servers(figureServers(params.servers, sIx))
+            .server(params.servers.get(rx % 2 == 0 ? 2 : 1))
             .ignoreDiscoveredServers()
             .noRandomize()
             .connectionTimeout(CONNECTION_TIMEOUT_MILLIS)

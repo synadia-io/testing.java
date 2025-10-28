@@ -1,10 +1,10 @@
-package io.synadia.workloads.tps;
+package io.synadia.workloads.cml;
 
 import io.nats.client.Connection;
 import io.nats.client.Message;
 import io.nats.client.impl.Headers;
 
-public class TpsUtils {
+public class CmlUtils {
     public static String MESSAGE_ID_KEY = "mid";
 
     public static long extractMessageId(Message msg) {
