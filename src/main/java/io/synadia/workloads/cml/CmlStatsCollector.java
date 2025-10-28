@@ -47,6 +47,10 @@ public class CmlStatsCollector extends NoOpStatistics {
         phase = new AtomicInteger(1);
     }
 
+    public long getTotalPayloadBufferedMessages() {
+        return pay.bufferedMessages + pay2.bufferedMessages;
+    }
+
     public void startPhase2() {
         phase.set(2);
     }

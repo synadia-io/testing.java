@@ -302,7 +302,14 @@ public class CoreMessageLoss extends Workload {
             Debug.info(TPS_SENDER, "Publishing Control Terminate Message");
             nc.publish(TERMINATE_SUBJECT, null);
 
-            sleep(2000); // gives enough time for messages to get published
+            int sleeps = 1;
+            while (sendStats.getTotalPayloadBufferedMessages() < pubId.get()) {
+                if (--sleeps == 0) {
+                    sleeps = 10;
+                    Debug.info(TPS_SENDER, "Payload Buffered Messages So Far: " + sendStats.getTotalPayloadBufferedMessages());
+                }
+                sleep(100);
+            }
             Debug.info(TPS_SENDER, "Done");
         }
     }
