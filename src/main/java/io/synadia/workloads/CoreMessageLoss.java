@@ -117,8 +117,13 @@ public class CoreMessageLoss extends Workload {
                     receivedMessages += rm;
                 }
                 Debug.info(TPS_RECEIVER, "Total Received Messages: %s", receivedMessages);
+                if (System.currentTimeMillis() - lastReceive.get() > 5000) {
+                    for (CountDownLatch l : latches) {
+                        l.countDown();
+                    }
+                }
             },
-            1, 1, TimeUnit.SECONDS);
+            2500, 2500, TimeUnit.MILLISECONDS);
 
         Thread s = new Thread(() -> { try { send(); } catch (Exception ignored) {} });
         s.setName("S-main");
@@ -151,6 +156,8 @@ public class CoreMessageLoss extends Workload {
         }
         System.out.println("  ------------------------------ -------");
         System.out.println(stringify("  Total Received Messages:       %s", format3Right(receivedMessages, 7)));
+        System.out.println();
+        System.out.println(stringify("  Highest Messages Id Received:  %s", format3Right(highestMessageId.get(), 7)));
 
         long expected = drained.getFirst();
         for (Long mid : drained) {
@@ -323,12 +330,18 @@ public class CoreMessageLoss extends Workload {
         AtomicBoolean ready = new AtomicBoolean(false);
     }
 
+    AtomicLong highestMessageId = new AtomicLong(0);
+    AtomicLong lastReceive = new AtomicLong(System.currentTimeMillis());
     LinkedBlockingQueue<Long> messageIds = new LinkedBlockingQueue<>();
     List<Receiver> receivers = new ArrayList<>();
+    List<CountDownLatch> latches = new ArrayList<>();
 
     private void receive(int rx) throws IOException, InterruptedException {
         Receiver r = receivers.get(rx);
         receivers.add(r);
+
+        CountDownLatch latch = new CountDownLatch(1);
+        latches.add(latch);
 
         String label = TPS_RECEIVER + "-" + rx;
         r.receiveCL = new CmlConnectionListener(label, params.servers, true);
@@ -349,10 +362,11 @@ public class CoreMessageLoss extends Workload {
         try (Connection nc = Nats.connect(options)) {
             Dispatcher d = nc.createDispatcher();
 
-            CountDownLatch latch = new CountDownLatch(1);
-
             d.subscribe(TEST_SUBJECT, TEST_QUEUE, msg -> {
-                messageIds.add(extractMessageId(msg));
+                long mid = extractMessageId(msg);
+                messageIds.add(mid);
+                highestMessageId.set(Math.max(highestMessageId.get(), mid));
+                lastReceive.set(System.currentTimeMillis());
                 if (++r.receivedMessages == 1) {
                     Debug.info(label, "Started Receiving");
                 }
@@ -375,22 +389,11 @@ public class CoreMessageLoss extends Workload {
     // ----------------------------------------------------------------------------------------------------
     // Helpers
     // ----------------------------------------------------------------------------------------------------
-    private static String[] figureServers(List<String> paramsServers, int firstServerIx) {
-        if (firstServerIx == 0) {
-            return paramsServers.toArray(new String[0]);
-        }
-        String firstServer = paramsServers.get(firstServerIx);
-        List<String> figured = new ArrayList<>(paramsServers);
-        figured.remove(firstServer);
-        figured.addFirst(firstServer);
-        return figured.toArray(new String[0]);
-    }
-
     private void reportSocketBufferSize() {
         try {
             Socket socket = new Socket();
-            Debug.info(workLabel, "Receive Buffer %s bytes", socket.getReceiveBufferSize());
-            Debug.info(workLabel, "Send Buffer %s bytes", socket.getSendBufferSize());
+            Debug.info(workLabel, "Socket Receive Buffer: %s bytes", socket.getReceiveBufferSize());
+            Debug.info(workLabel, "Socket Send Buffer: %s bytes", socket.getSendBufferSize());
             socket.close();
         }
         catch (IOException ioe) {
