@@ -308,15 +308,9 @@ public class CoreMessageLoss extends Workload {
 
     private void waitForPending(Connection nc) {
         long pending = nc.outgoingPendingMessageCount();
-        long rounds = 10000;
+        long rounds = 1000;
         Debug.info(TPS_SENDER, "Waiting for %s queued messages to be sent...", pending);
         while (rounds-- > 0 && pending > 0) {
-            if (nc.getStatus() != Connection.Status.CONNECTED) {
-                rounds = 10000;
-                sleep(1000);
-                continue;
-            }
-
             sleep(10);
             if (rounds % 250 == 0) {
                 Debug.info(TPS_SENDER, "Waiting for %s queued messages to be sent...", pending);
