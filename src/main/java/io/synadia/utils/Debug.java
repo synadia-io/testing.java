@@ -61,6 +61,13 @@ public abstract class Debug {
         info(label, msg, true, extras, false);
     }
 
+    public static Object[] combine(Object[] original, String... inserts) {
+        Object[] combined = new Object[original.length + inserts.length];
+        System.arraycopy(inserts, 0, combined, 0, inserts.length);
+        System.arraycopy(original, 0, combined, inserts.length, original.length);
+        return combined;
+    }
+
     public static void stackTrace(String label, Object... extras) {
         if (PAUSE) { return; }
         try {
@@ -70,37 +77,39 @@ public abstract class Debug {
             stackTrace(label, e, extras);
         }
     }
-
-    public static Object[] grow(String insert, Object[] original) {
-        Object[] result = new Object[original.length + 1];
-        result[0] = insert;
-        System.arraycopy(original, 0, result, 1, original.length);
-        return result;
-    }
-
     public static void stackTrace(String label, Throwable t, Object... extras) {
         if (PAUSE) { return; }
-        String m = t.getMessage();
-        if (m == null) {
-            info(label, grow("Stack Trace", extras));
-        }
-        else {
-            info(label, grow(t.getMessage(), extras));
-        }
+        info(label, combine(extras, t.toString()));
         StackTraceElement[] elements = t.getStackTrace();
         for (int i = 0; i < elements.length; i++) {
             String ts = elements[i].toString();
-            if (ts.startsWith("io.synadia.utils.Debug.stackTrace")) {
+            if (ts.contains("Debug.stackTrace")) {
                 continue;
             }
             if (i > 0) {
-                if (ts.startsWith("java")) {
-                    break;
+                for (String stop : STACK_TRACE_STOPS) {
+                    if (ts.startsWith(stop)) {
+                        return;
+                    }
+                }
+
+                boolean foundIgnore = false;
+                for (String ignore : STACK_TRACE_IGNORES) {
+                    if (ts.startsWith(ignore)) {
+                        foundIgnore = true;
+                        break;
+                    }
+                }
+                if (foundIgnore) {
+                    continue;
                 }
             }
             info(label, ">  " + ts);
         }
     }
+
+    public static String[] STACK_TRACE_STOPS = new String[]{"org.junit.", "com.intellij."};
+    public static String[] STACK_TRACE_IGNORES = new String[]{"sun."};
 
     public static void info(String label, Object... extras) {
         if (PAUSE) { return; }
