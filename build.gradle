@@ -8,8 +8,8 @@ group = 'synadia'
 repositories {
     mavenLocal()
     mavenCentral()
-    maven { url "https://repo1.maven.org/maven2/" }
-    maven { url "https://central.sonatype.com/repository/maven-snapshots" }
+    maven { url="https://repo1.maven.org/maven2/" }
+    maven { url="https://central.sonatype.com/repository/maven-snapshots" }
 }
 
 def jnatsv = System.getenv("JNATS_VERSION")
