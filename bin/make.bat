@@ -1,2 +1,2 @@
-gradle make --refresh-dependencies
+call gradlew make --refresh-dependencies
 dir build\libs\jnats*
