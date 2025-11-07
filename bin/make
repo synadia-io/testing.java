@@ -1,2 +1,2 @@
-gradlew make --refresh-dependencies
+gradle make --refresh-dependencies
 ls -la build/libs/jnats* | egrep -o "build.*"
